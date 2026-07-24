@@ -4,7 +4,7 @@ import logging
 import time
 
 import mlflow
-from cpg_ingester.nodes.llm import get_llm
+from cpg_contracts import get_llm
 from cpg_ingester.output import write_artifact
 from cpg_ingester.prompts.dmn_creator import DMN_CREATOR_SYSTEM, DMN_CREATOR_USER
 from cpg_ingester.reference.dmn_examples import REFERENCE_EXAMPLES

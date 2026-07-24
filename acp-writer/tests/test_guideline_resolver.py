@@ -145,9 +145,9 @@ class TestGuidelineResolver:
 
         bundle = json.loads((DATA_DIR / "patient-bundle-medication.json").read_text())
 
-        with patch("acp_writer.nodes.plan_composer._get_llm") as mock_compose, \
-             patch("acp_writer.nodes.brief_reviewer._get_llm") as mock_brief, \
-             patch("acp_writer.nodes.fhir_semantic_reviewer._get_llm") as mock_fhir:
+        with patch("acp_writer.nodes.plan_composer.get_llm") as mock_compose, \
+             patch("acp_writer.nodes.brief_reviewer.get_llm") as mock_brief, \
+             patch("acp_writer.nodes.fhir_semantic_reviewer.get_llm") as mock_fhir:
             for mock_llm in [mock_compose, mock_brief, mock_fhir]:
                 resp = MagicMock()
                 resp.content = '{"patient_reference":"Patient/patient-1","applicable_cpgs":[],"goals":[],"activities":[],"conflicts":[],"review_status":"pending"}'

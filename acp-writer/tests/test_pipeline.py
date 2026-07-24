@@ -15,9 +15,9 @@ def _mock_llm_invoke(messages):
     return mock_response
 
 
-@patch("acp_writer.nodes.plan_composer._get_llm")
-@patch("acp_writer.nodes.brief_reviewer._get_llm")
-@patch("acp_writer.nodes.fhir_semantic_reviewer._get_llm")
+@patch("acp_writer.nodes.plan_composer.get_llm")
+@patch("acp_writer.nodes.brief_reviewer.get_llm")
+@patch("acp_writer.nodes.fhir_semantic_reviewer.get_llm")
 def _run_pipeline(mock_fhir_llm, mock_brief_llm, mock_compose_llm, ips_bundle=None, checkpointer=None, config=None):
     """Run the pipeline with mocked LLM nodes for determinism."""
     import json

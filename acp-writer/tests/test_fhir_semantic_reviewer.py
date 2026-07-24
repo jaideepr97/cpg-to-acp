@@ -23,7 +23,7 @@ def _make_state(bundle: dict | None = None) -> dict:
 
 
 class TestFHIRSemanticReviewer:
-    @patch("acp_writer.nodes.fhir_semantic_reviewer._get_llm")
+    @patch("acp_writer.nodes.fhir_semantic_reviewer.get_llm")
     def test_approve(self, mock_get_llm):
         mock_llm = MagicMock()
         mock_response = MagicMock()
@@ -35,7 +35,7 @@ class TestFHIRSemanticReviewer:
         assert result["fhir_review_feedback"] == ""
         assert result["fhir_review_count"] == 1
 
-    @patch("acp_writer.nodes.fhir_semantic_reviewer._get_llm")
+    @patch("acp_writer.nodes.fhir_semantic_reviewer.get_llm")
     def test_revise(self, mock_get_llm):
         mock_llm = MagicMock()
         mock_response = MagicMock()
@@ -56,7 +56,7 @@ class TestFHIRSemanticReviewer:
         assert "Goal has no matching activity" in result["fhir_review_feedback"]
         assert result["fhir_review_count"] == 1
 
-    @patch("acp_writer.nodes.fhir_semantic_reviewer._get_llm")
+    @patch("acp_writer.nodes.fhir_semantic_reviewer.get_llm")
     def test_unparseable_treated_as_approve(self, mock_get_llm):
         mock_llm = MagicMock()
         mock_response = MagicMock()
@@ -73,7 +73,7 @@ class TestFHIRSemanticReviewer:
         assert result["fhir_review_feedback"] == ""
         assert result["fhir_review_count"] == 1
 
-    @patch("acp_writer.nodes.fhir_semantic_reviewer._get_llm")
+    @patch("acp_writer.nodes.fhir_semantic_reviewer.get_llm")
     def test_increments_count(self, mock_get_llm):
         mock_llm = MagicMock()
         mock_response = MagicMock()
@@ -86,7 +86,7 @@ class TestFHIRSemanticReviewer:
         result = fhir_semantic_reviewer(state)
         assert result["fhir_review_count"] == 2
 
-    @patch("acp_writer.nodes.fhir_semantic_reviewer._get_llm")
+    @patch("acp_writer.nodes.fhir_semantic_reviewer.get_llm")
     def test_passes_validation_context(self, mock_get_llm):
         mock_llm = MagicMock()
         mock_response = MagicMock()
@@ -104,7 +104,7 @@ class TestFHIRSemanticReviewer:
         assert "Missing AIAST" in user_msg
         assert "INVALID" in user_msg
 
-    @patch("acp_writer.nodes.fhir_semantic_reviewer._get_llm")
+    @patch("acp_writer.nodes.fhir_semantic_reviewer.get_llm")
     def test_writes_artifact(self, mock_get_llm, tmp_path):
         mock_llm = MagicMock()
         mock_response = MagicMock()

@@ -5,7 +5,7 @@ import logging
 import time
 
 import mlflow
-from cpg_ingester.nodes.llm import get_llm
+from cpg_contracts import get_llm
 from cpg_ingester.nodes.structure_analyzer import _parse_llm_json
 from cpg_ingester.output import write_artifact
 from cpg_ingester.prompts.dmn_semantic_reviewer import (

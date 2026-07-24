@@ -37,6 +37,7 @@ from cpg_contracts.artifact_store import (  # noqa: F401 — lazy boto3 import
     resolve_ref,
     store_artifact,
 )
+from cpg_contracts.llm import get_llm  # noqa: F401 — requires langchain-openai
 
 __all__ = [
     "CONTRACT_VERSION",
@@ -75,4 +76,6 @@ __all__ = [
     "get_phi_store",
     "resolve_ref",
     "store_artifact",
+    # LLM
+    "get_llm",
 ]

@@ -86,7 +86,7 @@ class TestSchemaValidation:
 
 
 class TestBriefReviewer:
-    @patch("acp_writer.nodes.brief_reviewer._get_llm")
+    @patch("acp_writer.nodes.brief_reviewer.get_llm")
     def test_approve(self, mock_get_llm):
         mock_llm = MagicMock()
         mock_response = MagicMock()
@@ -102,7 +102,7 @@ class TestBriefReviewer:
         assert result["brief_review_count"] == 1
         assert result["planning_brief"]["review_status"] == "approved"
 
-    @patch("acp_writer.nodes.brief_reviewer._get_llm")
+    @patch("acp_writer.nodes.brief_reviewer.get_llm")
     def test_revise(self, mock_get_llm):
         mock_llm = MagicMock()
         mock_response = MagicMock()
@@ -131,7 +131,7 @@ class TestBriefReviewer:
         assert "source_cpg" in result["brief_review_feedback"]
         assert result["brief_review_count"] == 1
 
-    @patch("acp_writer.nodes.brief_reviewer._get_llm")
+    @patch("acp_writer.nodes.brief_reviewer.get_llm")
     def test_unparseable_response_treated_as_approve(self, mock_get_llm):
         mock_llm = MagicMock()
         mock_response = MagicMock()
@@ -143,7 +143,7 @@ class TestBriefReviewer:
         assert result["brief_review_feedback"] == ""
         assert result["brief_review_count"] == 1
 
-    @patch("acp_writer.nodes.brief_reviewer._get_llm")
+    @patch("acp_writer.nodes.brief_reviewer.get_llm")
     def test_increments_review_count(self, mock_get_llm):
         mock_llm = MagicMock()
         mock_response = MagicMock()
@@ -156,7 +156,7 @@ class TestBriefReviewer:
         result = brief_reviewer(state)
         assert result["brief_review_count"] == 2
 
-    @patch("acp_writer.nodes.brief_reviewer._get_llm")
+    @patch("acp_writer.nodes.brief_reviewer.get_llm")
     def test_writes_review_artifact(self, mock_get_llm, tmp_path):
         mock_llm = MagicMock()
         mock_response = MagicMock()

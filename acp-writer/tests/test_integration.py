@@ -121,9 +121,9 @@ class TestCarePlanEndpoint:
         r = client.post("/api/v1/careplans", json={"not": "a bundle"})
         assert r.status_code == 400
 
-    @patch("acp_writer.nodes.plan_composer._get_llm")
-    @patch("acp_writer.nodes.brief_reviewer._get_llm")
-    @patch("acp_writer.nodes.fhir_semantic_reviewer._get_llm")
+    @patch("acp_writer.nodes.plan_composer.get_llm")
+    @patch("acp_writer.nodes.brief_reviewer.get_llm")
+    @patch("acp_writer.nodes.fhir_semantic_reviewer.get_llm")
     def test_generates_fhir_bundle(self, mock_fhir, mock_brief, mock_compose):
         brief_json = json.dumps({
             "patient_reference": "Patient/patient-1",

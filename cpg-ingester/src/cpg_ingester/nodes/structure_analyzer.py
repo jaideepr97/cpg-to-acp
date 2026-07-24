@@ -6,7 +6,7 @@ import re
 import time
 
 import mlflow
-from cpg_ingester.nodes.llm import get_llm
+from cpg_contracts import get_llm
 from cpg_ingester.output import write_artifact
 from cpg_ingester.prompts.structure_analyzer import (
     ARCHETYPE_DETECTION_SYSTEM,
