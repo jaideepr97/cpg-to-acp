@@ -199,7 +199,7 @@ class TestItemIdentifier:
                 "output_dir": tmpdir,
             }
 
-            with patch("cpg_ingester.nodes.item_identifier._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.item_identifier.get_llm", return_value=mock_llm):
                 result = item_identifier(state)
 
             manifest = result["item_manifest"]
@@ -215,7 +215,7 @@ class TestItemIdentifier:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             state = {"markdown": "content", "section_map": [], "abbreviations": {}, "output_dir": tmpdir}
-            with patch("cpg_ingester.nodes.item_identifier._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.item_identifier.get_llm", return_value=mock_llm):
                 result = item_identifier(state)
 
             for item in result["item_manifest"]:
@@ -228,7 +228,7 @@ class TestItemIdentifier:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             state = {"markdown": "content", "section_map": [], "abbreviations": {}, "output_dir": tmpdir}
-            with patch("cpg_ingester.nodes.item_identifier._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.item_identifier.get_llm", return_value=mock_llm):
                 result = item_identifier(state)
 
             manifest = result["item_manifest"]
@@ -243,7 +243,7 @@ class TestItemIdentifier:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             state = {"markdown": "content", "section_map": [], "abbreviations": {}, "output_dir": tmpdir}
-            with patch("cpg_ingester.nodes.item_identifier._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.item_identifier.get_llm", return_value=mock_llm):
                 item_identifier(state)
 
             from pathlib import Path
@@ -265,7 +265,7 @@ class TestItemIdentifier:
                 "classification_review_feedback": "Section 4.3 contains thresholds — should be decision",
                 "classification_review_count": 0,
             }
-            with patch("cpg_ingester.nodes.item_identifier._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.item_identifier.get_llm", return_value=mock_llm):
                 result = item_identifier(state)
 
             assert result["classification_review_count"] == 1
@@ -277,7 +277,7 @@ class TestItemIdentifier:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             state = {"markdown": "content", "section_map": [], "abbreviations": {}, "output_dir": tmpdir}
-            with patch("cpg_ingester.nodes.item_identifier._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.item_identifier.get_llm", return_value=mock_llm):
                 result = item_identifier(state)
 
             assert result["item_manifest"] == []

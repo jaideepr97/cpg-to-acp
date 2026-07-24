@@ -160,7 +160,7 @@ class TestRecExtractorNode:
                 "abbreviations": {"DASH": "Dietary Approaches to Stop Hypertension"},
                 "output_dir": tmpdir,
             }
-            with patch("cpg_ingester.nodes.rec_extractor._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.rec_extractor.get_llm", return_value=mock_llm):
                 result = rec_extractor(state)
 
             assert len(result["recommendations"]) == 1
@@ -179,7 +179,7 @@ class TestRecExtractorNode:
                 "abbreviations": {},
                 "output_dir": tmpdir,
             }
-            with patch("cpg_ingester.nodes.rec_extractor._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.rec_extractor.get_llm", return_value=mock_llm):
                 rec_extractor(state)
 
             rec_files = list(Path(tmpdir).glob("recommendations-*.json"))
@@ -199,7 +199,7 @@ class TestRecExtractorNode:
                 "schema_errors": ["Missing title field"],
                 "review_count": 0,
             }
-            with patch("cpg_ingester.nodes.rec_extractor._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.rec_extractor.get_llm", return_value=mock_llm):
                 result = rec_extractor(state)
 
             assert result["review_count"] == 1
@@ -219,7 +219,7 @@ class TestRecExtractorNode:
                 "abbreviations": {},
                 "output_dir": tmpdir,
             }
-            with patch("cpg_ingester.nodes.rec_extractor._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.rec_extractor.get_llm", return_value=mock_llm):
                 result = rec_extractor(state)
 
             assert result["recommendations"] == []
