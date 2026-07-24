@@ -4,9 +4,9 @@ Runs the rec subgraph for one section against a live LiteLLM proxy
 to verify that recommendations pass schema validation and semantic
 review with the tuned prompts.
 
-Run:
+Run explicitly (excluded from default test suite):
     cd cpg-ingester
-    .venv/bin/python -m pytest tests/test_rec_loop_live.py -v -s
+    .venv/bin/python -m pytest tests/test_rec_loop_live.py -v -s -m live
 
 Requires: LiteLLM running in podman on port 4000.
 """
@@ -90,6 +90,7 @@ def prereqs():
     _skip_if_no_litellm()
 
 
+@pytest.mark.live
 class TestRecLoopLive:
     """Run the full rec subgraph (extract → schema validate → semantic review)."""
 

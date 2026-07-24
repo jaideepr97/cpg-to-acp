@@ -37,3 +37,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not live'"
+markers = [
+    "live: requires a running LLM (LiteLLM on localhost:4000) — run with -m live",
+]
