@@ -89,7 +89,6 @@ spec:
               refName: assemble
               arguments:
                 analysis_result_ref: "${ .analysisResult.analysis_result_ref }"
-                HEADER_X-MLflow-Run-ID: "${ .mlflowRunId }"
             actionDataFilter:
               results: "${ . }"
               toStateData: "${ .assemblyResult }"
@@ -105,7 +104,6 @@ spec:
               refName: deliver
               arguments:
                 assembly_result_ref: "${ .assemblyResult.assembly_result_ref }"
-                HEADER_X-MLflow-Run-ID: "${ .mlflowRunId }"
             actionDataFilter:
               results: "${ . }"
               toStateData: "${ .deliveryResult }"

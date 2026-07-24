@@ -71,7 +71,6 @@ spec:
               refName: scanpatient
               arguments:
                 ips_bundle: "${ .ips_bundle }"
-                HEADER_X-MLflow-Run-ID: "${ .mlflowRunId }"
             actionDataFilter:
               results: "${ . }"
               toStateData: "${ .patientData }"
@@ -85,7 +84,6 @@ spec:
               refName: resolveguidelines
               arguments:
                 condition_codes: "${ .patientData.condition_codes }"
-                HEADER_X-MLflow-Run-ID: "${ .mlflowRunId }"
             actionDataFilter:
               results: "${ . }"
               toStateData: "${ .guidelineData }"
@@ -101,7 +99,6 @@ spec:
                 ips_bundle_ref: "${ .patientData.ips_bundle_ref }"
                 applicable_dmn_models: "${ .guidelineData.applicable_dmn_models }"
                 dmn_dependency_graph: "${ .guidelineData.dmn_dependency_graph }"
-                HEADER_X-MLflow-Run-ID: "${ .mlflowRunId }"
             actionDataFilter:
               results: "${ . }"
               toStateData: "${ .dmnData }"
@@ -117,7 +114,6 @@ spec:
                 condition_codes: "${ .patientData.condition_codes }"
                 dmn_results: "${ .dmnData.dmn_results }"
                 applicable_cpgs: "${ .guidelineData.applicable_cpgs }"
-                HEADER_X-MLflow-Run-ID: "${ .mlflowRunId }"
             actionDataFilter:
               results: "${ . }"
               toStateData: "${ .recData }"
@@ -221,7 +217,6 @@ spec:
               arguments:
                 fhir_bundle_ref: "${ .fhirGenData.fhir_bundle_ref }"
                 patient_reference: "${ .patientData.patient_reference }"
-                HEADER_X-MLflow-Run-ID: "${ .mlflowRunId }"
             actionDataFilter:
               results: "${ . }"
               toStateData: "${ .writeResult }"
