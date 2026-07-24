@@ -6,9 +6,11 @@ DecisionModelSummary.modifies for topological execution order.
 """
 
 import logging
+import os
 from typing import Any
 
 import mlflow
+import requests
 
 from acp_writer.state import CarePlanComposerState
 
@@ -16,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 SNOMED_SYSTEM = "http://snomed.info/sct"
 ICD10_SYSTEM = "http://hl7.org/fhir/sid/icd-10-cm"
+DECISION_ENGINE_URL = os.environ.get("DECISION_ENGINE_URL", "http://acp-decision-engine:8080")
 
 
 def _condition_matches_scope(condition_codes: list[dict], scope: str | None) -> bool:
@@ -78,7 +81,7 @@ def _build_dependency_graph(
 def guideline_resolver(state: CarePlanComposerState) -> dict:
     """Match patient conditions to registered CPGs and DMN models."""
     logger.info("── Guideline Resolver ──")
-    from acp_writer.api import _dynamic_models, _guidelines_store
+    from acp_writer.api import _guidelines_store
 
     condition_codes = state.get("condition_codes", [])
     if not condition_codes:
@@ -107,21 +110,25 @@ def guideline_resolver(state: CarePlanComposerState) -> dict:
             "dmn_dependency_graph": [],
         }
 
-    all_models = list(_dynamic_models.values())
+    try:
+        resp = requests.get(f"{DECISION_ENGINE_URL}/api/v1/decisions/models", timeout=10)
+        resp.raise_for_status()
+        all_models = resp.json()
+    except Exception as e:
+        logger.warning("Failed to query decision engine for models: %s", e)
+        all_models = []
+
     applicable_models = []
+    for model in all_models:
+        source_cpg = model.get("source_cpg")
+        if source_cpg and source_cpg in applicable_cpg_ids:
+            applicable_models.append(model)
+        elif not source_cpg:
+            applicable_models.append(model)
 
-    for model_entry in all_models:
-        summary = model_entry["summary"]
-        if summary.source_cpg and summary.source_cpg in applicable_cpg_ids:
-            applicable_models.append(summary.model_dump(mode="json"))
-        elif not summary.source_cpg:
-            applicable_models.append(summary.model_dump(mode="json"))
-
-    if not applicable_models:
+    if not applicable_models and all_models:
         logger.info("No DMN models matched applicable CPGs — using all deployed models")
-        applicable_models = [
-            m["summary"].model_dump(mode="json") for m in all_models
-        ]
+        applicable_models = all_models
 
     dependency_graph = _build_dependency_graph(applicable_models)
 
