@@ -15,6 +15,15 @@ network_policies:
         access: full
     binaries:
       - path: "**"
+  mlflow:
+    name: mlflow-tracing
+    endpoints:
+      - host: "mlflow-redhat-ods-applications.apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com"
+        port: 443
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: "**"
   fhir_server:
     name: hapi-fhir
     endpoints:
