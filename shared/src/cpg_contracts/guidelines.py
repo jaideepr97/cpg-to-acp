@@ -25,7 +25,7 @@ class GradingSystem(str, Enum):
 class CPGMetadata(BaseModel):
     contract_version: str = CONTRACT_VERSION
     cpg_id: str
-    title: str
+    title: str | None = None
     version: str | None = None
     publication_date: date | None = None
     evidence_review_date: date | None = None
