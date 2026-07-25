@@ -298,6 +298,13 @@ Full conflict resolution (interactive clinician UI, structured conflict types, r
 
 | Area | Work | Technology |
 |---|---|---|
+| **acp-writer** | Clinical review gates fail closed — reviewer parse errors flag instead of silently approving; FHIR review loop consumes feedback; deterministic validation gates the server write | — |
+| **acp-writer** | Enforce terminology API verification — wire lookup into Plan Composer; Terminology Validator repairs/flags unresolvable codes | — |
+| **cpg-ingester** | Escalated items surfaced — propagate escalation back to manifest; include in human-review output instead of dropping | — |
+| **cpg-ingester** | Assembly delivers only validated DMN — stop writing pre-validation DMN to disk; prevent disk-fallback from shipping unvalidated/escalated attempts | — |
+| **cpg-ingester** | Fix SSRF in delivery — pin acp-writer destination to env/config; do not accept URL from request body | — |
+| **acp-writer** | Gate sample data seeding behind dev/demo flag — `_setup_sample_data()` should not auto-inject fixtures on every fresh boot in production | — |
+| **platform** | MinIO IAM policies for PHI bucket access — per-pod credentials so pods only access the buckets they need (cpg-artifacts vs cpg-phi) | MinIO |
 | **platform** | NeMo Guardrails on agent I/O — healthcare-specific rules | NeMo Guardrails |
 | **platform** | EvalHub — golden test sets per CPG, extraction fidelity scorers, plan quality scorers | EvalHub |
 | **platform** | EvalHub gates that block deployment of degraded models/pipelines | EvalHub |
@@ -310,6 +317,13 @@ Full conflict resolution (interactive clinician UI, structured conflict types, r
 
 #### Exit Criteria
 
+- Clinical review gates fail closed (not open) on parse errors
+- Terminology codes API-verified before reaching FHIR server
+- Escalated clinical content surfaced for human review
+- Only validated DMN delivered to acp-writer
+- SSRF in delivery endpoint fixed
+- Sample data seeding gated behind explicit flag
+- MinIO per-pod IAM policies enforced
 - Guardrails actively filtering agent I/O
 - EvalHub gates preventing degraded deployments
 - Three audit trails: MLflow (tracing), OpenShell (sandbox), automation (execution)
@@ -414,15 +428,6 @@ Work that can be picked up at any time, independent of the current phase. These 
 | DMN model discovery in pod-split deployment | ✅ Complete | acp-writer | Guideline resolver queries decision engine REST API (`GET /api/v1/decisions/models`). Proven in clean E2E test (5+ DMN models found). Commit `b3086d0`. |
 | Guideline Resolver can't see in-process models (single-pod) | Won't fix | acp-writer | Single-pod/monolith mode is no longer a supported deployment. Pod-split with SonataFlow is the only deployment model going forward. |
 | compose default profile can't reach the LLM | Won't fix | deploy | Single-pod mode is no longer supported. Pod-split with SonataFlow is the only deployment model going forward. |
-| | | | **— Clinical safety & correctness —** |
-| Clinical review gates fail open and don't gate the server write | Not started | acp-writer | Three related gaps let unvalidated/unreviewed bundles reach the FHIR server. (1) `brief_reviewer.py:109` and `fhir_semantic_reviewer.py:70` treat any reviewer-response parse error as `APPROVE` — a clinical gate should fail closed or flag, not silently approve. (2) The FHIR semantic-review loop is inert: `fhir_bundle_generator.py:26` reads `fhir_review_feedback` but never applies it, so a REVISE verdict regenerates a byte-identical bundle until the counter exhausts. (3) `syntax_errors`/`terminology_issues` never block `fhir_server_writer.py`. Make deterministic validation gate the write, and make the review loop actually consume feedback. |
-| Enforce terminology API verification during composition | Not started | acp-writer | Design decision #4 / Node 5 require every FHIR code to be API-verified ("never trust the LLM's memory"). `plan_composer.py` never calls `tools/terminology_lookup` — it accepts LLM-emitted codes verbatim. The Terminology Validator only records `terminology_issues`; it never fixes codes or writes the promised `CarePlan.note` "Code verification gap" entries, and nothing downstream consumes the list. Wire terminology lookup into the Plan Composer and have the validator repair/flag unresolvable codes. |
-| Escalated items are dropped, never surfaced | Not started | cpg-ingester | `generation.py:217,245` append results only when `not result.get("escalated")`, and the escalation flag set in subgraph state is never written back to the manifest. Assembly looks for `item.get("escalated")` on manifest items (`assembly.py:115`) — a flag never set there — so `escalated-items.json` is always empty and escalated clinical content is neither delivered nor reviewed (violates design principle #9). Fix: propagate escalation back to the manifest/report and include escalated items in the human-review output. |
-| Assembly disk-fallback can deliver unvalidated DMN | Not started | cpg-ingester | `dmn_creator.py:90` writes `dmn/<name>.dmn` on every attempt — before validation and regardless of escalation. When the in-memory results list is empty, `assembly._collect_from_output_dir` globs all `dmn/*.dmn` and ships them, including failing/escalated attempts and with no metadata. Only deliver validated, accepted DMN. |
-| | | | **— Security —** |
-| SSRF: delivery target taken from request body | Not started | cpg-ingester | `services/delivery_svc.py:55` uses `data.get("acp_writer_url") or ACP_WRITER_URL`, letting a caller redirect CPGMetadata + recommendations (clinical content) to an arbitrary reachable host. In the pod-split model the delivery pod is the one component with egress. Pin the destination to env/config; do not accept it from the request. |
-| Production startup auto-seeds sample clinical data | Not started | acp-writer | `api.py:75` → `_setup_sample_data()` (`ui/app.py:68`) injects fixture guidelines, golden DMNs, and a recommendation bundle into the live stores whenever the registry is empty — on every fresh boot. For a clinical service this is a data-integrity hazard; gate it behind an explicit dev/demo flag. |
-| MinIO IAM policies for PHI bucket access | Not started | platform | Currently all pods share one MinIO credential. Add per-pod IAM policies so pods only access the buckets they need (cpg-artifacts vs cpg-phi). |
 | | | | **— Contract & data integrity —** |
 | Preserve ingester-assigned GUIDs (identity contract) | Not started | shared / cpg-ingester / acp-writer | Contract-proposal design decision #2 requires ingester-assigned GUIDs to be preserved end-to-end, but they are lost on both sides. cpg-ingester never emits a `DecisionModelSummary` (`dmn_creator.py` returns only `dmn_xml`; `generation.py:221` reads an always-empty summary), so the manifest GUID, `category`, `modifies`, and `source_location` for decisions never cross the boundary. acp-writer then re-derives the id from the model name (`api.py:91`, `decision_engine.py:37`), ignoring `root.get("id")`. Net effect: `CrossReference.target_id` GUIDs to decision models can't resolve, `modifies` override chains break, same-named models collide. Fix: emit `DecisionModelSummary` (carrying the manifest id) from the DMN track and deliver it; have acp-writer read and preserve the DMN root `id` instead of deriving from the name. |
 | Validate `contract_version` on ingestion | Not started | acp-writer | Contract principle #6 / design decision #6 require acp-writer to validate `contract_version` and reject incompatible payloads. There are no references to `contract_version` in `acp-writer/src`; `register_guideline` (`api.py:311`) and `ingest_recommendation_batch` (`api.py:355`) accept any/absent version. Add a version check on the ingest endpoints. |
