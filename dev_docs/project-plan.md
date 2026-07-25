@@ -6,22 +6,20 @@
 
 Transform Clinical Practice Guidelines into patient-specific, FHIR-compliant, actionable care plans — running on OpenShift with Red Hat AI platform capabilities. Enable parallel development across areas with cross-cutting milestones.
 
-## Current State (Phase 3.3 In Progress)
+## Current State (Phase 3.3 — Substantially Complete)
 
-Both cpg-ingester and acp-writer are multi-agent LangGraph pipelines with adversarial review. Phase 3.2 is complete (all 19 steps including minimal UI). Phase 3.3 (integration, governance, and end-to-end testing) is in progress.
+Both cpg-ingester and acp-writer are multi-agent LangGraph pipelines with adversarial review, running on OpenShift with OpenShell sandboxing, SonataFlow orchestration, and MaaS inference. Phase 3.3 core integration is complete with a clean E2E test passing (2026-07-25). Three exit criteria remain open.
 
-**What works:**
-- **cpg-ingester:** Full pipeline (Docling → Structure Analysis → Content Filter → Item Identification with adversarial review → Metadata Extraction → DMN Creation with syntax + semantic review → Recommendation Extraction with schema + semantic review → Assembly → Delivery). Minimal web UI for upload and artifact browsing.
-- **acp-writer:** Full 11-node pipeline (Condition Scanner → Guideline Resolver → DMN Executor → Recommendation Retriever → Plan Composer → Brief Reviewer → FHIR Bundle Generator → Terminology Validator → FHIR Syntax Validator → FHIR Semantic Reviewer → FHIR Server Writer). Vector store with pluggable embedding model. Guidelines CRUD + recommendation ingestion endpoints. AI Transparency IG compliance (AIAST/CLINAST_AIRPT). Care plan approval workflow. 205 unit tests + 3 E2E tests.
+**What works (verified in clean E2E on 2026-07-25):**
+- **Full cross-pipeline E2E:** CPG PDF → cpg-ingester (Parse → LLM Analysis → Assembly → Delivery) → acp-writer (Scan → Resolve → Execute DMN → Retrieve Recs → Compose → Generate FHIR → Review → Write) → CarePlan on FHIR server
+- **cpg-ingester:** Multi-agent LangGraph pipeline producing 5-9 DMN models + 12 recommendations from the synthetic hypertension CPG. Reviewer prompts tuned with CRITICAL/MINOR severity classification.
+- **acp-writer:** 11-node pipeline producing care plans with clinically appropriate content (Lisinopril 10mg, BMP monitoring, BP confirmation). AI Transparency IG compliance. Approval workflow.
+- **Infrastructure:** Pod-per-security-profile (11 pods), SonataFlow orchestration with async callbacks, MinIO artifact store with PHI-segmented buckets, API gateway, MCP Gateway (12 tools, 3 virtual servers), OpenShell sandboxes with per-pod network policies (Landlock + OPA + OCSF audit), MaaS inference (gpt-5.6-terra), MLflow tracing.
 
-**What's been added in Phase 3.3 (in progress):**
-- Pod-per-security-profile deployment: 11 pod groups (5 cpg-ingester + 6 acp-writer)
-- SonataFlow orchestration with async callbacks for LLM-heavy steps
-- MinIO artifact store with PHI-segmented buckets (cpg-artifacts + cpg-phi)
-- API gateway (Nginx) for unified acp-writer REST interface
-- MCP Gateway with 12 tools, 3 virtual servers, tool prefixing
-- OpenShell sandboxes with per-pod network policies
-- MaaS inference via gateway to OpenAI (gpt-5.6-terra)
+**Phase 3.3 remaining gaps (see exit criteria):**
+- Multi-CPG test with second CPG (diabetes — synthetic CPG prepared but not tested E2E on OpenShift)
+- FHIR approval workflow E2E test (draft → active / entered-in-error)
+- Golden test suite
 
 **What doesn't exist yet:** Production UIs (current are minimal Python/Jinja), BPMN output, automation service, identity/auth, multi-CPG at scale.
 
@@ -206,16 +204,16 @@ Full conflict resolution (interactive clinician UI, structured conflict types, r
 
 ##### Exit Criteria
 
-- End-to-end pipeline: cpg-ingester → acp-writer produces CarePlans using both DMN and recommendations
-- Pipeline tested with at least two CPGs
-- Pipeline runs on OpenShift with MLflow traces visible for every step
-- Both cpg-ingester and acp-writer split into pod-per-security-profile
-- Orchestration engine selected and driving cross-pod pipeline execution
-- OpenShell agent policies applied and enforced per pod
-- MCP Gateway demonstrating governed tool access
-- FHIR server integration working (draft → active / entered-in-error)
-- Pipeline parallelism: Terminology Validator ∥ FHIR Syntax Validator
-- Inference routed through MaaS on OpenShift
+- [x] End-to-end pipeline: cpg-ingester → acp-writer produces CarePlans using both DMN and recommendations — **PASS** (2026-07-25: CarePlan/1115 with 4 goals + 4 activities, clean re-run with zero intervention)
+- [ ] Pipeline tested with at least two CPGs — **NOT MET** (synthetic diabetes CPG prepared but not tested E2E on OpenShift)
+- [x] Pipeline runs on OpenShift with MLflow traces visible for every step — **PASS**
+- [x] Both cpg-ingester and acp-writer split into pod-per-security-profile — **PASS** (11 pods)
+- [x] Orchestration engine selected and driving cross-pod pipeline execution — **PASS** (SonataFlow with async callbacks)
+- [x] OpenShell agent policies applied and enforced per pod — **PASS** (9 sandboxes with Landlock + OPA + OCSF, unauthorized endpoints blocked)
+- [x] MCP Gateway demonstrating governed tool access — **PASS** (12 tools, 3 virtual servers)
+- [ ] FHIR server integration working (draft → active / entered-in-error) — **PARTIAL** (draft write works, approval lifecycle not tested E2E through SonataFlow)
+- [x] Pipeline parallelism: Terminology Validator ∥ FHIR Syntax Validator — **PASS** (LangGraph fan-out/fan-in implemented)
+- [x] Inference routed through MaaS on OpenShift — **PASS** (gpt-5.6-terra via MaaS gateway)
 - Golden test cases passing
 - All Phase 3.1 and Phase 3.2 exit criteria met
 
@@ -436,6 +434,13 @@ Work that can be picked up at any time, independent of the current phase. These 
 | OpenShell transparent service routing | Not started | deploy | Current integration uses an nginx hostname-translation router to bridge K8s services → OpenShell gateway. Future: OpenShell mutating webhook or supervisor init container injection for transparent pod integration. See `dev_docs/design/openshell-integration-findings.md`. |
 | OpenShell botocore proxy compatibility | Not started | deploy | boto3 S3 PUT fails through OpenShell CONNECT proxy (response not relayed). Workaround: presigned URL + requests. File upstream issue with OpenShell. See `dev_docs/design/openshell-integration-findings.md`. |
 | OpenShell short hostname matching | Not started | deploy | OPA engine requires exact hostname match — short K8s DNS names don't match FQDN wildcards. Currently duplicating entries. Request upstream support for DNS-aware matching. |
+| Multi-CPG E2E test on OpenShift | Phase 3.3 | acp-writer | Synthetic diabetes CPG (`SYN-DM2-2026-001`) prepared and tested in local integration (24/24 checks pass). Not yet tested E2E on OpenShift through SonataFlow with OpenShell sandboxing. Need to verify multi-CPG care plan generation with overlapping scope (hypertension + diabetes → combined care plan with potential duplicates). |
+| FHIR approval lifecycle E2E test | Phase 3.3 | acp-writer | Care plans are written as `draft`. The approve/reject flow (draft → active / entered-in-error) exists in code and works locally but has not been tested end-to-end through SonataFlow on OpenShift. May need a separate SonataFlow workflow or a manual trigger endpoint. |
+| Golden test suite | Phase 3.3 | testing | Comprehensive regression suite for the full pipeline: single-CPG medication, single-CPG lifestyle, multi-CPG diabetes+hypertension, no-guidelines. Parameterized tests verifying structural patterns (not exact text). Gate behind inference endpoint. See `working/phase3.3-implementation.md` Step 15. |
+| E2E test automation script | Phase 3.3 | testing | Update `scripts/run-e2e-openshift.sh` with SonataFlow-based pipeline execution, OpenShell sandbox deployment, and results verification. Current E2E is manual CLI commands. |
+| cpg-ingester metadata extractor null handling | ✅ Complete | cpg-ingester | `raw.get("title", "Untitled")` returns None when LLM outputs explicit null. Fixed to use `or "Untitled"` pattern. Commit `40ebd7d`. |
+| acp-writer workflow ips_ref fix | ✅ Complete | acp-writer | SonataFlow workflow passed `ips_bundle` (null inline) instead of `ips_ref` (MinIO reference) to scan endpoint. Fixed in commit `9d80206`. |
+| acp-writer patient-data scan ref resolution | ✅ Complete | acp-writer | Scan endpoint now resolves IPS from MinIO ref (`ips_ref`) in addition to inline `ips_bundle`. Uses `resolve_ref()` + fallback for legacy key name. Commit `b8cbaf0`. |
 
 ---
 
