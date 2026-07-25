@@ -229,19 +229,19 @@ Full conflict resolution (interactive clinician UI, structured conflict types, r
 
 #### Spikes
 
-| Spike | Focus | Deliverable |
-|---|---|---|
-| **A. UI Technology & Design System** | PatternFly 6 + React + TypeScript (matches all Red Hat AI UIs). Evaluate PatternFly AI components (ChatBot). Build tooling (Vite vs Next.js). | Technology decision doc + starter template |
-| **B. UI ↔ Backend Interaction Pattern** | Async communication (the backend uses SonataFlow callbacks — UI must not block). WebSocket vs SSE vs polling. Should UI talk to SonataFlow directly or through a BFF? How does human-in-the-loop work (clinician review pauses workflow)? | Interaction pattern decision + sequence diagrams |
-| **C. cpg-ingester UX Design** | Upload flow, CPG → section → decision/recommendation lineage, item manifest review, DMN visualization (read-only), recommendation review, approval workflow | Wireframes + flow diagram |
-| **D. acp-writer UX Design** | Patient context display, care plan visualization (goals, activities, medications), conflict display for multi-CPG, AI Transparency display, approval/rejection with clinician notes | Wireframes + flow diagram |
-| **E. mock-EHR Research** | Evaluate: (1) Full Medplum — replaces HAPI FHIR + EHR UI, has built-in SMART on FHIR OAuth. (2) HAPI FHIR + Medplum React components — keep existing data store, use Medplum UI components. (3) HAPI FHIR + custom PatternFly UI. Also evaluate SMART-EHR-Launcher (CSIRO). Key question: can Medplum React components work against a HAPI FHIR backend? | Comparison matrix + recommendation |
+| Spike | Focus | Status | Results |
+|---|---|---|---|
+| **A. UI Technology & Design System** | PatternFly 6 + React + TypeScript, PatternFly AI components, build tooling | ✅ Complete | [`dev_docs/ui/spike-a-technology.md`](ui/spike-a-technology.md) |
+| **B. UI ↔ Backend Interaction Pattern** | Async communication, WebSocket vs SSE vs polling, BFF pattern, human-in-the-loop | ✅ Complete | [`dev_docs/ui/spike-b-backend-interaction.md`](ui/spike-b-backend-interaction.md) |
+| **C. cpg-ingester UX Design** | Upload flow, CPG lineage, item manifest review, DMN visualization, approval workflow | ✅ Complete | [`dev_docs/ui/spike-c-cpg-ingester-ux.md`](ui/spike-c-cpg-ingester-ux.md) |
+| **D. acp-writer UX Design** | Patient context, care plan visualization, multi-CPG conflicts, AI Transparency, approval | ✅ Complete | [`dev_docs/ui/spike-d-acp-writer-ux.md`](ui/spike-d-acp-writer-ux.md) |
+| **E. mock-EHR Research** | Medplum vs HAPI+components vs custom, SMART on FHIR, SMART-EHR-Launcher evaluation | ✅ Complete | [`dev_docs/ui/spike-e-mock-ehr.md`](ui/spike-e-mock-ehr.md) |
 
 #### Work Items (staged)
 
 | Stage | Area | Work | Auth needed? |
 |---|---|---|---|
-| 4.0 | **research** | Complete Spikes A-E | No |
+| 4.0 | **research** | ~~Complete Spikes A-E~~ ✅ Complete | No |
 | 4.1 | **cpg-ingester** | Rebuild cpg-ingester UI in React/PatternFly — upload, review, approve flow. Show CPG-to-recommendation lineage. | No |
 | 4.2 | **mock-EHR** | Evaluate and set up mock-EHR (Medplum vs HAPI+components vs custom). Patient list, basic EHR UI. | No |
 | 4.3 | **acp-writer** | Rebuild acp-writer UI in React/PatternFly — care plan review, FHIR Bundle visualization, approve/reject. Standalone initially (mock patient context). | No |
