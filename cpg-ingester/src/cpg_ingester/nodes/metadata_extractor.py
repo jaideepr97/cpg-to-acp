@@ -85,8 +85,8 @@ def metadata_extractor(state: dict) -> dict:
 
     try:
         metadata = CPGMetadata(
-            cpg_id=raw.get("cpg_id", "UNKNOWN"),
-            title=raw.get("title", "Untitled"),
+            cpg_id=raw.get("cpg_id") or "UNKNOWN",
+            title=raw.get("title") or "Untitled",
             version=raw.get("version"),
             publication_date=raw.get("publication_date"),
             evidence_review_date=raw.get("evidence_review_date"),
