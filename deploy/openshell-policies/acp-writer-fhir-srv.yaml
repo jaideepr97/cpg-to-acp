@@ -28,6 +28,12 @@ network_policies:
   fhir_server:
     name: hapi-fhir
     endpoints:
+      - host: "cpg-mock-ehr-hapi-fhir"
+        port: 8080
+        enforcement: enforce
+        allowed_ips:
+          - "172.30.0.0/16"
+          - "10.128.0.0/14"
       - host: "**.svc.cluster.local"
         port: 8080
         enforcement: enforce
