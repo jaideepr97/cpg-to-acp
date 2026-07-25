@@ -46,6 +46,17 @@ network_policies:
           - "10.128.0.0/14"
     binaries:
       - path: "**"
+  decision_engine_query:
+    name: decision-engine-models
+    endpoints:
+      - host: "acp-decision-engine"
+        port: 8080
+        enforcement: log
+        allowed_ips:
+          - "172.30.0.0/16"
+          - "10.128.0.0/14"
+    binaries:
+      - path: "**"
   callback:
     name: sonataflow-callback
     endpoints:
