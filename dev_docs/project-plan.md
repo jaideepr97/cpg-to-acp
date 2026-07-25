@@ -6,9 +6,9 @@
 
 Transform Clinical Practice Guidelines into patient-specific, FHIR-compliant, actionable care plans — running on OpenShift with Red Hat AI platform capabilities. Enable parallel development across areas with cross-cutting milestones.
 
-## Current State (Phase 3.3 — Substantially Complete)
+## Current State (Phase 3.3 Complete)
 
-Both cpg-ingester and acp-writer are multi-agent LangGraph pipelines with adversarial review, running on OpenShift with OpenShell sandboxing, SonataFlow orchestration, and MaaS inference. Phase 3.3 core integration is complete with a clean E2E test passing (2026-07-25). Three exit criteria remain open.
+Both cpg-ingester and acp-writer are multi-agent LangGraph pipelines with adversarial review, running on OpenShift with OpenShell sandboxing, SonataFlow orchestration, and MaaS inference. Phase 3.3 closed 2026-07-25 with a clean E2E test passing. Remaining items (multi-CPG E2E, FHIR approval lifecycle, golden test suite) captured in the backlog for future work.
 
 **What works (verified in clean E2E on 2026-07-25):**
 - **Full cross-pipeline E2E:** CPG PDF → cpg-ingester (Parse → LLM Analysis → Assembly → Delivery) → acp-writer (Scan → Resolve → Execute DMN → Retrieve Recs → Compose → Generate FHIR → Review → Write) → CarePlan on FHIR server
@@ -16,7 +16,7 @@ Both cpg-ingester and acp-writer are multi-agent LangGraph pipelines with advers
 - **acp-writer:** 11-node pipeline producing care plans with clinically appropriate content (Lisinopril 10mg, BMP monitoring, BP confirmation). AI Transparency IG compliance. Approval workflow.
 - **Infrastructure:** Pod-per-security-profile (11 pods), SonataFlow orchestration with async callbacks, MinIO artifact store with PHI-segmented buckets, API gateway, MCP Gateway (12 tools, 3 virtual servers), OpenShell sandboxes with per-pod network policies (Landlock + OPA + OCSF audit), MaaS inference (gpt-5.6-terra), MLflow tracing.
 
-**Phase 3.3 remaining gaps (see exit criteria):**
+**Deferred to backlog:**
 - Multi-CPG test with second CPG (diabetes — synthetic CPG prepared but not tested E2E on OpenShift)
 - FHIR approval workflow E2E test (draft → active / entered-in-error)
 - Golden test suite
@@ -164,7 +164,7 @@ Can proceed independently after Phase 3.0 contracts are defined. Does not depend
 
 ---
 
-#### Phase 3.3 — Integration, Governance, and End-to-End Testing
+#### Phase 3.3 — Integration, Governance, and End-to-End Testing (complete)
 
 **Goal:** Connect cpg-ingester and acp-writer end-to-end, apply governance (OpenShell, MCP Gateway), split into pod-per-security-profile with workflow orchestration, and validate the complete pipeline with multiple CPGs.
 
