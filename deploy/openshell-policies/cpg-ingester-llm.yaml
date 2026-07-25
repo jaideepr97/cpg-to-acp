@@ -12,11 +12,9 @@ network_policies:
       - host: "**.svc.cluster.local"
         port: 8080
         enforcement: log
-        access: full
       - host: "**.svc.cluster.local"
         port: 80
         enforcement: log
-        access: full
     binaries:
       - path: "**"
   mlflow:
@@ -25,7 +23,6 @@ network_policies:
       - host: "mlflow-redhat-ods-applications.apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com"
         port: 443
         enforcement: enforce
-        access: full
     binaries:
       - path: "**"
   llm_inference:
@@ -34,19 +31,27 @@ network_policies:
       - host: api.openai.com
         port: 443
         enforcement: enforce
-        access: full
       - host: "**.svc.cluster.local"
         port: 443
         enforcement: enforce
-        access: full
+    binaries:
+      - path: "**"
+  callback:
+    name: sonataflow-callback
+    endpoints:
+      - host: "cpgingester"
+        port: 80
+        enforcement: enforce
     binaries:
       - path: "**"
   minio:
     name: artifact-store
     endpoints:
+      - host: "minio"
+        port: 9000
+        enforcement: enforce
       - host: "minio.sschifma-cpg-to-acp.svc.cluster.local"
         port: 9000
         enforcement: enforce
-        access: full
     binaries:
       - path: "**"

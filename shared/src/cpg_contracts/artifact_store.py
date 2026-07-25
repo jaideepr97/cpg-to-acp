@@ -62,14 +62,21 @@ class ArtifactStore:
             except Exception:
                 pass
 
+    def _put_via_presigned(self, key: str, body: bytes, content_type: str) -> None:
+        """PUT using a presigned URL + requests to avoid proxy incompatibility with boto3."""
+        import requests as _requests
+
+        url = self._get_client().generate_presigned_url(
+            "put_object",
+            Params={"Bucket": self.bucket, "Key": key, "ContentType": content_type},
+            ExpiresIn=300,
+        )
+        resp = _requests.put(url, data=body, headers={"Content-Type": content_type}, timeout=30)
+        resp.raise_for_status()
+
     def put(self, key: str, data: dict | list) -> str:
         """Store a JSON artifact. Returns a qualified ref: 'bucket:key'."""
-        self._get_client().put_object(
-            Bucket=self.bucket,
-            Key=key,
-            Body=json.dumps(data).encode(),
-            ContentType="application/json",
-        )
+        self._put_via_presigned(key, json.dumps(data).encode(), "application/json")
         ref = f"{self.bucket}:{key}"
         logger.debug("Stored artifact: %s", ref)
         return ref
@@ -85,9 +92,7 @@ class ArtifactStore:
 
     def put_raw(self, key: str, data: bytes, content_type: str = "application/octet-stream") -> str:
         """Store raw bytes. Returns a qualified ref: 'bucket:key'."""
-        self._get_client().put_object(
-            Bucket=self.bucket, Key=key, Body=data, ContentType=content_type,
-        )
+        self._put_via_presigned(key, data, content_type)
         return f"{self.bucket}:{key}"
 
     def get(self, ref: str) -> dict | list:

@@ -12,7 +12,6 @@ network_policies:
       - host: "**.svc.cluster.local"
         port: 8080
         enforcement: log
-        access: full
     binaries:
       - path: "**"
   cluster_services:
@@ -21,10 +20,8 @@ network_policies:
       - host: "**.svc.cluster.local"
         port: 8082
         enforcement: log
-        access: full
       - host: "**.svc.cluster.local"
         port: 8090
         enforcement: log
-        access: full
     binaries:
       - path: "**"
