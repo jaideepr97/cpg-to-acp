@@ -1,4 +1,9 @@
-"""FastAPI web UI for cpg-ingester pipeline."""
+"""FastAPI web UI for cpg-ingester pipeline.
+
+In pod-split mode, the UI does NOT run the pipeline directly. It sends
+the PDF to the Ingestion pod, which feeds into the SonataFlow orchestrator.
+Run status and artifacts are read from the shared output directory.
+"""
 
 import json
 import logging
@@ -6,16 +11,13 @@ import os
 import shutil
 import uuid
 from pathlib import Path
-from threading import Thread
 
 import click
+import requests as http_requests
 import uvicorn
 from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from langgraph.checkpoint.memory import MemorySaver
-
-from cpg_ingester.pipeline import build_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +26,14 @@ templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 
 app = FastAPI(title="CPG Ingester UI")
 
-OUTPUT_BASE = Path("output")
+
+@app.get("/health")
+def health():
+    return {"status": "UP", "service": "cpg-ingester-ui"}
+
+
+OUTPUT_BASE = Path(os.environ.get("OUTPUT_DIR", "output"))
+INGESTION_URL = os.environ.get("INGESTION_URL", "")
 _active_runs: dict[str, dict] = {}
 
 
@@ -91,9 +100,41 @@ def _list_artifacts(run_dir: Path) -> list[dict]:
     return artifacts
 
 
-def _run_pipeline_background(run_id: str, pdf_path: str, output_dir: str):
-    """Run the pipeline in a background thread."""
+def _run_via_service(run_id: str, pdf_path: str, output_dir: str):
+    """Send PDF to the Ingestion pod service for processing."""
     try:
+        with open(pdf_path, "rb") as f:
+            r = http_requests.post(
+                f"{INGESTION_URL}/api/v1/parse",
+                files={"file": (Path(pdf_path).name, f, "application/pdf")},
+                timeout=600,
+            )
+        if r.status_code == 200:
+            _active_runs[run_id] = {"status": "complete"}
+            result = r.json()
+            from cpg_ingester.output import write_artifact
+            write_artifact(output_dir, "run-summary.json", {
+                "run_id": run_id,
+                "pdf_path": pdf_path,
+                "manifest_items": 0,
+                "dmn_results": 0,
+                "recommendations": 0,
+                "escalated_items": 0,
+            })
+            logger.info("Ingestion service returned for run %s", run_id)
+        else:
+            _active_runs[run_id] = {"status": "failed", "error": f"Service returned {r.status_code}"}
+    except Exception as e:
+        logger.error("Service call failed for run %s: %s", run_id, e)
+        _active_runs[run_id] = {"status": "failed", "error": str(e)}
+
+
+def _run_local(run_id: str, pdf_path: str, output_dir: str):
+    """Run the pipeline locally (monolithic mode)."""
+    try:
+        from langgraph.checkpoint.memory import MemorySaver
+        from cpg_ingester.pipeline import build_pipeline
+
         import mlflow
         try:
             mlflow.langchain.autolog()
@@ -153,11 +194,12 @@ async def upload_cpg(pdf: UploadFile = File(...)):
 
     _active_runs[run_id] = {"status": "running"}
 
-    thread = Thread(
-        target=_run_pipeline_background,
-        args=(run_id, str(pdf_path), str(output_dir)),
-        daemon=True,
-    )
+    from threading import Thread
+    if INGESTION_URL:
+        target = _run_via_service
+    else:
+        target = _run_local
+    thread = Thread(target=target, args=(run_id, str(pdf_path), str(output_dir)), daemon=True)
     thread.start()
 
     return RedirectResponse(url=f"/runs/{run_id}", status_code=303)

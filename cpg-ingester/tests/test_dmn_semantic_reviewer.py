@@ -48,7 +48,7 @@ class TestDMNSemanticReviewer:
                 "output_dir": tmpdir,
                 "review_count": 0,
             }
-            with patch("cpg_ingester.nodes.dmn_semantic_reviewer._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.dmn_semantic_reviewer.get_llm", return_value=mock_llm):
                 result = dmn_semantic_reviewer(state)
 
             assert result["semantic_discrepancies"] == []
@@ -65,7 +65,7 @@ class TestDMNSemanticReviewer:
                 "output_dir": tmpdir,
                 "review_count": 0,
             }
-            with patch("cpg_ingester.nodes.dmn_semantic_reviewer._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.dmn_semantic_reviewer.get_llm", return_value=mock_llm):
                 result = dmn_semantic_reviewer(state)
 
             assert len(result["semantic_discrepancies"]) == 2
@@ -84,7 +84,7 @@ class TestDMNSemanticReviewer:
                 "output_dir": tmpdir,
                 "review_count": 0,
             }
-            with patch("cpg_ingester.nodes.dmn_semantic_reviewer._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.dmn_semantic_reviewer.get_llm", return_value=mock_llm):
                 dmn_semantic_reviewer(state)
 
             reports = list(Path(tmpdir).glob("dmn-review-*.json"))
@@ -129,7 +129,7 @@ class TestDMNSemanticReviewer:
                 "output_dir": tmpdir,
                 "review_count": 0,
             }
-            with patch("cpg_ingester.nodes.dmn_semantic_reviewer._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.dmn_semantic_reviewer.get_llm", return_value=mock_llm):
                 result = dmn_semantic_reviewer(state)
 
             assert result["semantic_discrepancies"] == []

@@ -12,10 +12,12 @@ is code with no LLM, your output must be unambiguous and complete.
 - Every activity MUST trace back to a source recommendation (by ID) and CPG.
 - Every goal MUST have a measurable target when clinically appropriate.
 - NEVER fabricate FHIR codes from memory — use the terminology lookup results \
-provided in the context. If no code was found, leave the code field as null \
-and note the gap.
-- Medication activities need: drug name, dose, route, frequency.
-- Monitoring activities need: what to monitor, frequency.
+provided in the context. If no code was found, leave the code field as null.
+- Medication activities MUST include: drug name, dose (e.g. "10 mg"), \
+route (e.g. "oral"), and frequency (e.g. "daily"). Missing any of these \
+will cause a review rejection.
+- Monitoring activities MUST include: what to monitor and frequency \
+(e.g. "4 weeks", "monthly").
 - Lifestyle activities need: specific actionable description.
 - Include clinical_rationale explaining WHY each activity was selected, \
 especially when DMN logic drove the decision.
@@ -23,6 +25,34 @@ especially when DMN logic drove the decision.
 the recommendation implies process steps — this data feeds BPMN generation later.
 - Flag potential conflicts when the same clinical target is addressed by \
 multiple recommendations with different approaches.
+
+## Example: Correct Medication Activity
+{{
+  "type": "medication",
+  "description": "Start Lisinopril 10mg daily for blood pressure control",
+  "code": {{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "29046", "display": "Lisinopril"}},
+  "dose": "10 mg",
+  "route": "oral",
+  "frequency": "daily",
+  "source_recommendation_id": "rec-abc-123",
+  "source_cpg": "SYN-HTN-2026-001",
+  "source_dmn_call": 0,
+  "clinical_rationale": "DMN model recommended initiating ACE inhibitor therapy based on Stage 2 hypertension classification",
+  "workflow": {{
+    "actor": "prescribing_physician",
+    "escalation": "If blood pressure not at target (<140/90 mmHg) after 4 weeks, consider dose increase or adding second agent",
+    "monitoring_trigger": "Order BMP in 2 weeks to check renal function and electrolytes"
+  }}
+}}
+
+## Example: Correct Goal with Target
+{{
+  "description": "Lower blood pressure to target range",
+  "target_measure_code": {{"system": "http://loinc.org", "code": "8480-6", "display": "Systolic blood pressure"}},
+  "target_value": {{"high": 140, "unit": "mmHg"}},
+  "source_recommendation_id": "rec-xyz-456",
+  "source_cpg": "SYN-HTN-2026-001"
+}}
 """
 
 PLAN_COMPOSER_USER = """\

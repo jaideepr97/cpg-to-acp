@@ -9,7 +9,7 @@ import logging
 import time
 
 import mlflow
-from langchain_openai import ChatOpenAI
+from cpg_contracts import get_llm
 
 from acp_writer.output import write_artifact
 from acp_writer.prompts.fhir_semantic_reviewer import (
@@ -19,14 +19,6 @@ from acp_writer.prompts.fhir_semantic_reviewer import (
 from acp_writer.state import CarePlanComposerState
 
 logger = logging.getLogger(__name__)
-
-
-def _get_llm(state: dict) -> ChatOpenAI:
-    return ChatOpenAI(
-        base_url=f"{state.get('litellm_url', 'http://localhost:4000')}/v1",
-        api_key=state.get("llm_api_key", "sk-change-me"),
-        model=state.get("llm_model", "default"),
-    )
 
 
 def _parse_review_response(content: str) -> dict:
@@ -61,7 +53,7 @@ def fhir_semantic_reviewer(state: CarePlanComposerState) -> dict:
         terminology_issues=json.dumps(terminology_issues) if terminology_issues else "None",
     )
 
-    llm = _get_llm(state)
+    llm = get_llm(state)
     logger.info("Calling LLM...")
     t0 = time.time()
 

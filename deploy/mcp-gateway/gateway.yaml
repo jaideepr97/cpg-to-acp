@@ -1,0 +1,57 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: cpg-gateway
+  labels:
+    gateway.io/name: cpg-gateway
+    istio: ingressgateway
+spec:
+  gatewayClassName: openshift-default
+  listeners:
+    - name: mcp
+      port: 8080
+      protocol: HTTP
+      hostname: cpg-mcp.apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: mcps
+      port: 8080
+      protocol: HTTP
+      hostname: "*.mcp.local"
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+apiVersion: mcp.kuadrant.io/v1alpha1
+kind: MCPGatewayExtension
+metadata:
+  name: cpg-gateway-mcp
+spec:
+  backendPingIntervalSeconds: 60
+  httpRouteManagement: Enabled
+  publicHost: cpg-mcp.apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com
+  privateHost: cpg-gateway-openshift-default.sschifma-cpg-to-acp.svc.cluster.local:8080
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: cpg-gateway
+    namespace: sschifma-cpg-to-acp
+    sectionName: mcp
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: cpg-gateway
+spec:
+  host: cpg-mcp.apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  port:
+    targetPort: mcp
+  to:
+    kind: Service
+    name: cpg-gateway-openshift-default
+    weight: 100

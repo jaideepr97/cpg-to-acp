@@ -127,6 +127,8 @@ def _find_references(obj: Any, path: str = "") -> list[tuple[str, str]]:
         if "reference" in obj and isinstance(obj["reference"], str):
             results.append((path, obj["reference"]))
         for key, val in obj.items():
+            if key in ("meta", "request", "extension"):
+                continue
             results.extend(_find_references(val, f"{path}.{key}" if path else key))
     elif isinstance(obj, list):
         for i, item in enumerate(obj):

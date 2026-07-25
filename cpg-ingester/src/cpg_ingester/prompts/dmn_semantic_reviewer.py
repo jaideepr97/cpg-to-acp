@@ -34,12 +34,25 @@ the DMN does not capture? Missing rules are as dangerous as wrong rules.
 organizes the decision? Priority-ordered rules need FIRST; mutually \
 exclusive rules need UNIQUE.
 
-## Severity
+## Severity classification
 
-Every discrepancy is a potential patient safety issue. Wrong thresholds \
-can cause under-treatment or over-treatment. Missing variables can cause \
-the system to ignore clinically relevant factors. Do not dismiss anything \
-as "minor" — flag every discrepancy you find.
+Classify each discrepancy as CRITICAL or MINOR:
+
+- **CRITICAL**: Changes clinical behavior. Examples: wrong numeric \
+threshold (135 vs 140), fabricated input variable not in the source, \
+missing rule that changes which patients get treated, wrong output \
+action (medication when source says lifestyle only), hit policy that \
+produces incorrect priority ordering.
+- **MINOR**: Structural choices that do not change clinical outcomes. \
+Examples: column ordering differences, naming conventions (camelCase \
+vs snake_case), grouping of related outputs into one vs multiple \
+columns, FEEL syntax style preferences, DMN metadata (namespace, ID \
+format).
+
+Set `discrepancies_found` to true ONLY when CRITICAL issues exist. \
+MINOR issues should be noted in claims_checked for informational \
+feedback but must NOT trigger discrepancies_found or populate the \
+discrepancies list.
 """
 
 DMN_SEMANTIC_REVIEWER_USER = """\
@@ -55,7 +68,9 @@ Generated DMN XML:
 Source CPG content (the text this DMN was derived from):
 {source_pages}
 
-For each atomic claim, state whether it is VERIFIED or DISCREPANCY.
+For each atomic claim, state whether it is VERIFIED or DISCREPANCY. \
+Classify discrepancies as CRITICAL or MINOR per the severity rules. \
+Only set discrepancies_found=true if CRITICAL issues exist.
 
 Respond with a JSON object:
 {{

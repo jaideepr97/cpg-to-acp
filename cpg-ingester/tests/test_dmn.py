@@ -210,7 +210,7 @@ class TestDMNCreatorNode:
                 "abbreviations": {},
                 "output_dir": tmpdir,
             }
-            with patch("cpg_ingester.nodes.dmn_creator._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.dmn_creator.get_llm", return_value=mock_llm):
                 result = dmn_creator(state)
 
             assert result["dmn_xml"]
@@ -229,7 +229,7 @@ class TestDMNCreatorNode:
                 "abbreviations": {},
                 "output_dir": tmpdir,
             }
-            with patch("cpg_ingester.nodes.dmn_creator._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.dmn_creator.get_llm", return_value=mock_llm):
                 dmn_creator(state)
 
             dmn_files = list(Path(tmpdir).rglob("*.dmn"))
@@ -248,7 +248,7 @@ class TestDMNCreatorNode:
                 "syntax_errors": ["Missing hitPolicy attribute"],
                 "review_count": 0,
             }
-            with patch("cpg_ingester.nodes.dmn_creator._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.dmn_creator.get_llm", return_value=mock_llm):
                 result = dmn_creator(state)
 
             assert result["review_count"] == 1

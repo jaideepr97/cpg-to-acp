@@ -61,7 +61,7 @@ class TestRecSemanticReviewer:
                 "review_count": 0,
                 "items": [{"section": "3.4"}],
             }
-            with patch("cpg_ingester.nodes.rec_semantic_reviewer._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.rec_semantic_reviewer.get_llm", return_value=mock_llm):
                 result = rec_semantic_reviewer(state)
 
             assert result["semantic_discrepancies"] == []
@@ -78,7 +78,7 @@ class TestRecSemanticReviewer:
                 "review_count": 0,
                 "items": [{"section": "3.4"}],
             }
-            with patch("cpg_ingester.nodes.rec_semantic_reviewer._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.rec_semantic_reviewer.get_llm", return_value=mock_llm):
                 result = rec_semantic_reviewer(state)
 
             assert len(result["semantic_discrepancies"]) == 2
@@ -97,7 +97,7 @@ class TestRecSemanticReviewer:
                 "review_count": 0,
                 "items": [{"section": "3.4"}],
             }
-            with patch("cpg_ingester.nodes.rec_semantic_reviewer._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.rec_semantic_reviewer.get_llm", return_value=mock_llm):
                 rec_semantic_reviewer(state)
 
             reports = list(Path(tmpdir).glob("rec-review-*.json"))
@@ -142,7 +142,7 @@ class TestRecSemanticReviewer:
                 "review_count": 0,
                 "items": [{"section": "3.4"}],
             }
-            with patch("cpg_ingester.nodes.rec_semantic_reviewer._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.rec_semantic_reviewer.get_llm", return_value=mock_llm):
                 result = rec_semantic_reviewer(state)
 
             assert result["semantic_discrepancies"] == []
@@ -154,4 +154,5 @@ class TestRecSemanticReviewer:
     def test_checks_content_faithfulness(self):
         from cpg_ingester.prompts.rec_semantic_reviewer import REC_SEMANTIC_REVIEWER_SYSTEM
         assert "faithful" in REC_SEMANTIC_REVIEWER_SYSTEM.lower()
-        assert "softened" in REC_SEMANTIC_REVIEWER_SYSTEM.lower() or "soften" in REC_SEMANTIC_REVIEWER_SYSTEM.lower()
+        assert "critical" in REC_SEMANTIC_REVIEWER_SYSTEM.lower()
+        assert "minor" in REC_SEMANTIC_REVIEWER_SYSTEM.lower()

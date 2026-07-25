@@ -1,0 +1,229 @@
+apiVersion: sonataflow.org/v1alpha08
+kind: SonataFlow
+metadata:
+  name: acpwriter
+  annotations:
+    sonataflow.org/profile: dev
+    sonataflow.org/description: "ACP Writer pipeline orchestration"
+    sonataflow.org/version: "0.2.0"
+spec:
+  podTemplate:
+    container:
+      env:
+        - name: PATIENT_DATA_URL
+          value: "http://acp-patient-data:8080"
+        - name: LLM_REASONING_URL
+          value: "http://acp-llm-reasoning:8080"
+        - name: DECISION_ENGINE_URL
+          value: "http://acp-decision-engine:8080"
+        - name: FHIR_GENERATION_URL
+          value: "http://acp-fhir-generation:8080"
+        - name: FHIR_SERVER_URL
+          value: "http://acp-fhir-server:8080"
+  flow:
+    specVersion: "0.8"
+    start: ScanPatient
+    events:
+      - name: composeDone
+        source: ""
+        type: compose-done
+      - name: generateDone
+        source: ""
+        type: generate-done
+      - name: reviewDone
+        source: ""
+        type: review-done
+    functions:
+      # Sync functions (fast, <10s)
+      - name: scanpatient
+        type: custom
+        operation: rest:post:http://acp-patient-data:8080/api/v1/scan
+      - name: resolveguidelines
+        type: custom
+        operation: rest:post:http://acp-llm-reasoning:8080/api/v1/resolve
+      - name: executedmn
+        type: custom
+        operation: rest:post:http://acp-decision-engine:8080/api/v1/execute
+      - name: retrieverecommendations
+        type: custom
+        operation: rest:post:http://acp-llm-reasoning:8080/api/v1/retrieve
+      - name: writefhir
+        type: custom
+        operation: rest:post:http://acp-fhir-server:8080/api/v1/write
+      # Async functions (LLM-heavy, 30-120s)
+      - name: composeplanasynch
+        type: custom
+        operation: rest:post:http://acp-llm-reasoning:8080/api/v1/compose-async
+      - name: generatebundleasync
+        type: custom
+        operation: rest:post:http://acp-fhir-generation:8080/api/v1/generate-bundle-async
+      - name: reviewfhirasync
+        type: custom
+        operation: rest:post:http://acp-llm-reasoning:8080/api/v1/review-fhir-async
+    states:
+      # --- Phase 1: Data collection (sync) ---
+
+      - name: ScanPatient
+        type: operation
+        actions:
+          - name: callScan
+            functionRef:
+              refName: scanpatient
+              arguments:
+                ips_ref: "${ .ips_ref }"
+            actionDataFilter:
+              results: "${ . }"
+              toStateData: "${ .patientData }"
+        transition: ResolveGuidelines
+
+      - name: ResolveGuidelines
+        type: operation
+        actions:
+          - name: callResolve
+            functionRef:
+              refName: resolveguidelines
+              arguments:
+                condition_codes: "${ .patientData.condition_codes }"
+            actionDataFilter:
+              results: "${ . }"
+              toStateData: "${ .guidelineData }"
+        transition: ExecuteDMN
+
+      - name: ExecuteDMN
+        type: operation
+        actions:
+          - name: callExecute
+            functionRef:
+              refName: executedmn
+              arguments:
+                ips_bundle_ref: "${ .patientData.ips_bundle_ref }"
+                applicable_dmn_models: "${ .guidelineData.applicable_dmn_models }"
+                dmn_dependency_graph: "${ .guidelineData.dmn_dependency_graph }"
+            actionDataFilter:
+              results: "${ . }"
+              toStateData: "${ .dmnData }"
+        transition: RetrieveRecommendations
+
+      - name: RetrieveRecommendations
+        type: operation
+        actions:
+          - name: callRetrieve
+            functionRef:
+              refName: retrieverecommendations
+              arguments:
+                condition_codes: "${ .patientData.condition_codes }"
+                dmn_results: "${ .dmnData.dmn_results }"
+                applicable_cpgs: "${ .guidelineData.applicable_cpgs }"
+            actionDataFilter:
+              results: "${ . }"
+              toStateData: "${ .recData }"
+        transition: ComposePlan
+
+      # --- Phase 2: LLM composition (async callbacks) ---
+
+      - name: ComposePlan
+        type: callback
+        action:
+          functionRef:
+            refName: composeplanasynch
+            arguments:
+              callback_url: "http://acpwriter:80/wait-compose"
+              process_instance_id: "$WORKFLOW.instanceId"
+              patient_reference: "${ .patientData.patient_reference }"
+              patient_demographics: "${ .patientData.patient_demographics }"
+              condition_codes: "${ .patientData.condition_codes }"
+              medication_codes: "${ .patientData.medication_codes }"
+              allergy_codes: "${ .patientData.allergy_codes }"
+              dmn_results: "${ .dmnData.dmn_results }"
+              recommendations_ref: "${ .recData.recommendations_ref }"
+              applicable_cpgs: "${ .guidelineData.applicable_cpgs }"
+        eventRef: composeDone
+        eventDataFilter:
+          toStateData: "${ .composerData }"
+        stateDataFilter:
+          output: "${ del(.ips_bundle) }"
+        transition: InitFHIRReview
+
+      - name: InitFHIRReview
+        type: inject
+        data:
+          fhirReviewCount: 0
+          maxFHIRReviews: 4
+          fhirReviewFeedback: ""
+        transition: GenerateBundle
+
+      # --- Phase 3: FHIR generation + review loop (async callbacks) ---
+
+      - name: GenerateBundle
+        type: callback
+        action:
+          functionRef:
+            refName: generatebundleasync
+            arguments:
+              callback_url: "http://acpwriter:80/wait-generate"
+              process_instance_id: "$WORKFLOW.instanceId"
+              planning_brief_ref: "${ .composerData.planning_brief_ref }"
+              patient_demographics: "${ .patientData.patient_demographics }"
+              fhir_review_feedback: "${ .fhirReviewFeedback }"
+        eventRef: generateDone
+        eventDataFilter:
+          toStateData: "${ .fhirGenData }"
+        transition: ReviewFHIR
+
+      - name: ReviewFHIR
+        type: callback
+        action:
+          functionRef:
+            refName: reviewfhirasync
+            arguments:
+              callback_url: "http://acpwriter:80/wait-review"
+              process_instance_id: "$WORKFLOW.instanceId"
+              fhir_bundle_ref: "${ .fhirGenData.fhir_bundle_ref }"
+              terminology_issues: "${ .fhirGenData.terminology_issues }"
+              syntax_errors: "${ .fhirGenData.syntax_errors }"
+              fhir_review_count: "${ .fhirReviewCount }"
+        eventRef: reviewDone
+        eventDataFilter:
+          toStateData: "${ .fhirReviewData }"
+        transition: IncrementFHIRReview
+
+      - name: IncrementFHIRReview
+        type: inject
+        data: {}
+        stateDataFilter:
+          output: "${ . + {fhirReviewCount: (.fhirReviewCount + 1), fhirReviewFeedback: .fhirReviewData.fhir_review_feedback} }"
+        transition: CheckFHIRVerdict
+
+      - name: CheckFHIRVerdict
+        type: switch
+        dataConditions:
+          - name: Approved
+            condition: '${ (.fhirReviewData.fhir_review_feedback == "") or (.fhirReviewData.fhir_review_feedback == null) }'
+            transition: WriteFHIR
+          - name: MaxReached
+            condition: "${ .fhirReviewCount >= .maxFHIRReviews }"
+            transition: WriteFHIR
+        defaultCondition:
+          transition: GenerateBundle
+
+      # --- Phase 4: Write to FHIR server (sync) ---
+
+      - name: WriteFHIR
+        type: operation
+        actions:
+          - name: callWrite
+            functionRef:
+              refName: writefhir
+              arguments:
+                fhir_bundle_ref: "${ .fhirGenData.fhir_bundle_ref }"
+                patient_reference: "${ .patientData.patient_reference }"
+            actionDataFilter:
+              results: "${ . }"
+              toStateData: "${ .writeResult }"
+        transition: Done
+
+      - name: Done
+        type: inject
+        data:
+          status: "completed"
+        end: true

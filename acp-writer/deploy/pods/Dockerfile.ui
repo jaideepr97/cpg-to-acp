@@ -1,0 +1,9 @@
+FROM registry.access.redhat.com/ubi9/python-312:latest
+WORKDIR /app
+COPY acp-writer/src/acp_writer/ui/ /app/src/acp_writer/ui/
+COPY acp-writer/src/acp_writer/__init__.py /app/src/acp_writer/__init__.py
+RUN pip install --no-cache-dir fastapi uvicorn jinja2 requests python-multipart
+ENV PYTHONPATH=/app/src
+USER 1001
+EXPOSE 8082
+CMD ["uvicorn", "acp_writer.ui.app:app", "--host", "0.0.0.0", "--port", "8082"]

@@ -61,7 +61,7 @@ class TestMetadataExtractor:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             state = {"markdown": "# Guideline\nSome content", "output_dir": tmpdir}
-            with patch("cpg_ingester.nodes.metadata_extractor._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.metadata_extractor.get_llm", return_value=mock_llm):
                 result = metadata_extractor(state)
 
             meta = result["cpg_metadata"]
@@ -77,7 +77,7 @@ class TestMetadataExtractor:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             state = {"markdown": "content", "output_dir": tmpdir}
-            with patch("cpg_ingester.nodes.metadata_extractor._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.metadata_extractor.get_llm", return_value=mock_llm):
                 metadata_extractor(state)
 
             metadata_file = Path(tmpdir) / "metadata.json"
@@ -91,7 +91,7 @@ class TestMetadataExtractor:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             state = {"markdown": "content", "output_dir": tmpdir}
-            with patch("cpg_ingester.nodes.metadata_extractor._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.metadata_extractor.get_llm", return_value=mock_llm):
                 result = metadata_extractor(state)
 
             from cpg_contracts import CPGMetadata
@@ -108,7 +108,7 @@ class TestMetadataExtractor:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             state = {"markdown": "content", "output_dir": tmpdir}
-            with patch("cpg_ingester.nodes.metadata_extractor._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.metadata_extractor.get_llm", return_value=mock_llm):
                 result = metadata_extractor(state)
 
             assert result["cpg_metadata"]["cpg_id"] == "TEST-001"
@@ -120,7 +120,7 @@ class TestMetadataExtractor:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             state = {"markdown": "content", "output_dir": tmpdir}
-            with patch("cpg_ingester.nodes.metadata_extractor._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.metadata_extractor.get_llm", return_value=mock_llm):
                 result = metadata_extractor(state)
 
             assert result["cpg_metadata"] == {}
@@ -131,7 +131,7 @@ class TestMetadataExtractor:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             state = {"markdown": "content", "output_dir": tmpdir}
-            with patch("cpg_ingester.nodes.metadata_extractor._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.metadata_extractor.get_llm", return_value=mock_llm):
                 result = metadata_extractor(state)
 
             assert result["cpg_metadata"]["contract_version"] == "1.0"

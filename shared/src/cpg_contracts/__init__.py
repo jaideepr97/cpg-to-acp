@@ -29,6 +29,20 @@ from cpg_contracts.search import (
     RecommendationSearchResult,
 )
 from cpg_contracts.fhir import PatientSummary
+from cpg_contracts.cloud_events import post_callback
+from cpg_contracts.artifact_store import (  # noqa: F401 — lazy boto3 import
+    ArtifactStore,
+    get_artifact_store,
+    get_phi_store,
+    resolve_ref,
+    store_artifact,
+)
+def __getattr__(name):
+    if name == "get_llm":
+        from cpg_contracts.llm import get_llm
+        return get_llm
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "CONTRACT_VERSION",
@@ -59,4 +73,14 @@ __all__ = [
     "RecommendationSearchResult",
     # FHIR
     "PatientSummary",
+    # Cloud events
+    "post_callback",
+    # Artifact store
+    "ArtifactStore",
+    "get_artifact_store",
+    "get_phi_store",
+    "resolve_ref",
+    "store_artifact",
+    # LLM
+    "get_llm",
 ]

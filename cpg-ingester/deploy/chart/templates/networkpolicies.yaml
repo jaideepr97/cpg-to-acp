@@ -1,0 +1,192 @@
+# Ingestion pod: MinIO artifact store only (filesystem + ML, no LLM)
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-ingestion-policy
+spec:
+  podSelector:
+    matchLabels:
+      security-profile: ingestion
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      ports:
+        - port: 5353
+          protocol: UDP
+        - port: 5353
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app: minio
+      ports:
+        - port: 9000
+          protocol: TCP
+    - to:
+        - podSelector: {}
+      ports:
+        - port: 8080
+          protocol: TCP
+
+# LLM Analysis pod: LLM inference (MaaS gateway) + MinIO artifact store
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-llm-analysis-policy
+spec:
+  podSelector:
+    matchLabels:
+      security-profile: llm-analysis
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      ports:
+        - port: 5353
+          protocol: UDP
+        - port: 5353
+          protocol: TCP
+    - to: []
+      ports:
+        - port: 443
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-ingress
+      ports:
+        - port: 80
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app: minio
+      ports:
+        - port: 9000
+          protocol: TCP
+    - to:
+        - podSelector: {}
+      ports:
+        - port: 8080
+          protocol: TCP
+
+# Assembly pod: MinIO artifact store only (no LLM, no external)
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-assembly-policy
+spec:
+  podSelector:
+    matchLabels:
+      security-profile: assembly
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      ports:
+        - port: 5353
+          protocol: UDP
+        - port: 5353
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app: minio
+      ports:
+        - port: 9000
+          protocol: TCP
+    - to:
+        - podSelector: {}
+      ports:
+        - port: 8080
+          protocol: TCP
+
+# Delivery pod: acp-writer API gateway + MinIO artifact store
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-delivery-policy
+spec:
+  podSelector:
+    matchLabels:
+      security-profile: delivery
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      ports:
+        - port: 5353
+          protocol: UDP
+        - port: 5353
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app: acp-writer-api
+      ports:
+        - port: 8080
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app: minio
+      ports:
+        - port: 9000
+          protocol: TCP
+    - to:
+        - podSelector: {}
+      ports:
+        - port: 8080
+          protocol: TCP
+
+# UI pod: orchestrator access only
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-ui-policy
+spec:
+  podSelector:
+    matchLabels:
+      security-profile: ui
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - {}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      ports:
+        - port: 5353
+          protocol: UDP
+        - port: 5353
+          protocol: TCP
+    - to: []
+      ports:
+        - port: 443
+          protocol: TCP
+    - to:
+        - podSelector: {}
+      ports:
+        - port: 8080
+          protocol: TCP

@@ -1,0 +1,58 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-ehr-mcp
+  labels:
+    app: mock-ehr-mcp
+    component: mcp-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mock-ehr-mcp
+  template:
+    metadata:
+      labels:
+        app: mock-ehr-mcp
+        component: mcp-server
+    spec:
+      containers:
+        - name: mcp-server
+          image: image-registry.openshift-image-registry.svc:5000/sschifma-cpg-to-acp/mock-ehr-mcp:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8090
+              protocol: TCP
+          env:
+            - name: FHIR_BASE_URL
+              value: "http://cpg-mock-ehr-hapi-fhir:8080/fhir"
+            - name: MLFLOW_TRACKING_URI
+              value: "https://mlflow-redhat-ods-applications.apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-ehr-mcp
+  labels:
+    app: mock-ehr-mcp
+spec:
+  selector:
+    app: mock-ehr-mcp
+  ports:
+    - port: 8090
+      targetPort: 8090
+      protocol: TCP

@@ -3,8 +3,9 @@
 Two-phase architecture:
   Phase 1 (Clinical Reasoning): condition_scanner → guideline_resolver →
     dmn_executor → recommendation_retriever → plan_composer → brief_reviewer
-  Phase 2 (FHIR Generation): fhir_bundle_generator → terminology_validator →
-    fhir_syntax_validator → fhir_semantic_reviewer → fhir_server_writer
+  Phase 2 (FHIR Generation): fhir_bundle_generator →
+    [terminology_validator ∥ fhir_syntax_validator] →
+    fhir_semantic_reviewer → fhir_server_writer
 """
 
 import logging
@@ -26,8 +27,8 @@ from acp_writer.state import CarePlanComposerState
 
 logger = logging.getLogger(__name__)
 
-MAX_BRIEF_REVIEWS = 2
-MAX_FHIR_REVIEWS = 2
+MAX_BRIEF_REVIEWS = 4
+MAX_FHIR_REVIEWS = 4
 
 
 # --- Stub nodes ---
@@ -96,9 +97,10 @@ def build_pipeline() -> StateGraph:
         },
     )
 
-    # Phase 2 edges (sequential with FHIR review loop)
+    # Phase 2 edges (validators in parallel, then FHIR review loop)
     graph.add_edge("fhir_bundle_generator", "terminology_validator")
-    graph.add_edge("terminology_validator", "fhir_syntax_validator")
+    graph.add_edge("fhir_bundle_generator", "fhir_syntax_validator")
+    graph.add_edge("terminology_validator", "fhir_semantic_reviewer")
     graph.add_edge("fhir_syntax_validator", "fhir_semantic_reviewer")
     graph.add_conditional_edges(
         "fhir_semantic_reviewer",

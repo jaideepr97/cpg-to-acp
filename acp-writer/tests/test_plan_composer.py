@@ -131,7 +131,7 @@ class TestPlanComposer:
             "llm_api_key": "sk-test",
         }
 
-    @patch("acp_writer.nodes.plan_composer._get_llm")
+    @patch("acp_writer.nodes.plan_composer.get_llm")
     def test_produces_valid_brief(self, mock_get_llm):
         mock_llm = MagicMock()
         mock_response = MagicMock()
@@ -147,7 +147,7 @@ class TestPlanComposer:
         assert len(brief.activities) >= 1
         assert brief.activities[0].source_cpg == "SYN-HTN-2026-001"
 
-    @patch("acp_writer.nodes.plan_composer._get_llm")
+    @patch("acp_writer.nodes.plan_composer.get_llm")
     def test_clears_review_feedback(self, mock_get_llm):
         mock_llm = MagicMock()
         mock_response = MagicMock()
@@ -158,7 +158,7 @@ class TestPlanComposer:
         result = plan_composer(self._make_state())
         assert result["brief_review_feedback"] == ""
 
-    @patch("acp_writer.nodes.plan_composer._get_llm")
+    @patch("acp_writer.nodes.plan_composer.get_llm")
     def test_handles_parse_error(self, mock_get_llm):
         mock_llm = MagicMock()
         mock_response = MagicMock()
@@ -170,7 +170,7 @@ class TestPlanComposer:
         assert result["planning_brief"]["review_status"] == "flagged"
         assert "parse error" in result["planning_brief"]["review_feedback"].lower()
 
-    @patch("acp_writer.nodes.plan_composer._get_llm")
+    @patch("acp_writer.nodes.plan_composer.get_llm")
     def test_includes_feedback_in_prompt(self, mock_get_llm):
         mock_llm = MagicMock()
         mock_response = MagicMock()
@@ -186,7 +186,7 @@ class TestPlanComposer:
         user_msg = call_args[1]["content"]
         assert "Missing monitoring activity" in user_msg
 
-    @patch("acp_writer.nodes.plan_composer._get_llm")
+    @patch("acp_writer.nodes.plan_composer.get_llm")
     def test_writes_artifact(self, mock_get_llm, tmp_path):
         mock_llm = MagicMock()
         mock_response = MagicMock()

@@ -1,12 +1,16 @@
-"""FastAPI web UI for acp-writer care plan review and approval."""
+"""FastAPI web UI for acp-writer care plan review and approval.
+
+In pod-split mode, the UI does NOT import pipeline or node code.
+All backend interactions happen via HTTP to the API / pod services.
+In monolithic mode (API_URL points to local acp-writer), behavior is identical.
+"""
 
 import json
 import logging
 import os
-import uuid
 from pathlib import Path
-from threading import Thread
 
+import requests as http_requests
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -18,73 +22,77 @@ templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 
 app = FastAPI(title="ACP Writer UI")
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.parent
-SAMPLE_DATA_DIR = PROJECT_ROOT / "mock-EHR" / "data"
-FIXTURES_DIR = PROJECT_ROOT / "shared" / "tests" / "fixtures"
+
+@app.get("/health")
+def health():
+    return {"status": "UP", "service": "acp-writer-ui"}
+
+
+API_URL = os.environ.get("API_URL", "http://localhost:8082")
 
 _pending_runs: dict[str, dict] = {}
 
 
-def _run_pipeline_background(run_id: str, ips_bundle: dict):
-    """Run the pipeline in a background thread."""
+def _api_get(path: str) -> dict | list | None:
     try:
-        import acp_writer.api as api_module
-        from acp_writer.pipeline import build_pipeline
+        r = http_requests.get(f"{API_URL}{path}", timeout=10)
+        if r.status_code == 200:
+            return r.json()
+    except http_requests.RequestException as e:
+        logger.warning("API GET %s failed: %s", path, e)
+    return None
 
-        graph = build_pipeline()
-        compiled = graph.compile()
 
-        result = compiled.invoke({
-            "ips_bundle": ips_bundle,
-            "run_id": run_id,
-            "output_dir": f"output/{run_id}",
-            "litellm_url": os.environ.get("LITELLM_URL", "http://localhost:4000"),
-            "llm_model": os.environ.get("LLM_MODEL", "default"),
-            "llm_api_key": os.environ.get("LLM_API_KEY", "sk-change-me"),
-        })
+def _api_post(path: str, json_data: dict | None = None, data=None, headers=None, timeout=300) -> dict | None:
+    try:
+        r = http_requests.post(f"{API_URL}{path}", json=json_data, data=data, headers=headers, timeout=timeout)
+        if r.status_code in (200, 201):
+            return r.json()
+        logger.warning("API POST %s returned %d", path, r.status_code)
+    except http_requests.RequestException as e:
+        logger.warning("API POST %s failed: %s", path, e)
+    return None
 
-        careplan_id = result.get("careplan_id", "")
-        _pending_runs[run_id] = {
-            "status": "complete",
-            "careplan_id": careplan_id,
-            "planning_brief": result.get("planning_brief", {}),
-        }
-        logger.info("Pipeline complete for run %s -> careplan %s", run_id, careplan_id)
 
-    except Exception as e:
-        logger.error("Pipeline failed for run %s: %s", run_id, e)
-        _pending_runs[run_id] = {"status": "error", "error": str(e)}
+def _api_put(path: str, json_data: dict) -> dict | None:
+    try:
+        r = http_requests.put(f"{API_URL}{path}", json=json_data, timeout=30)
+        if r.status_code == 200:
+            return r.json()
+        logger.warning("API PUT %s returned %d", path, r.status_code)
+    except http_requests.RequestException as e:
+        logger.warning("API PUT %s failed: %s", path, e)
+    return None
 
 
 def _setup_sample_data():
-    """Load sample CPG data if not already registered."""
-    import acp_writer.api as api_module
-    from acp_writer.api import _dynamic_models, _parse_dmn_metadata
-    from cpg_contracts import CPGMetadata, RecommendationBundle
-
-    if api_module._guidelines_store.count() > 0:
+    """Load sample CPG data via API if not already registered."""
+    guidelines = _api_get("/api/v1/guidelines")
+    if guidelines and len(guidelines) > 0:
         return
 
-    fixtures_file = FIXTURES_DIR / "sample-recommendations.json"
+    project_root = Path(__file__).parent.parent.parent.parent.parent
+    fixtures_file = project_root / "shared" / "tests" / "fixtures" / "sample-recommendations.json"
     if not fixtures_file.exists():
         logger.warning("Sample fixtures not found at %s", fixtures_file)
         return
 
     data = json.loads(fixtures_file.read_text())
-    meta = CPGMetadata.model_validate(data["metadata"])
-    api_module._guidelines_store.register(meta)
 
-    dmn_dir = PROJECT_ROOT / "cpg-ingester" / "data" / "golden"
+    _api_post("/api/v1/guidelines", json_data=data["metadata"])
+
+    dmn_dir = project_root / "cpg-ingester" / "data" / "golden"
     for f in ["treatment-recommendation.dmn", "monitoring-plan.dmn"]:
         dmn_path = dmn_dir / f
         if dmn_path.exists():
-            xml = dmn_path.read_text()
-            s = _parse_dmn_metadata(xml)
-            _dynamic_models[s.id] = {"summary": s, "dmn_xml": xml}
+            _api_post(
+                "/api/v1/decisions/models",
+                data=dmn_path.read_bytes(),
+                headers={"Content-Type": "application/xml"},
+            )
 
-    bundle = RecommendationBundle.model_validate(data["recommendation_bundle"])
-    api_module._vector_store.add_batch(bundle.recommendations)
-    logger.info("Loaded sample data: 1 CPG, %d recommendations, 2 DMN models", len(bundle.recommendations))
+    _api_post("/api/v1/knowledge/recommendations/batch", json_data=data["recommendation_bundle"])
+    logger.info("Loaded sample data via API")
 
 
 @app.on_event("startup")
@@ -100,14 +108,14 @@ async def startup():
 
 @app.get("/", response_class=HTMLResponse)
 async def submit_page(request: Request):
-    import acp_writer.api as api_module
-    from acp_writer.api import _dynamic_models
-    guidelines = [g.model_dump(mode="json") for g in api_module._guidelines_store.list_all()]
+    guidelines = _api_get("/api/v1/guidelines") or []
+    models = _api_get("/api/v1/decisions/models") or []
+    status = _api_get("/api/v1/status") or {}
     return templates.TemplateResponse(request, "submit.html", {
         "error": request.query_params.get("error"),
         "guidelines": guidelines,
-        "models_deployed": len(_dynamic_models),
-        "recs_ingested": api_module._vector_store.count(),
+        "models_deployed": len(models),
+        "recs_ingested": status.get("knowledge", {}).get("recommendations", 0),
     })
 
 
@@ -126,10 +134,12 @@ async def submit_bundle(request: Request, bundle_file: UploadFile = File(...)):
             request, "submit.html", {"error": "File must be a FHIR Bundle"}, status_code=400
         )
 
+    import uuid
     run_id = str(uuid.uuid4())[:8]
     _pending_runs[run_id] = {"status": "processing"}
 
-    thread = Thread(target=_run_pipeline_background, args=(run_id, ips_bundle), daemon=True)
+    from threading import Thread
+    thread = Thread(target=_generate_via_api, args=(run_id, ips_bundle), daemon=True)
     thread.start()
 
     return templates.TemplateResponse(request, "processing.html", {"run_id": run_id})
@@ -137,21 +147,42 @@ async def submit_bundle(request: Request, bundle_file: UploadFile = File(...)):
 
 @app.post("/submit-sample")
 async def submit_sample(request: Request, sample: str = Form(...)):
+    project_root = Path(__file__).parent.parent.parent.parent.parent
+    sample_dir = project_root / "mock-EHR" / "data"
     filename = f"patient-bundle-{sample}.json"
-    path = SAMPLE_DATA_DIR / filename
+    path = sample_dir / filename
     if not path.exists():
         return templates.TemplateResponse(
             request, "submit.html", {"error": f"Sample '{sample}' not found"}, status_code=404
         )
 
     ips_bundle = json.loads(path.read_text())
+
+    import uuid
     run_id = str(uuid.uuid4())[:8]
     _pending_runs[run_id] = {"status": "processing"}
 
-    thread = Thread(target=_run_pipeline_background, args=(run_id, ips_bundle), daemon=True)
+    from threading import Thread
+    thread = Thread(target=_generate_via_api, args=(run_id, ips_bundle), daemon=True)
     thread.start()
 
     return templates.TemplateResponse(request, "processing.html", {"run_id": run_id})
+
+
+def _generate_via_api(run_id: str, ips_bundle: dict):
+    """Generate a care plan by calling the acp-writer API."""
+    try:
+        result = _api_post("/api/v1/careplans", json_data=ips_bundle, timeout=600)
+        if result and result.get("resourceType") == "Bundle":
+            plans = _api_get("/api/v1/careplans") or []
+            careplan_id = plans[-1]["id"] if plans else ""
+            _pending_runs[run_id] = {"status": "complete", "careplan_id": careplan_id}
+            logger.info("Care plan generated via API for run %s -> %s", run_id, careplan_id)
+        else:
+            _pending_runs[run_id] = {"status": "error", "error": "API returned unexpected response"}
+    except Exception as e:
+        logger.error("API call failed for run %s: %s", run_id, e)
+        _pending_runs[run_id] = {"status": "error", "error": str(e)}
 
 
 @app.get("/plans/{run_id}/poll")
@@ -172,16 +203,13 @@ async def poll_run(run_id: str):
 
 @app.get("/plans", response_class=HTMLResponse)
 async def plans_list(request: Request):
-    from acp_writer.nodes.fhir_server_writer import list_care_plans
-    plans = list_care_plans()
+    plans = _api_get("/api/v1/careplans") or []
     return templates.TemplateResponse(request, "plans.html", {"plans": plans})
 
 
 @app.get("/plans/{careplan_id}", response_class=HTMLResponse)
 async def plan_review(request: Request, careplan_id: str):
-    from acp_writer.nodes.fhir_server_writer import get_care_plan
-
-    cp = get_care_plan(careplan_id)
+    cp = _api_get(f"/api/v1/careplans/{careplan_id}")
     if not cp:
         return HTMLResponse("<h1>Care plan not found</h1>", status_code=404)
 
@@ -212,13 +240,17 @@ async def plan_review(request: Request, careplan_id: str):
 
 @app.post("/plans/{careplan_id}/approve")
 async def approve(careplan_id: str, clinician: str = Form("")):
-    from acp_writer.nodes.fhir_server_writer import approve_care_plan
-    approve_care_plan(careplan_id, clinician=clinician or "Clinician")
+    _api_put(
+        f"/api/v1/careplans/{careplan_id}/status",
+        json_data={"status": "active", "clinician": clinician or "Clinician"},
+    )
     return RedirectResponse(url=f"/ui/plans/{careplan_id}", status_code=303)
 
 
 @app.post("/plans/{careplan_id}/reject")
 async def reject(careplan_id: str, reason: str = Form("")):
-    from acp_writer.nodes.fhir_server_writer import reject_care_plan
-    reject_care_plan(careplan_id, reason=reason or "No reason provided")
+    _api_put(
+        f"/api/v1/careplans/{careplan_id}/status",
+        json_data={"status": "entered-in-error", "reason": reason or "No reason provided"},
+    )
     return RedirectResponse(url=f"/ui/plans/{careplan_id}", status_code=303)

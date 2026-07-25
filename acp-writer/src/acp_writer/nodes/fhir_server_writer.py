@@ -2,6 +2,8 @@
 
 Validates OperationOutcome response and stores care plan reference.
 Supports approve/reject workflow with AI Transparency tag transitions.
+Care plans are POSTed as "draft" and updated to "active" or
+"entered-in-error" on the server on approve/reject.
 """
 
 import json
@@ -22,6 +24,51 @@ FHIR_SERVER_URL = os.environ.get("FHIR_SERVER_URL", "http://localhost:8080/fhir"
 _care_plans: dict[str, dict] = {}
 
 
+def _parse_server_ids(bundle: dict, response_data: dict) -> dict[str, str]:
+    """Map urn:uuid: fullUrls to server-assigned IDs from a transaction response."""
+    id_map: dict[str, str] = {}
+    request_entries = bundle.get("entry", [])
+    response_entries = response_data.get("entry", [])
+    for req_entry, resp_entry in zip(request_entries, response_entries):
+        full_url = req_entry.get("fullUrl", "")
+        location = resp_entry.get("response", {}).get("location", "")
+        if full_url and location:
+            parts = location.split("/")
+            if len(parts) >= 2:
+                server_ref = f"{parts[0]}/{parts[1]}"
+                id_map[full_url] = server_ref
+    return id_map
+
+
+def _find_careplan_server_id(id_map: dict[str, str]) -> str | None:
+    """Find the server-assigned CarePlan reference from the ID map."""
+    for urn, server_ref in id_map.items():
+        if server_ref.startswith("CarePlan/"):
+            return server_ref
+    return None
+
+
+def _update_on_server(server_ref: str, resource: dict) -> bool:
+    """PUT an updated resource to the FHIR server. Returns True on success."""
+    url = f"{FHIR_SERVER_URL}/{server_ref}"
+    try:
+        r = requests.put(
+            url,
+            json=resource,
+            headers={"Content-Type": "application/fhir+json"},
+            timeout=30,
+        )
+        if r.status_code in (200, 201):
+            logger.info("Updated %s on FHIR server", server_ref)
+            return True
+        else:
+            logger.warning("FHIR server PUT %s returned %d: %s", server_ref, r.status_code, r.text[:200])
+            return False
+    except requests.RequestException as e:
+        logger.warning("FHIR server unavailable for PUT %s: %s", server_ref, e)
+        return False
+
+
 @mlflow.trace(name="fhir_server_writer")
 def fhir_server_writer(state: CarePlanComposerState) -> dict:
     """Write the FHIR Bundle to the HAPI FHIR server."""
@@ -40,6 +87,7 @@ def fhir_server_writer(state: CarePlanComposerState) -> dict:
         "bundle": bundle,
         "status": "draft",
         "patient_reference": state.get("patient_reference", ""),
+        "server_ids": {},
     }
 
     try:
@@ -54,7 +102,9 @@ def fhir_server_writer(state: CarePlanComposerState) -> dict:
 
         if r.status_code in (200, 201):
             logger.info("FHIR Bundle posted successfully (status %d)", r.status_code)
+            server_ids = _parse_server_ids(bundle, response_data)
             _care_plans[careplan_id]["fhir_response"] = response_data
+            _care_plans[careplan_id]["server_ids"] = server_ids
 
             if output_dir:
                 write_artifact(output_dir, "fhir-server-response.json", response_data)
@@ -107,7 +157,7 @@ CLINAST_AIRPT_SECURITY = {
 
 
 def approve_care_plan(careplan_id: str, clinician: str | None = None) -> dict | None:
-    """Approve a care plan: status→active, AIAST→CLINAST_AIRPT."""
+    """Approve a care plan: status→active, AIAST→CLINAST_AIRPT, update on FHIR server."""
     cp = _care_plans.get(careplan_id)
     if not cp:
         return None
@@ -115,6 +165,7 @@ def approve_care_plan(careplan_id: str, clinician: str | None = None) -> dict | 
     cp["status"] = "active"
     bundle = cp.get("bundle", {})
 
+    careplan_resource = None
     for entry in bundle.get("entry", []):
         resource = entry.get("resource", {})
         security = resource.get("meta", {}).get("security", [])
@@ -124,6 +175,7 @@ def approve_care_plan(careplan_id: str, clinician: str | None = None) -> dict | 
 
         if resource.get("resourceType") == "CarePlan":
             resource["status"] = "active"
+            careplan_resource = resource
 
         if resource.get("resourceType") == "Provenance":
             profiles = resource.get("meta", {}).get("profile", [])
@@ -139,24 +191,38 @@ def approve_care_plan(careplan_id: str, clinician: str | None = None) -> dict | 
                     "who": {"display": clinician or "Clinician"},
                 })
 
+    server_ref = _find_careplan_server_id(cp.get("server_ids", {}))
+    if server_ref and careplan_resource:
+        _update_on_server(server_ref, careplan_resource)
+    elif careplan_resource:
+        logger.info("No server ID for CarePlan — server-side update skipped (local only)")
+
     return {"id": careplan_id, "status": "active"}
 
 
 def reject_care_plan(careplan_id: str, reason: str) -> dict | None:
-    """Reject a care plan: status→revoked, record reason."""
+    """Reject a care plan: status→entered-in-error, update on FHIR server."""
     cp = _care_plans.get(careplan_id)
     if not cp:
         return None
 
-    cp["status"] = "revoked"
+    cp["status"] = "entered-in-error"
     bundle = cp.get("bundle", {})
 
+    careplan_resource = None
     for entry in bundle.get("entry", []):
         resource = entry.get("resource", {})
         if resource.get("resourceType") == "CarePlan":
-            resource["status"] = "revoked"
+            resource["status"] = "entered-in-error"
             notes = resource.get("note", [])
             notes.append({"text": f"Rejected: {reason}"})
             resource["note"] = notes
+            careplan_resource = resource
 
-    return {"id": careplan_id, "status": "revoked", "reason": reason}
+    server_ref = _find_careplan_server_id(cp.get("server_ids", {}))
+    if server_ref and careplan_resource:
+        _update_on_server(server_ref, careplan_resource)
+    elif careplan_resource:
+        logger.info("No server ID for CarePlan — server-side update skipped (local only)")
+
+    return {"id": careplan_id, "status": "entered-in-error", "reason": reason}

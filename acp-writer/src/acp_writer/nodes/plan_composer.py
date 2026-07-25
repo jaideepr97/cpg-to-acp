@@ -11,7 +11,7 @@ import time
 from typing import Any
 
 import mlflow
-from langchain_openai import ChatOpenAI
+from cpg_contracts import get_llm
 
 from acp_writer.output import write_artifact
 from acp_writer.planning_brief import PlanningBrief
@@ -19,14 +19,6 @@ from acp_writer.prompts.plan_composer import PLAN_COMPOSER_SYSTEM, PLAN_COMPOSER
 from acp_writer.state import CarePlanComposerState
 
 logger = logging.getLogger(__name__)
-
-
-def _get_llm(state: dict) -> ChatOpenAI:
-    return ChatOpenAI(
-        base_url=f"{state.get('litellm_url', 'http://localhost:4000')}/v1",
-        api_key=state.get("llm_api_key", "sk-change-me"),
-        model=state.get("llm_model", "default"),
-    )
 
 
 def _format_conditions(condition_codes: list[dict]) -> str:
@@ -167,7 +159,7 @@ def plan_composer(state: CarePlanComposerState) -> dict:
     review_round = state.get("brief_review_count", 0)
     logger.info("── Plan Composer (round %d) ──", review_round + 1)
 
-    llm = _get_llm(state)
+    llm = get_llm(state)
     logger.info("Calling LLM...")
     t0 = time.time()
 

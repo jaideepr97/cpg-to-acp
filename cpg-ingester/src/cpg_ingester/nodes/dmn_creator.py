@@ -4,22 +4,12 @@ import logging
 import time
 
 import mlflow
-from langchain_openai import ChatOpenAI
-
+from cpg_contracts import get_llm
 from cpg_ingester.output import write_artifact
 from cpg_ingester.prompts.dmn_creator import DMN_CREATOR_SYSTEM, DMN_CREATOR_USER
 from cpg_ingester.reference.dmn_examples import REFERENCE_EXAMPLES
 
 logger = logging.getLogger(__name__)
-
-
-def _get_llm(state: dict) -> ChatOpenAI:
-    return ChatOpenAI(
-        base_url=f"{state.get('litellm_url', 'http://localhost:4000')}/v1",
-        api_key=state.get("llm_api_key", "sk-change-me"),
-        model=state.get("llm_model", "default"),
-
-    )
 
 
 def _format_inputs(inputs: list[dict]) -> str:
@@ -74,7 +64,7 @@ def dmn_creator(state: dict) -> dict:
 
     abbr_str = "\n".join(f"- {k}: {v}" for k, v in abbreviations.items()) if abbreviations else "(none)"
 
-    llm = _get_llm(state)
+    llm = get_llm(state)
 
     logger.info("Calling LLM...")
     t0 = time.time()

@@ -37,10 +37,19 @@ Respond with exactly one JSON object:
   ]
 }}
 
-- **APPROVE**: The brief is clinically sound and ready for FHIR generation. \
-issues may still contain warnings.
-- **REVISE**: The brief has errors that must be fixed. List numbered objections \
-with specific fixes.
+## Verdict Decision Rules
+- **APPROVE** when:
+  - No error-severity issues remain
+  - Warnings are acceptable imperfections (style, optional context, nice-to-haves)
+  - The brief is clinically safe even if not perfect
+  - Example: a monitoring activity lacks an ideal frequency but has a reasonable \
+one — APPROVE with a warning, do not REVISE
+- **REVISE** only when:
+  - A clinical safety concern exists (wrong drug, dangerous dose, contraindication missed)
+  - A required field is missing (medication without dose, activity without source)
+  - DMN decision outputs are ignored or contradicted
+  - A condition is completely unaddressed by any goal or activity
+- Do NOT REVISE for style preferences, minor wording, or optimization suggestions
 """
 
 BRIEF_REVIEWER_USER = """\

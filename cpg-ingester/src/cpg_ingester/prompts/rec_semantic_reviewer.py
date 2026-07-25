@@ -9,40 +9,57 @@ original CPG text.
 ## What to check
 
 1. **Content faithfulness**: Does the `content` field accurately represent \
-what the source says? Watch for:
-   - Softened language: "may consider" in source → "should consider" in extraction
-   - Strengthened language: "consider" → "must"
-   - Added content not in the source
-   - Omitted qualifiers or caveats from the source
-   - Paraphrasing that subtly changes clinical meaning
+what the source says? Focus on whether the clinical meaning is preserved:
+   - REJECT: Reversed direction ("avoid" → "use"), wrong dosing, \
+fabricated claims not in the source, omitted critical qualifiers \
+(e.g., dropping "only in patients with CKD")
+   - ACCEPT: Reasonable paraphrasing that preserves clinical intent \
+(e.g., "engage in at least 150 minutes" → "at least 150 minutes per week"), \
+condensing verbose source language into clear recommendations, \
+minor word choice differences that do not change the clinical action
 
-2. **Certainty grade accuracy**: Does the `certainty` field match what the \
-source states? Check:
-   - Strength: is "strong-for" vs "conditional-for" correct?
-   - Evidence quality: is "high" vs "moderate" correct?
-   - Original grade: does it match the exact label in the source?
-   - Recommendations without formal grading should use consensus/ungraded, \
-not fabricated grades
+2. **Certainty grade accuracy**: Does the `certainty` field match what \
+the source states?
+   - If the source section contains explicit grading (e.g., "Strong \
+recommendation, High-certainty evidence" or "Grade 1A"), the extraction \
+must match it exactly.
+   - If the source section has NO formal grading, the extraction should \
+use strength="consensus" and evidence_quality="ungraded". If it instead \
+assigns a specific strength like "strong-for", note this as a MINOR issue \
+for correction — it is a metadata error, not a content safety problem.
 
 3. **Completeness**: Are there recommendations in the source section that \
-were NOT extracted? A missing recommendation is as serious as an incorrect one.
+were NOT extracted? A missing recommendation is a significant gap.
 
-4. **Scope notes**: Are non-computable applicability caveats captured? \
-If the source says "in patients not previously treated" or "for those \
-who cannot tolerate ACE inhibitors", this should be in scope_notes.
-
-5. **Type accuracy**: Is the recommendation_type correct? A monitoring \
+4. **Type accuracy**: Is the recommendation_type correct? A monitoring \
 recommendation classified as "treatment" will be retrieved in the wrong \
 context.
+
+5. **Scope notes**: Are explicit non-computable applicability caveats \
+captured? Only flag scope as missing when the source states a specific \
+patient subgroup (e.g., "in patients not previously treated"). Do NOT \
+flag scope as missing for population context implied by the section \
+header or document title.
 
 6. **Remarks completeness**: If the source has structured "Remarks", \
 "Notes", or "Practice Points", are they captured in the remarks field?
 
-## Severity
-Every inaccuracy in a clinical recommendation is a potential patient \
-safety issue. Softened or strengthened language can change clinical \
-behavior. Missing recommendations leave gaps in care plans. Do not \
-dismiss anything as minor.
+## Severity classification
+
+Classify each issue as CRITICAL or MINOR:
+
+- **CRITICAL**: Changes clinical meaning or could lead to patient harm. \
+Examples: reversed treatment direction, fabricated content, wrong drug or \
+dose, omitted critical qualifier, missing recommendation entirely, wrong \
+recommendation type that would cause retrieval in the wrong clinical context.
+- **MINOR**: Metadata imprecision or stylistic differences that do not \
+change the clinical action. Examples: certainty grading assigned when \
+source has no formal grades, reasonable paraphrasing, missing implicit \
+scope from section headers, rationale sourced from a nearby section.
+
+Set `discrepancies_found` to true ONLY when CRITICAL issues exist. \
+MINOR issues should be reported in the checks for informational feedback \
+but must NOT trigger discrepancies_found or populate the discrepancies list.
 """
 
 REC_SEMANTIC_REVIEWER_USER = """\
@@ -57,6 +74,9 @@ Source CPG content (the text these were extracted from):
 For each recommendation, check content faithfulness, certainty accuracy, \
 and type correctness. Also check for any recommendations in the source \
 that are missing from the extraction.
+
+Classify each issue as CRITICAL or MINOR per the severity rules. Only \
+set discrepancies_found=true if CRITICAL issues exist.
 
 Respond with a JSON object:
 {{
@@ -73,22 +93,29 @@ Respond with a JSON object:
       "content_faithful": false,
       "certainty_accurate": true,
       "type_correct": true,
-      "issues": ["Content says 'must engage' but source says 'engage in at least' — language strengthened"]
+      "issues": ["CRITICAL: Content says 'avoid exercise' but source says 'engage in exercise' — reversed meaning"]
+    }},
+    {{
+      "recommendation_title": "Weight Management",
+      "content_faithful": true,
+      "certainty_accurate": false,
+      "type_correct": true,
+      "issues": ["MINOR: Assigned strong-for but source has no formal grading — should be consensus/ungraded"]
     }}
   ],
   "missing_recommendations": [
     "Source section mentions alcohol limitation but no recommendation was extracted for it"
   ],
   "discrepancies_found": true,
-  "summary": "One-sentence summary of all issues",
+  "summary": "One-sentence summary of CRITICAL issues only",
   "discrepancies": [
-    "Specific discrepancy for feedback to the extractor"
+    "CRITICAL issue description for feedback to the extractor"
   ]
 }}
 
-If no issues are found:
+If only MINOR issues or no issues are found:
 {{
-  "checks": [...],
+  "checks": [...with MINOR issues noted...],
   "missing_recommendations": [],
   "discrepancies_found": false,
   "summary": "",

@@ -1,0 +1,21 @@
+{{- range $name, $pod := .Values.pods }}
+{{- if $pod.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}
+  labels:
+    app.kubernetes.io/name: acp-writer-{{ $name }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/part-of: cpg-to-acp
+spec:
+  selector:
+    app.kubernetes.io/name: acp-writer-{{ $name }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+  ports:
+    - port: {{ $pod.port }}
+      targetPort: {{ $pod.port }}
+      protocol: TCP
+{{- end }}
+{{- end }}

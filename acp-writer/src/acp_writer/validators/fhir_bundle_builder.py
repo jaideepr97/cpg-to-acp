@@ -63,13 +63,53 @@ def _codeable_concept(code_dict: dict | None, text: str | None = None) -> dict:
     return {"text": "Unknown"}
 
 
-def build_fhir_bundle(brief: PlanningBrief) -> dict:
+def build_fhir_bundle(
+    brief: PlanningBrief,
+    patient_demographics: dict[str, Any] | None = None,
+) -> dict:
     """Build a complete FHIR R4 transaction Bundle from a PlanningBrief."""
     entries: list[dict] = []
     now = datetime.now(timezone.utc).isoformat()
 
-    patient_ref = brief.patient_reference
     bundle_id = _uuid()
+
+    patient_uid = _uuid()
+    patient_urn = _urn(patient_uid)
+    patient_resource: dict[str, Any] = {
+        "resourceType": "Patient",
+        "id": patient_uid,
+        "meta": _meta(),
+    }
+    if_none_exist = None
+    if patient_demographics:
+        identifiers = patient_demographics.get("identifiers", [])
+        if identifiers:
+            patient_resource["identifier"] = [
+                {"system": ident["system"], "value": ident["value"]}
+                for ident in identifiers
+            ]
+            first = identifiers[0]
+            if_none_exist = f"identifier={first['system']}|{first['value']}"
+        if patient_demographics.get("name"):
+            patient_resource["name"] = [{"text": patient_demographics["name"]}]
+        if patient_demographics.get("gender"):
+            patient_resource["gender"] = patient_demographics["gender"]
+        if patient_demographics.get("birth_date"):
+            patient_resource["birthDate"] = patient_demographics["birth_date"]
+
+    patient_entry: dict[str, Any] = {
+        "fullUrl": patient_urn,
+        "resource": patient_resource,
+        "request": {
+            "method": "POST",
+            "url": "Patient",
+        },
+    }
+    if if_none_exist:
+        patient_entry["request"]["ifNoneExist"] = if_none_exist
+    entries.append(patient_entry)
+
+    patient_ref = patient_urn
 
     goal_uids: list[str] = []
     activity_refs: list[dict] = []
@@ -112,9 +152,9 @@ def build_fhir_bundle(brief: PlanningBrief) -> dict:
 
     for i, activity in enumerate(brief.activities):
         uid = _uuid()
-        activity_uid_map[i] = uid
 
         if activity.type == ActivityType.MEDICATION:
+            activity_uid_map[i] = uid
             resource: dict[str, Any] = {
                 "resourceType": "MedicationRequest",
                 "id": uid,
@@ -135,6 +175,7 @@ def build_fhir_bundle(brief: PlanningBrief) -> dict:
             activity_refs.append({"reference": {"reference": _urn(uid)}})
 
         elif activity.type in (ActivityType.MONITORING, ActivityType.REFERRAL):
+            activity_uid_map[i] = uid
             resource = {
                 "resourceType": "ServiceRequest",
                 "id": uid,
@@ -246,14 +287,23 @@ def build_fhir_bundle(brief: PlanningBrief) -> dict:
         if not activity.source_recommendation_id:
             continue
         uid = activity_uid_map.get(i)
-        target_ref = _urn(uid) if uid else _urn(careplan_uid)
+        if uid:
+            prov_target: dict[str, Any] = {"reference": _urn(uid)}
+        else:
+            prov_target = {
+                "reference": _urn(careplan_uid),
+                "extension": [{
+                    "url": f"{AI_TRANSPARENCY_PROFILE}/targetPath",
+                    "valueString": f"CarePlan.activity[{i}].performedActivity",
+                }],
+            }
 
         act_prov_uid = _uuid()
         act_provenance: dict[str, Any] = {
             "resourceType": "Provenance",
             "id": act_prov_uid,
             "meta": _meta(),
-            "target": [{"reference": target_ref}],
+            "target": [prov_target],
             "recorded": now,
             "agent": [{
                 "type": {

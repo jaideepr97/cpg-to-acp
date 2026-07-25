@@ -1,0 +1,60 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: acp-writer-mcp
+  labels:
+    app: acp-writer-mcp
+    component: mcp-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: acp-writer-mcp
+  template:
+    metadata:
+      labels:
+        app: acp-writer-mcp
+        component: mcp-server
+    spec:
+      containers:
+        - name: mcp-server
+          image: image-registry.openshift-image-registry.svc:5000/sschifma-cpg-to-acp/acp-writer-mcp:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8090
+              protocol: TCP
+          env:
+            - name: KOGITO_URL
+              value: "http://cpg-decision-svc-decision-service:80"
+            - name: FHIR_SERVER_URL
+              value: "http://acp-fhir-server:8080"
+            - name: MLFLOW_TRACKING_URI
+              value: "https://mlflow-redhat-ods-applications.apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: acp-writer-mcp
+  labels:
+    app: acp-writer-mcp
+spec:
+  selector:
+    app: acp-writer-mcp
+  ports:
+    - port: 8090
+      targetPort: 8090
+      protocol: TCP

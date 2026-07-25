@@ -1,0 +1,68 @@
+{{- range $name, $pod := .Values.pods }}
+{{- if $pod.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}
+  labels:
+    app.kubernetes.io/name: cpg-ingester-{{ $name }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: {{ $name }}
+    app.kubernetes.io/part-of: cpg-to-acp
+    security-profile: {{ $name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cpg-ingester-{{ $name }}
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cpg-ingester-{{ $name }}
+        app.kubernetes.io/instance: {{ $.Release.Name }}
+        app.kubernetes.io/component: {{ $name }}
+        app.kubernetes.io/part-of: cpg-to-acp
+        security-profile: {{ $name }}
+    spec:
+      containers:
+        - name: {{ $name }}
+          image: "{{ $.Values.image.registry }}/{{ $.Values.image.namespace }}/{{ $pod.image }}:{{ $pod.tag }}"
+          imagePullPolicy: Always
+          ports:
+            - containerPort: {{ $pod.port }}
+              protocol: TCP
+          env:
+            - name: MLFLOW_TRACKING_URI
+              value: {{ $.Values.mlflow.trackingUri | quote }}
+            {{- if $pod.env }}
+            {{- if $pod.env.litellmUrl }}
+            - name: LITELLM_URL
+              value: {{ $pod.env.litellmUrl | quote }}
+            {{- end }}
+            {{- if $pod.env.llmModel }}
+            - name: LLM_MODEL
+              value: {{ $pod.env.llmModel | quote }}
+            {{- end }}
+            {{- if $pod.env.acpWriterUrl }}
+            - name: ACP_WRITER_URL
+              value: {{ $pod.env.acpWriterUrl | quote }}
+            {{- end }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ $pod.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ $pod.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml $pod.resources | nindent 12 }}
+{{- end }}
+{{- end }}

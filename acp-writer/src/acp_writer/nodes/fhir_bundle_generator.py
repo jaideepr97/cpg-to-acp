@@ -47,7 +47,7 @@ def fhir_bundle_generator(state: CarePlanComposerState) -> dict:
             },
         }
 
-    bundle = build_fhir_bundle(brief)
+    bundle = build_fhir_bundle(brief, patient_demographics=state.get("patient_demographics"))
 
     resource_types: dict[str, int] = {}
     for entry in bundle.get("entry", []):

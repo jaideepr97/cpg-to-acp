@@ -5,8 +5,7 @@ import logging
 import time
 
 import mlflow
-from langchain_openai import ChatOpenAI
-
+from cpg_contracts import get_llm
 from cpg_ingester.nodes.structure_analyzer import _parse_llm_json
 from cpg_ingester.output import write_artifact
 from cpg_ingester.prompts.dmn_semantic_reviewer import (
@@ -15,15 +14,6 @@ from cpg_ingester.prompts.dmn_semantic_reviewer import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _get_llm(state: dict) -> ChatOpenAI:
-    return ChatOpenAI(
-        base_url=f"{state.get('litellm_url', 'http://localhost:4000')}/v1",
-        api_key=state.get("llm_api_key", "sk-change-me"),
-        model=state.get("llm_model", "default"),
-
-    )
 
 
 @mlflow.trace(name="dmn_semantic_reviewer")
@@ -45,7 +35,7 @@ def dmn_semantic_reviewer(state: dict) -> dict:
         logger.warning("No source pages for semantic review of '%s' — skipping", name)
         return {"semantic_discrepancies": []}
 
-    llm = _get_llm(state)
+    llm = get_llm(state)
 
     logger.info("Calling LLM...")
     t0 = time.time()

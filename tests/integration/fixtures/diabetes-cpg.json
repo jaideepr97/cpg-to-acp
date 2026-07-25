@@ -1,0 +1,80 @@
+{
+  "metadata": {
+    "contract_version": "1.0",
+    "cpg_id": "SYN-DM2-2026-001",
+    "title": "Clinical Practice Guideline: Type 2 Diabetes Management in Adults",
+    "version": "1.0",
+    "publication_date": "2026-07-01",
+    "evidence_review_date": "2026-06-01",
+    "issuing_body": "Synthetic Guidelines Collaborative",
+    "grading_system": "GRADE",
+    "scope": "Adults (age 18+) with type 2 diabetes mellitus",
+    "supersedes": null
+  },
+  "recommendation_bundle": {
+    "contract_version": "1.0",
+    "source_cpg": "SYN-DM2-2026-001",
+    "recommendations": [
+      {
+        "id": "dm2-rec-001",
+        "source_cpg": "SYN-DM2-2026-001",
+        "section": "4.1",
+        "title": "First-Line Therapy — Metformin",
+        "content": "Metformin is recommended as the first-line pharmacological agent for type 2 diabetes mellitus. Starting dose of 500mg twice daily with meals, titrated up to 2000mg daily as tolerated.",
+        "recommendation_type": "treatment",
+        "certainty": {
+          "strength": "strong-for",
+          "evidence_quality": "high",
+          "grading_system": null,
+          "original_grade": "Strong recommendation, high-certainty evidence"
+        },
+        "provenance": "reviewed"
+      },
+      {
+        "id": "dm2-rec-002",
+        "source_cpg": "SYN-DM2-2026-001",
+        "section": "4.2",
+        "title": "Blood Pressure Control in Diabetes — ACE Inhibitor",
+        "content": "Patients with type 2 diabetes and hypertension (Blood Pressure >= 130/80) should receive an ACE inhibitor (e.g., Lisinopril) as preferred antihypertensive due to renal protective effects in diabetic nephropathy. Target blood pressure < 130/80 mmHg.",
+        "recommendation_type": "treatment",
+        "certainty": {
+          "strength": "strong-for",
+          "evidence_quality": "high",
+          "grading_system": null,
+          "original_grade": "Strong recommendation, high-certainty evidence"
+        },
+        "provenance": "reviewed"
+      },
+      {
+        "id": "dm2-rec-003",
+        "source_cpg": "SYN-DM2-2026-001",
+        "section": "4.3",
+        "title": "Monitoring — HbA1c",
+        "content": "Monitor Hemoglobin A1c (HbA1c) every 3 months until stable, then every 6 months. Target HbA1c < 7.0% for most adults.",
+        "recommendation_type": "monitoring",
+        "certainty": {
+          "strength": "strong-for",
+          "evidence_quality": "high",
+          "grading_system": null,
+          "original_grade": null
+        },
+        "provenance": "reviewed"
+      },
+      {
+        "id": "dm2-rec-004",
+        "source_cpg": "SYN-DM2-2026-001",
+        "section": "4.4",
+        "title": "Lifestyle — Dietary Management",
+        "content": "Adopt a balanced diet emphasizing whole grains, lean proteins, vegetables, and limiting refined carbohydrates and added sugars. Carbohydrate counting or the plate method should be taught by a registered dietitian.",
+        "recommendation_type": "lifestyle",
+        "certainty": {
+          "strength": "strong-for",
+          "evidence_quality": "moderate",
+          "grading_system": null,
+          "original_grade": null
+        },
+        "provenance": "reviewed"
+      }
+    ]
+  }
+}

@@ -174,22 +174,31 @@ async def generate_careplan(request: Request):
     if bundle.get("resourceType") != "Bundle":
         raise HTTPException(status_code=400, detail="Request body must be a FHIR Bundle")
 
+    import uuid
+
+    from acp_writer.checkpointer import get_checkpointer
     from acp_writer.pipeline import build_pipeline
 
     litellm_url = os.environ.get("LITELLM_URL", "http://localhost:4000")
     llm_model = os.environ.get("LLM_MODEL", "default")
     llm_api_key = os.environ.get("LLM_API_KEY", "sk-change-me")
 
+    run_id = str(uuid.uuid4())
     graph = build_pipeline()
-    compiled = graph.compile()
+    checkpointer = get_checkpointer()
+    compiled = graph.compile(checkpointer=checkpointer)
 
     try:
-        result = compiled.invoke({
-            "ips_bundle": bundle,
-            "litellm_url": litellm_url,
-            "llm_model": llm_model,
-            "llm_api_key": llm_api_key,
-        })
+        result = compiled.invoke(
+            {
+                "ips_bundle": bundle,
+                "run_id": run_id,
+                "litellm_url": litellm_url,
+                "llm_model": llm_model,
+                "llm_api_key": llm_api_key,
+            },
+            config={"configurable": {"thread_id": run_id}},
+        )
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Care plan generation failed: {e}")
 
@@ -226,14 +235,14 @@ async def update_careplan_status(careplan_id: str, request: Request):
         if not result:
             raise HTTPException(status_code=404, detail=f"Care plan '{careplan_id}' not found")
         return result
-    elif new_status == "revoked":
+    elif new_status == "entered-in-error":
         reason = data.get("reason", "No reason provided")
         result = reject_care_plan(careplan_id, reason=reason)
         if not result:
             raise HTTPException(status_code=404, detail=f"Care plan '{careplan_id}' not found")
         return result
     else:
-        raise HTTPException(status_code=400, detail=f"Invalid status: {new_status}. Use 'active' or 'revoked'.")
+        raise HTTPException(status_code=400, detail=f"Invalid status: {new_status}. Use 'active' or 'entered-in-error'.")
 
 
 # --- Decision Models ---

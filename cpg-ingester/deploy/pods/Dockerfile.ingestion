@@ -1,0 +1,21 @@
+FROM registry.access.redhat.com/ubi9/python-312:latest
+USER 0
+WORKDIR /app
+RUN dnf install -y gcc gcc-c++ make mesa-libGL && dnf clean all
+COPY shared/ /app/shared/
+RUN pip install --no-cache-dir /app/shared/
+COPY cpg-ingester/pyproject.toml .
+COPY cpg-ingester/src/ src/
+RUN pip install --no-cache-dir boto3 python-multipart .
+ENV DOCLING_CACHE_DIR=/app/.cache/docling
+ENV DOCLING_ARTIFACTS_PATH=/app/.cache/docling/models
+ENV HF_HUB_ENABLE_HF_TRANSFER=0
+RUN docling-tools models download layout tableformer && \
+    du -sh /app/.cache/docling/models/ && \
+    chmod -R g=u /app/.cache
+ENV HF_HUB_OFFLINE=1
+COPY cpg-ingester/data/ data/
+RUN chmod -R g=u /app
+USER 1001
+EXPOSE 8080
+CMD ["uvicorn", "cpg_ingester.services.ingestion:app", "--host", "0.0.0.0", "--port", "8080"]

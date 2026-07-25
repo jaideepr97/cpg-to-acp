@@ -139,7 +139,7 @@ class TestStructureAnalyzerWithMockedLLM:
         with tempfile.TemporaryDirectory() as tmpdir:
             state = self._make_state_with_docling(tmpdir)
 
-            with patch("cpg_ingester.nodes.structure_analyzer._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.structure_analyzer.get_llm", return_value=mock_llm):
                 result = structure_analyzer(state)
 
             assert "section_map" in result

@@ -98,7 +98,10 @@ def assembly(state: dict) -> dict:
     item_manifest = state.get("item_manifest", [])
     output_dir = state.get("output_dir", "output")
 
-    dmn_results, all_recs = _collect_from_output_dir(output_dir)
+    dmn_results = state.get("dmn_results") or []
+    all_recs = state.get("recommendation_results") or []
+    if not dmn_results and not all_recs:
+        dmn_results, all_recs = _collect_from_output_dir(output_dir)
 
     cpg_id = cpg_metadata.get("cpg_id", "UNKNOWN")
     for rec in all_recs:

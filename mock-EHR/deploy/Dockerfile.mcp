@@ -1,0 +1,12 @@
+FROM registry.access.redhat.com/ubi9/python-312:latest
+USER 0
+WORKDIR /app
+COPY shared/ /app/shared/
+RUN pip install --no-cache-dir /app/shared/
+RUN pip install --no-cache-dir mlflow requests fastapi uvicorn "mcp[cli]>=1.0"
+COPY mock-EHR/src/ /app/src/
+ENV PYTHONPATH=/app/src
+RUN chmod -R g=u /app
+USER 1001
+EXPOSE 8090
+CMD ["uvicorn", "mock_ehr.mcp_app:app", "--host", "0.0.0.0", "--port", "8090"]

@@ -1,0 +1,93 @@
+image:
+  registry: image-registry.openshift-image-registry.svc:5000
+  namespace: sschifma-cpg-to-acp
+
+pods:
+  patient-data:
+    enabled: true
+    image: acp-writer-patient-data
+    tag: phase3
+    port: 8080
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
+
+  llm-reasoning:
+    enabled: true
+    image: acp-writer-llm
+    tag: phase3
+    port: 8080
+    env:
+      litellmUrl: http://maas-model-gpt-5-6-backend:443/v1
+      llmModel: gpt-5-6
+    resources:
+      requests:
+        cpu: 500m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 512Mi
+
+  decision-engine:
+    enabled: true
+    image: acp-writer-decision
+    tag: phase3
+    port: 8080
+    env:
+      kogitoUrl: http://cpg-decision-svc-decision-service:8081
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
+
+  fhir-generation:
+    enabled: true
+    image: acp-writer-fhir-gen
+    tag: phase3
+    port: 8080
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  fhir-server:
+    enabled: true
+    image: acp-writer-fhir-srv
+    tag: phase3
+    port: 8080
+    env:
+      fhirServerUrl: http://cpg-mock-ehr-hapi-fhir:8080/fhir
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
+
+  ui:
+    enabled: true
+    image: acp-writer-ui
+    tag: phase3
+    port: 8082
+    route: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+mlflow:
+  trackingUri: https://mlflow-redhat-ods-applications.apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com

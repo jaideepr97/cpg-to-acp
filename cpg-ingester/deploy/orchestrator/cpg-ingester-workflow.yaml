@@ -1,0 +1,116 @@
+apiVersion: sonataflow.org/v1alpha08
+kind: SonataFlow
+metadata:
+  name: cpgingester
+  annotations:
+    sonataflow.org/profile: dev
+    sonataflow.org/description: "CPG Ingester pipeline orchestration"
+    sonataflow.org/version: "0.2.0"
+spec:
+  podTemplate:
+    container:
+      env:
+        - name: INGESTION_URL
+          value: "http://cpg-ing-ingestion:8080"
+        - name: LLM_ANALYSIS_URL
+          value: "http://cpg-ing-llm-analysis:8080"
+        - name: ASSEMBLY_URL
+          value: "http://cpg-ing-assembly:8080"
+        - name: DELIVERY_URL
+          value: "http://cpg-ing-delivery:8080"
+  flow:
+    specVersion: "0.8"
+    start: Parse
+    events:
+      - name: parseDone
+        source: ""
+        type: parse-done
+      - name: analyzeDone
+        source: ""
+        type: analyze-done
+    functions:
+      # Async functions (long-running: Docling ML + LLM calls)
+      - name: parsepdfasync
+        type: custom
+        operation: rest:post:http://cpg-ing-ingestion:8080/api/v1/parse-async
+      - name: analyzeasync
+        type: custom
+        operation: rest:post:http://cpg-ing-llm-analysis:8080/api/v1/analyze-async
+      # Sync functions (fast: deterministic + bounded REST)
+      - name: assemble
+        type: custom
+        operation: rest:post:http://cpg-ing-assembly:8080/api/v1/assemble
+      - name: deliver
+        type: custom
+        operation: rest:post:http://cpg-ing-delivery:8080/api/v1/deliver
+    states:
+      # --- Phase 1: PDF parsing (async callback — Docling ML, 30-120s) ---
+
+      - name: Parse
+        type: callback
+        action:
+          functionRef:
+            refName: parsepdfasync
+            arguments:
+              callback_url: "http://cpgingester:80/wait-parse"
+              process_instance_id: "$WORKFLOW.instanceId"
+              pdf_ref: "${ .pdf_ref }"
+        eventRef: parseDone
+        eventRef: parseDone
+        eventDataFilter:
+          toStateData: "${ .parseResult }"
+        stateDataFilter:
+          output: "${ del(.pdf_ref) }"
+        transition: Analyze
+
+      # --- Phase 2: LLM analysis (async callback — 2-30+ minutes) ---
+
+      - name: Analyze
+        type: callback
+        action:
+          functionRef:
+            refName: analyzeasync
+            arguments:
+              callback_url: "http://cpgingester:80/wait-analyze"
+              process_instance_id: "$WORKFLOW.instanceId"
+              parse_result_ref: "${ .parseResult.parse_result_ref }"
+        eventRef: analyzeDone
+        eventDataFilter:
+          toStateData: "${ .analysisResult }"
+        transition: Assemble
+
+      # --- Phase 3: Assembly (sync — deterministic, <1s) ---
+
+      - name: Assemble
+        type: operation
+        actions:
+          - name: callAssemble
+            functionRef:
+              refName: assemble
+              arguments:
+                analysis_result_ref: "${ .analysisResult.analysis_result_ref }"
+            actionDataFilter:
+              results: "${ . }"
+              toStateData: "${ .assemblyResult }"
+        transition: Deliver
+
+      # --- Phase 4: Delivery to acp-writer (sync — bounded REST, 10-30s) ---
+
+      - name: Deliver
+        type: operation
+        actions:
+          - name: callDeliver
+            functionRef:
+              refName: deliver
+              arguments:
+                assembly_result_ref: "${ .assemblyResult.assembly_result_ref }"
+            actionDataFilter:
+              results: "${ . }"
+              toStateData: "${ .deliveryResult }"
+        transition: Done
+
+      - name: Done
+        type: inject
+        data:
+          status: "completed"
+        end: true

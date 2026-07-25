@@ -1,0 +1,78 @@
+image:
+  registry: image-registry.openshift-image-registry.svc:5000
+  namespace: sschifma-cpg-to-acp
+
+pods:
+  ingestion:
+    enabled: true
+    image: cpg-ingester-ingestion
+    tag: phase3
+    port: 8080
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        cpu: "2"
+        memory: 3Gi
+
+  llm-analysis:
+    enabled: true
+    image: cpg-ingester-llm
+    tag: phase3
+    port: 8080
+    env:
+      litellmUrl: http://maas-model-gpt-5-6-backend:443/v1
+      llmModel: gpt-5-6
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: "2"
+        memory: 2Gi
+
+  assembly:
+    enabled: true
+    image: cpg-ingester-assembly
+    tag: phase3
+    port: 8080
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
+
+  delivery:
+    enabled: true
+    image: cpg-ingester-delivery
+    tag: phase3
+    port: 8080
+    env:
+      acpWriterUrl: http://cpg-acp-writer-acp-writer:8082
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
+
+  ui:
+    enabled: true
+    image: cpg-ingester-ui
+    tag: phase3
+    port: 8090
+    route: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+mlflow:
+  trackingUri: https://mlflow-redhat-ods-applications.apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com

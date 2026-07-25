@@ -1,0 +1,166 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openshell-http
+  labels:
+    app.kubernetes.io/name: openshell-http
+spec:
+  selector:
+    app.kubernetes.io/name: openshell
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openshell-router-config
+data:
+  nginx.conf: |
+    worker_processes 1;
+    events { worker_connections 128; }
+
+    http {
+        server_names_hash_bucket_size 128;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+        proxy_connect_timeout 10s;
+        client_max_body_size 50m;
+
+        server {
+            listen 8080;
+            server_name cpg-ing-ingestion cpg-ing-ingestion.sschifma-cpg-to-acp.svc.cluster.local;
+            location / {
+                proxy_set_header Host sb-ingestion--http.openshell.localhost;
+                proxy_pass http://openshell-http:8080;
+            }
+        }
+        server {
+            listen 8080;
+            server_name cpg-ing-llm-analysis cpg-ing-llm-analysis.sschifma-cpg-to-acp.svc.cluster.local;
+            location / {
+                proxy_set_header Host sb-llm-analysis--http.openshell.localhost;
+                proxy_pass http://openshell-http:8080;
+            }
+        }
+        server {
+            listen 8080;
+            server_name cpg-ing-assembly cpg-ing-assembly.sschifma-cpg-to-acp.svc.cluster.local;
+            location / {
+                proxy_set_header Host sb-assembly--http.openshell.localhost;
+                proxy_pass http://openshell-http:8080;
+            }
+        }
+        server {
+            listen 8080;
+            server_name cpg-ing-delivery cpg-ing-delivery.sschifma-cpg-to-acp.svc.cluster.local;
+            location / {
+                proxy_set_header Host sb-delivery--http.openshell.localhost;
+                proxy_pass http://openshell-http:8080;
+            }
+        }
+        server {
+            listen 8080;
+            server_name acp-patient-data acp-patient-data.sschifma-cpg-to-acp.svc.cluster.local;
+            location / {
+                proxy_set_header Host sb-patient-data--http.openshell.localhost;
+                proxy_pass http://openshell-http:8080;
+            }
+        }
+        server {
+            listen 8080;
+            server_name acp-llm-reasoning acp-llm-reasoning.sschifma-cpg-to-acp.svc.cluster.local;
+            location / {
+                proxy_set_header Host sb-llm-reasoning--http.openshell.localhost;
+                proxy_pass http://openshell-http:8080;
+            }
+        }
+        server {
+            listen 8080;
+            server_name acp-decision-engine acp-decision-engine.sschifma-cpg-to-acp.svc.cluster.local;
+            location / {
+                proxy_set_header Host sb-decision-engine--http.openshell.localhost;
+                proxy_pass http://openshell-http:8080;
+            }
+        }
+        server {
+            listen 8080;
+            server_name acp-fhir-generation acp-fhir-generation.sschifma-cpg-to-acp.svc.cluster.local;
+            location / {
+                proxy_set_header Host sb-fhir-generation--http.openshell.localhost;
+                proxy_pass http://openshell-http:8080;
+            }
+        }
+        server {
+            listen 8080;
+            server_name acp-fhir-server acp-fhir-server.sschifma-cpg-to-acp.svc.cluster.local;
+            location / {
+                proxy_set_header Host sb-fhir-server--http.openshell.localhost;
+                proxy_pass http://openshell-http:8080;
+            }
+        }
+        server {
+            listen 8080 default_server;
+            location /health {
+                return 200 '{"status":"UP","service":"openshell-router"}';
+                add_header Content-Type application/json;
+            }
+            location / {
+                return 404 '{"error":"no matching sandbox for this hostname"}';
+                add_header Content-Type application/json;
+            }
+        }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openshell-router
+  labels:
+    app: openshell-router
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openshell-router
+  template:
+    metadata:
+      labels:
+        app: openshell-router
+    spec:
+      containers:
+        - name: nginx
+          image: registry.access.redhat.com/ubi9/nginx-124:latest
+          command: ["nginx", "-g", "daemon off;", "-c", "/etc/nginx/nginx-custom.conf"]
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx-custom.conf
+              subPath: nginx.conf
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: openshell-router-config

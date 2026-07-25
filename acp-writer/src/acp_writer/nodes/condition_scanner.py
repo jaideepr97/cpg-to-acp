@@ -64,6 +64,13 @@ def _extract_patient_demographics(patient: dict) -> dict[str, Any]:
         given = " ".join(name.get("given", []))
         family = name.get("family", "")
         demographics["name"] = f"{given} {family}".strip()
+    identifiers = patient.get("identifier", [])
+    if identifiers:
+        demographics["identifiers"] = [
+            {"system": ident.get("system", ""), "value": ident.get("value", "")}
+            for ident in identifiers
+            if ident.get("value")
+        ]
     return demographics
 
 

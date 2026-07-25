@@ -5,8 +5,7 @@ import logging
 import time
 
 import mlflow
-from langchain_openai import ChatOpenAI
-
+from cpg_contracts import get_llm
 from cpg_ingester.nodes.structure_analyzer import _parse_llm_json
 from cpg_ingester.output import write_artifact
 from cpg_ingester.prompts.classification_reviewer import (
@@ -15,15 +14,6 @@ from cpg_ingester.prompts.classification_reviewer import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _get_llm(state: dict) -> ChatOpenAI:
-    return ChatOpenAI(
-        base_url=f"{state.get('litellm_url', 'http://localhost:4000')}/v1",
-        api_key=state.get("llm_api_key", "sk-change-me"),
-        model=state.get("llm_model", "default"),
-
-    )
 
 
 @mlflow.trace(name="classification_reviewer")
@@ -41,7 +31,7 @@ def classification_reviewer(state: dict) -> dict:
         logger.warning("Empty manifest — nothing to review")
         return {"classification_review_feedback": ""}
 
-    llm = _get_llm(state)
+    llm = get_llm(state)
 
     section_map_str = "\n".join(
         f"- [{s['classification']}] Page {s.get('page_start', '?')}: \"{s['heading']}\""

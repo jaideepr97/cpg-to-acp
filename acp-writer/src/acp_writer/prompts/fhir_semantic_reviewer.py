@@ -15,6 +15,20 @@ All source CPGs referenced?
 5. **CarePlan.addresses**: Do the referenced conditions match the patient's actual conditions?
 6. **Consistency**: Do MedicationRequest codes match what the CarePlan activities reference?
 
+## Verdict Decision Rules
+- **APPROVE** when:
+  - No error-severity issues remain
+  - The bundle is clinically safe and the FHIR resources correctly represent intent
+  - Warnings about optional improvements are acceptable — note them but APPROVE
+  - Syntax and terminology validation results are already handled by upstream \
+validators — do not duplicate their findings
+- **REVISE** only when:
+  - A clinical safety issue exists in the FHIR representation (wrong dose, \
+missing subject, goal-activity mismatch)
+  - Required FHIR fields are missing or semantically wrong
+  - AI Transparency IG compliance is broken (missing Provenance, Device, or tags)
+- Do NOT REVISE for style, optional extensions, or cosmetic improvements
+
 ## Response Format
 Respond with exactly one JSON object:
 {{

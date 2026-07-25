@@ -74,3 +74,95 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  cpg-ingester:
+    build:
+      context: .
+      dockerfile: cpg-ingester/deploy/Dockerfile
+    depends_on:
+      acp-writer:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    environment:
+      - ACP_WRITER_URL=http://acp-writer:8082
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    profiles:
+      - ingester
+
+  # --- cpg-ingester pod-split services ---
+
+  cpg-ingester-ingestion:
+    build:
+      context: .
+      dockerfile: cpg-ingester/deploy/pods/Dockerfile.ingestion
+    ports:
+      - "8090:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    profiles:
+      - ingester-pods
+
+  cpg-ingester-llm:
+    build:
+      context: .
+      dockerfile: cpg-ingester/deploy/pods/Dockerfile.llm-analysis
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    environment:
+      - LITELLM_URL=http://litellm:4000
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    profiles:
+      - ingester-pods
+
+  cpg-ingester-assembly:
+    build:
+      context: .
+      dockerfile: cpg-ingester/deploy/pods/Dockerfile.assembly
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    profiles:
+      - ingester-pods
+
+  cpg-ingester-delivery:
+    build:
+      context: .
+      dockerfile: cpg-ingester/deploy/pods/Dockerfile.delivery
+    depends_on:
+      acp-writer:
+        condition: service_healthy
+    environment:
+      - ACP_WRITER_URL=http://acp-writer:8082
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    profiles:
+      - ingester-pods
+
+  cpg-ingester-ui:
+    build:
+      context: .
+      dockerfile: cpg-ingester/deploy/pods/Dockerfile.ui
+    ports:
+      - "8095:8090"
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    profiles:
+      - ingester-pods

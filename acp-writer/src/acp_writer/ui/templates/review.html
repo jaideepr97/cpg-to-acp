@@ -111,7 +111,7 @@
 </div>
 {% elif status == 'active' %}
 <div class="status status-success">This care plan has been approved.</div>
-{% elif status == 'revoked' %}
+{% elif status == 'entered-in-error' %}
 <div class="status status-error">This care plan has been rejected.</div>
 {% endif %}
 {% endblock %}

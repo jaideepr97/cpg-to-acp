@@ -1,0 +1,36 @@
+---
+apiVersion: mcp.kuadrant.io/v1alpha1
+kind: MCPVirtualServer
+metadata:
+  name: delivery-tools
+spec:
+  description: "Tools for cpg-ingester Delivery agent — deploy CPG artifacts to acp-writer"
+  tools:
+    - acp_register_guideline
+    - acp_deploy_decision_model
+    - acp_ingest_recommendation
+    - acp_ingest_recommendation_batch
+---
+apiVersion: mcp.kuadrant.io/v1alpha1
+kind: MCPVirtualServer
+metadata:
+  name: patient-tools
+spec:
+  description: "Tools for Patient Data agent — query FHIR patient records"
+  tools:
+    - ehr_get_patient_summary
+    - ehr_get_patient_conditions
+    - ehr_get_patient_observations
+---
+apiVersion: mcp.kuadrant.io/v1alpha1
+kind: MCPVirtualServer
+metadata:
+  name: careplan-tools
+spec:
+  description: "Tools for care plan generation and clinical decision support"
+  tools:
+    - acp_generate_careplan
+    - acp_list_decision_models
+    - acp_evaluate_decision
+    - acp_search_recommendations
+    - ehr_list_patients

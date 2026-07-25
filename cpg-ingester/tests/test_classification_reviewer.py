@@ -33,7 +33,7 @@ class TestClassificationReviewer:
                 "output_dir": tmpdir,
                 "classification_review_count": 0,
             }
-            with patch("cpg_ingester.nodes.classification_reviewer._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.classification_reviewer.get_llm", return_value=mock_llm):
                 result = classification_reviewer(state)
 
             assert result["classification_review_feedback"] == ""
@@ -61,7 +61,7 @@ class TestClassificationReviewer:
                 "output_dir": tmpdir,
                 "classification_review_count": 0,
             }
-            with patch("cpg_ingester.nodes.classification_reviewer._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.classification_reviewer.get_llm", return_value=mock_llm):
                 result = classification_reviewer(state)
 
             assert "thresholds" in result["classification_review_feedback"]
@@ -83,7 +83,7 @@ class TestClassificationReviewer:
                 "output_dir": tmpdir,
                 "classification_review_count": 0,
             }
-            with patch("cpg_ingester.nodes.classification_reviewer._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.classification_reviewer.get_llm", return_value=mock_llm):
                 classification_reviewer(state)
 
             report_path = Path(tmpdir) / "classification-review-1.json"
@@ -106,7 +106,7 @@ class TestClassificationReviewer:
                 "output_dir": tmpdir,
                 "classification_review_count": 1,
             }
-            with patch("cpg_ingester.nodes.classification_reviewer._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.classification_reviewer.get_llm", return_value=mock_llm):
                 classification_reviewer(state)
 
             assert (Path(tmpdir) / "classification-review-2.json").exists()
@@ -134,7 +134,7 @@ class TestClassificationReviewer:
                 "output_dir": tmpdir,
                 "classification_review_count": 0,
             }
-            with patch("cpg_ingester.nodes.classification_reviewer._get_llm", return_value=mock_llm):
+            with patch("cpg_ingester.nodes.classification_reviewer.get_llm", return_value=mock_llm):
                 result = classification_reviewer(state)
 
             assert result["classification_review_feedback"] == ""

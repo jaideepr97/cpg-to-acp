@@ -38,7 +38,8 @@ The system has four application components connected by standards-based contract
 | [`mock-EHR/`](mock-EHR/) | HAPI FHIR server acting as an EHR proxy, plus a simple EHR client that the acp-writer can launch within. Used for development and demonstration. |
 | [`platform/`](platform/) | Shared infrastructure services (MaaS, MLflow) consumed by multiple application components. On OpenShift AI these are platform capabilities; for local dev this directory provides equivalent deployments. |
 | [`shared/`](shared/) | Shared contracts and utilities across components. Used sparingly to prevent coupling. |
-| [`dev_docs/`](dev_docs/) | Project proposals, design documents, and onboarding materials. Point-in-time references — may not reflect current state. |
+| [`docs/`](docs/) | User-facing documentation: architecture, security, deployment guides. |
+| [`dev_docs/`](dev_docs/) | Internal development documents: design docs, spikes, project plan. Point-in-time references — may not reflect current state. |
 
 ## Pipeline Overview
 

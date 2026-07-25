@@ -9,7 +9,7 @@ import logging
 import time
 
 import mlflow
-from langchain_openai import ChatOpenAI
+from cpg_contracts import get_llm
 
 from acp_writer.output import write_artifact
 from acp_writer.planning_brief import PlanningBrief, ReviewStatus
@@ -17,14 +17,6 @@ from acp_writer.prompts.brief_reviewer import BRIEF_REVIEWER_SYSTEM, BRIEF_REVIE
 from acp_writer.state import CarePlanComposerState
 
 logger = logging.getLogger(__name__)
-
-
-def _get_llm(state: dict) -> ChatOpenAI:
-    return ChatOpenAI(
-        base_url=f"{state.get('litellm_url', 'http://localhost:4000')}/v1",
-        api_key=state.get("llm_api_key", "sk-change-me"),
-        model=state.get("llm_model", "default"),
-    )
 
 
 def _format_code_list(codes: list[dict]) -> str:
@@ -100,7 +92,7 @@ def brief_reviewer(state: CarePlanComposerState) -> dict:
         ),
     )
 
-    llm = _get_llm(state)
+    llm = get_llm(state)
     logger.info("Calling LLM...")
     t0 = time.time()
 

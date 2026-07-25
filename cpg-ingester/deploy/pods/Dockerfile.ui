@@ -1,0 +1,10 @@
+FROM registry.access.redhat.com/ubi9/python-312:latest
+WORKDIR /app
+COPY cpg-ingester/src/cpg_ingester/ui/ /app/src/cpg_ingester/ui/
+COPY cpg-ingester/src/cpg_ingester/__init__.py /app/src/cpg_ingester/__init__.py
+COPY cpg-ingester/src/cpg_ingester/output.py /app/src/cpg_ingester/output.py
+RUN pip install --no-cache-dir fastapi uvicorn jinja2 requests click python-multipart
+ENV PYTHONPATH=/app/src
+USER 1001
+EXPOSE 8090
+CMD ["python", "-m", "cpg_ingester.ui.app"]

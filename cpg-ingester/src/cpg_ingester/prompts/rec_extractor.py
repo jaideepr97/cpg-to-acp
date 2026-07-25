@@ -24,14 +24,15 @@ no-recommendation, conditional-against, strong-against
   - **evidence_quality**: One of: high, moderate, low, very-low, ungraded
   - **grading_system**: The grading system used (or null to inherit from CPG metadata)
   - **original_grade**: The exact grade label from the source (e.g., "1A", "Strong, High")
-  Set to null if the recommendation has no formal grading.
+  If the source has no formal grading, use strength="consensus", \
+evidence_quality="ungraded", grading_system=null, original_grade=null.
 - **scope_notes**: Non-computable applicability caveats (e.g., "applies only to \
 patients not previously treated"). Null if none.
 - **remarks**: Structured implementation notes as a list of strings. \
 Capture "Remarks", "Notes", "Practice Points" sections. Null if none.
 - **rationale**: Brief evidence rationale if stated. Null if not.
-- **cross_references**: List of GUIDs from the manifest for related items. \
-Use the pre-assigned GUIDs, not names.
+- **cross_references**: Leave as an empty list `[]`. Cross-references \
+are populated automatically by a downstream pipeline step.
 - **provenance**: One of: reviewed, new-added, amended, not-changed, removed. \
 Default to "reviewed" for initial extraction.
 - **evidence_review_date**: Date in YYYY-MM-DD format if stated. Null otherwise.
@@ -49,7 +50,7 @@ strength="consensus", evidence_quality="ungraded".
 explicitly states it cannot make a recommendation.
 - If a recommendation has structured "Remarks" or "Notes", put them in \
 the remarks field as a list of strings.
-- Cross-references should use GUIDs from the manifest, not names.
+- Always set cross_references to an empty list `[]`.
 - **Abbreviation expansion**: In the `content` field, expand EVERY occurrence \
 of an abbreviation using the pattern "Full Name (ABBREVIATION)" — e.g., \
 "Dietary Approaches to Stop Hypertension (DASH)" every time, not just the \

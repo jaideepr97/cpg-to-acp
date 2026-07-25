@@ -1,0 +1,54 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: acp-writer-mcp-server
+spec:
+  hostnames:
+    - acp-writer.mcp.local
+  parentRefs:
+    - name: cpg-gateway
+      sectionName: mcps
+  rules:
+    - backendRefs:
+        - name: acp-writer-mcp
+          port: 8090
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mock-ehr-mcp-server
+spec:
+  hostnames:
+    - mock-ehr.mcp.local
+  parentRefs:
+    - name: cpg-gateway
+      sectionName: mcps
+  rules:
+    - backendRefs:
+        - name: mock-ehr-mcp
+          port: 8090
+---
+apiVersion: mcp.kuadrant.io/v1alpha1
+kind: MCPServerRegistration
+metadata:
+  name: acp-writer-mcp-server
+spec:
+  toolPrefix: "acp_"
+  path: /mcp
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: acp-writer-mcp-server
+---
+apiVersion: mcp.kuadrant.io/v1alpha1
+kind: MCPServerRegistration
+metadata:
+  name: mock-ehr-mcp-server
+spec:
+  toolPrefix: "ehr_"
+  path: /mcp
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: mock-ehr-mcp-server

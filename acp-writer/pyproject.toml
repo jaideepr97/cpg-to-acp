@@ -17,6 +17,7 @@ dependencies = [
     "mlflow>=2.15",
     "mcp>=1.0",
     "langgraph>=0.4",
+    "langgraph-checkpoint-sqlite>=3.0",
     "langchain-openai>=0.3",
     "pgvector>=0.5.0",
     "sqlalchemy>=2.0",

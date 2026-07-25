@@ -2,11 +2,12 @@
 
 import json
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 import acp_writer.api as api_module
-from acp_writer.api import _dynamic_models, init_stores
+from acp_writer.api import init_stores
 from acp_writer.nodes.guideline_resolver import (
     _build_dependency_graph,
     _condition_matches_scope,
@@ -30,16 +31,22 @@ def _deploy_dmn(name: str):
     from acp_writer.api import _parse_dmn_metadata
     dmn_xml = (DMN_DIR / name).read_text()
     summary = _parse_dmn_metadata(dmn_xml)
-    _dynamic_models[summary.id] = {"summary": summary, "dmn_xml": dmn_xml}
-    return summary
+    return summary.model_dump(mode="json")
+
+
+def _mock_decision_engine_response(*dmn_names):
+    models = [_deploy_dmn(n) for n in dmn_names]
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.json.return_value = models
+    resp.raise_for_status = MagicMock()
+    return resp
 
 
 @pytest.fixture(autouse=True)
 def reset_stores():
-    _dynamic_models.clear()
     init_stores(FakeEmbeddingProvider(dimensions=8))
     yield
-    _dynamic_models.clear()
     init_stores(FakeEmbeddingProvider(dimensions=8))
 
 
@@ -90,11 +97,13 @@ class TestBuildDependencyGraph:
 
 
 class TestGuidelineResolver:
-    def test_matches_hypertension_cpg(self):
+    @patch("acp_writer.nodes.guideline_resolver.requests.get")
+    def test_matches_hypertension_cpg(self, mock_get):
         metadata = _load_sample_metadata()
         api_module._guidelines_store.register(metadata)
-        _deploy_dmn("treatment-recommendation.dmn")
-        _deploy_dmn("monitoring-plan.dmn")
+        mock_get.return_value = _mock_decision_engine_response(
+            "treatment-recommendation.dmn", "monitoring-plan.dmn"
+        )
 
         state = {
             "condition_codes": [
@@ -121,6 +130,21 @@ class TestGuidelineResolver:
         assert result["applicable_cpgs"] == []
         assert result["applicable_dmn_models"] == []
 
+    @patch("acp_writer.nodes.guideline_resolver.requests.get")
+    def test_decision_engine_unavailable(self, mock_get):
+        metadata = _load_sample_metadata()
+        api_module._guidelines_store.register(metadata)
+        mock_get.side_effect = Exception("Connection refused")
+
+        state = {
+            "condition_codes": [
+                {"system": "http://snomed.info/sct", "code": "59621000", "display": "Essential hypertension"},
+            ],
+        }
+        result = guideline_resolver(state)
+        assert len(result["applicable_cpgs"]) == 1
+        assert result["applicable_dmn_models"] == []
+
     def test_no_registered_guidelines(self):
         state = {
             "condition_codes": [
@@ -134,20 +158,20 @@ class TestGuidelineResolver:
         result = guideline_resolver({})
         assert result["applicable_cpgs"] == []
 
-    def test_pipeline_integration(self):
+    @patch("acp_writer.nodes.guideline_resolver.requests.get")
+    def test_pipeline_integration(self, mock_get):
         """Full pipeline with Condition Scanner + Guideline Resolver."""
-        from unittest.mock import MagicMock, patch
-
         metadata = _load_sample_metadata()
         api_module._guidelines_store.register(metadata)
-        _deploy_dmn("treatment-recommendation.dmn")
-        _deploy_dmn("monitoring-plan.dmn")
+        mock_get.return_value = _mock_decision_engine_response(
+            "treatment-recommendation.dmn", "monitoring-plan.dmn"
+        )
 
         bundle = json.loads((DATA_DIR / "patient-bundle-medication.json").read_text())
 
-        with patch("acp_writer.nodes.plan_composer._get_llm") as mock_compose, \
-             patch("acp_writer.nodes.brief_reviewer._get_llm") as mock_brief, \
-             patch("acp_writer.nodes.fhir_semantic_reviewer._get_llm") as mock_fhir:
+        with patch("acp_writer.nodes.plan_composer.get_llm") as mock_compose, \
+             patch("acp_writer.nodes.brief_reviewer.get_llm") as mock_brief, \
+             patch("acp_writer.nodes.fhir_semantic_reviewer.get_llm") as mock_fhir:
             for mock_llm in [mock_compose, mock_brief, mock_fhir]:
                 resp = MagicMock()
                 resp.content = '{"patient_reference":"Patient/patient-1","applicable_cpgs":[],"goals":[],"activities":[],"conflicts":[],"review_status":"pending"}'

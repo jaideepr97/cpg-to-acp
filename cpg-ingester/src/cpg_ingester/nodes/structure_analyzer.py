@@ -6,8 +6,7 @@ import re
 import time
 
 import mlflow
-from langchain_openai import ChatOpenAI
-
+from cpg_contracts import get_llm
 from cpg_ingester.output import write_artifact
 from cpg_ingester.prompts.structure_analyzer import (
     ARCHETYPE_DETECTION_SYSTEM,
@@ -103,15 +102,6 @@ def _parse_llm_json(text: str) -> dict | list:
     return json.loads(cleaned.strip())
 
 
-def _get_llm(state: dict) -> ChatOpenAI:
-    return ChatOpenAI(
-        base_url=f"{state.get('litellm_url', 'http://localhost:4000')}/v1",
-        api_key=state.get("llm_api_key", "sk-change-me"),
-        model=state.get("llm_model", "default"),
-
-    )
-
-
 @mlflow.trace(name="structure_analyzer")
 def structure_analyzer(state: dict) -> dict:
     """Analyze document structure, detect archetype, build section map."""
@@ -129,7 +119,7 @@ def structure_analyzer(state: dict) -> dict:
     abbreviations = _extract_abbreviations(markdown)
     logger.info("Extracted %d abbreviations", len(abbreviations))
 
-    llm = _get_llm(state)
+    llm = get_llm(state)
 
     # Classify sections
     section_list = "\n".join(

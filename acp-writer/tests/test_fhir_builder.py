@@ -115,9 +115,55 @@ class TestCarePlan:
         cp = _get_resources(bundle, "CarePlan")[0]
         assert cp["status"] == "draft"
         assert cp["intent"] == "proposal"
-        assert cp["subject"]["reference"] == "Patient/patient-1"
+        assert cp["subject"]["reference"].startswith("urn:uuid:")
         assert len(cp["goal"]) == 1
         assert len(cp["activity"]) == 3
+
+
+class TestPatientResource:
+    def test_patient_included_in_bundle(self):
+        bundle = build_fhir_bundle(_hypertension_brief())
+        patients = _get_resources(bundle, "Patient")
+        assert len(patients) == 1
+
+    def test_patient_is_first_entry(self):
+        bundle = build_fhir_bundle(_hypertension_brief())
+        first = bundle["entry"][0]["resource"]
+        assert first["resourceType"] == "Patient"
+
+    def test_patient_conditional_create_with_demographics(self):
+        demographics = {
+            "id": "patient-1",
+            "reference": "Patient/patient-1",
+            "name": "John Doe",
+            "gender": "male",
+            "birth_date": "1970-01-01",
+            "identifiers": [
+                {"system": "http://hospital.example/mrn", "value": "MRN-12345"},
+            ],
+        }
+        bundle = build_fhir_bundle(_hypertension_brief(), patient_demographics=demographics)
+        patient_entry = bundle["entry"][0]
+        patient = patient_entry["resource"]
+        assert patient["resourceType"] == "Patient"
+        assert patient["identifier"][0]["value"] == "MRN-12345"
+        assert patient["gender"] == "male"
+        assert patient["birthDate"] == "1970-01-01"
+        assert patient_entry["request"]["ifNoneExist"] == "identifier=http://hospital.example/mrn|MRN-12345"
+
+    def test_patient_without_demographics(self):
+        bundle = build_fhir_bundle(_hypertension_brief())
+        patient_entry = bundle["entry"][0]
+        assert "ifNoneExist" not in patient_entry["request"]
+
+    def test_all_subject_refs_use_patient_urn(self):
+        bundle = build_fhir_bundle(_hypertension_brief())
+        patient_urn = bundle["entry"][0]["fullUrl"]
+        for entry in bundle["entry"]:
+            resource = entry["resource"]
+            subject = resource.get("subject", {})
+            if subject:
+                assert subject["reference"] == patient_urn
 
 
 class TestGoals:
@@ -196,6 +242,33 @@ class TestAITransparency:
             entities = prov.get("entity", [])
             assert len(entities) >= 1
             assert entities[0]["role"] == "source"
+
+    def test_inline_activity_provenance_uses_target_path(self):
+        bundle = build_fhir_bundle(_hypertension_brief())
+        provs = _get_resources(bundle, "Provenance")
+        activity_provs = [p for p in provs if "AI-Provenance" not in str(p.get("meta", {}).get("profile", []))]
+        inline_provs = [
+            p for p in activity_provs
+            if any("targetPath" in str(ext.get("url", "")) for t in p.get("target", []) for ext in t.get("extension", []))
+        ]
+        assert len(inline_provs) == 1
+        target = inline_provs[0]["target"][0]
+        ext = target["extension"][0]
+        assert "targetPath" in ext["url"]
+        assert "CarePlan.activity[" in ext["valueString"]
+        assert ".performedActivity" in ext["valueString"]
+
+    def test_standalone_activity_provenance_no_target_path(self):
+        bundle = build_fhir_bundle(_hypertension_brief())
+        provs = _get_resources(bundle, "Provenance")
+        activity_provs = [p for p in provs if "AI-Provenance" not in str(p.get("meta", {}).get("profile", []))]
+        standalone_provs = [
+            p for p in activity_provs
+            if not any(t.get("extension") for t in p.get("target", []))
+        ]
+        assert len(standalone_provs) == 2
+        for prov in standalone_provs:
+            assert prov["target"][0]["reference"].startswith("urn:uuid:")
 
     def test_provenance_has_cpg_source(self):
         bundle = build_fhir_bundle(_hypertension_brief())

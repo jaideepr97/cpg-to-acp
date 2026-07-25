@@ -6,9 +6,8 @@ import re
 import time
 
 import mlflow
-from langchain_openai import ChatOpenAI
-
 from cpg_contracts import CPGMetadata, GradingSystem
+from cpg_contracts import get_llm
 from cpg_ingester.nodes.structure_analyzer import _parse_llm_json
 from cpg_ingester.output import write_artifact
 from cpg_ingester.prompts.metadata_extractor import (
@@ -50,15 +49,6 @@ def _cross_check_grading_system(declared: str | None, markdown: str) -> str | No
     return None
 
 
-def _get_llm(state: dict) -> ChatOpenAI:
-    return ChatOpenAI(
-        base_url=f"{state.get('litellm_url', 'http://localhost:4000')}/v1",
-        api_key=state.get("llm_api_key", "sk-change-me"),
-        model=state.get("llm_model", "default"),
-
-    )
-
-
 @mlflow.trace(name="metadata_extractor")
 def metadata_extractor(state: dict) -> dict:
     """Extract CPGMetadata from the document."""
@@ -66,7 +56,7 @@ def metadata_extractor(state: dict) -> dict:
     markdown = state.get("markdown", "")
     output_dir = state.get("output_dir", "output")
 
-    llm = _get_llm(state)
+    llm = get_llm(state)
 
     content = markdown[:6000]
 
@@ -95,8 +85,8 @@ def metadata_extractor(state: dict) -> dict:
 
     try:
         metadata = CPGMetadata(
-            cpg_id=raw.get("cpg_id", "UNKNOWN"),
-            title=raw.get("title", "Untitled"),
+            cpg_id=raw.get("cpg_id") or "UNKNOWN",
+            title=raw.get("title") or "Untitled",
             version=raw.get("version"),
             publication_date=raw.get("publication_date"),
             evidence_review_date=raw.get("evidence_review_date"),

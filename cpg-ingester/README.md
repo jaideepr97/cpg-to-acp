@@ -17,7 +17,7 @@ Phase 2 — Generation (parallel with adversarial review):
   └─ Rec Extractor → Schema Validator → Semantic Reviewer ┘
 ```
 
-See `dev_docs/cpg-ingester-design.md` for the full design rationale.
+See `dev_docs/design/cpg-ingester-design.md` for the full design rationale.
 
 ## Two Outputs
 
