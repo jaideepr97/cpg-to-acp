@@ -174,6 +174,28 @@ Every network connection is logged as an OCSF (Open Cybersecurity Schema Framewo
 
 These logs are collected by the OpenShell gateway and can be forwarded to centralized logging for compliance auditing. Every allowed and denied connection is recorded with the sandbox ID, timestamp, binary path, and destination.
 
+## Deployment Considerations
+
+OpenShell sandboxes isolate workloads in dedicated network namespaces — they are designed for agents that initiate outbound work, not for services receiving inbound requests. Integrating OpenShell with Kubernetes service-mesh-style workloads requires several deployment-level workarounds documented in [`dev_docs/design/openshell-integration-findings.md`](../dev_docs/design/openshell-integration-findings.md).
+
+### Inbound traffic routing
+
+SonataFlow orchestrates calls to pod services via Kubernetes DNS. Since OpenShell sandboxes can't receive inbound traffic directly, an nginx hostname-translation router (`deploy/openshell-router/`) sits between the K8s services and the OpenShell gateway. It rewrites the `Host` header from K8s service names (e.g., `acp-llm-reasoning`) to OpenShell gateway service hostnames (e.g., `sb-llm-reasoning--http.openshell.localhost`), enabling the gateway's loopback HTTP proxy to route requests to the correct sandbox.
+
+### S3-compatible storage
+
+The OpenShell CONNECT proxy handles HTTP GET requests correctly but drops boto3 PUT responses, causing `ProxyConnectionError`. The artifact store uses presigned URLs with `requests.put()` instead of boto3's `put_object()` for all S3 write operations. GET operations remain on boto3.
+
+### Network policy configuration
+
+Three patterns are required for cluster-internal endpoints:
+
+1. **Short hostnames** — The OPA engine matches hostnames literally. Policies must include both short names (`minio`) and FQDN wildcards (`**.svc.cluster.local`) since K8s DNS resolves both forms.
+
+2. **`allowed_ips` CIDR lists** — The proxy blocks RFC 1918 addresses by default (SSRF protection). Cluster-internal endpoints need explicit `allowed_ips` entries with the service CIDR (`172.30.0.0/16`) and pod CIDR (`10.128.0.0/14`).
+
+3. **Port coverage** — Policies must cover all ports the application uses, including SonataFlow callback port (80), MaaS inference port (80 or 443), and MLflow tracing (443 to external hostname).
+
 ## Future Direction
 
 - **Per-binary network policies** — restrict specific Python processes to specific endpoints (e.g., only the embedding model binary can reach the vector store).
