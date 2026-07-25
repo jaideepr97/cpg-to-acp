@@ -13,9 +13,15 @@ network_policies:
       - host: "**.svc.cluster.local"
         port: 8080
         enforcement: log
+        allowed_ips:
+          - "172.30.0.0/16"
+          - "10.128.0.0/14"
       - host: "**.svc.cluster.local"
         port: 80
         enforcement: log
+        allowed_ips:
+          - "172.30.0.0/16"
+          - "10.128.0.0/14"
     binaries:
       - path: "**"
   mlflow:
@@ -49,6 +55,9 @@ network_policies:
       - host: "acpwriter"
         port: 80
         enforcement: enforce
+        allowed_ips:
+          - "172.30.0.0/16"
+          - "10.128.0.0/14"
     binaries:
       - path: "**"
   minio:
@@ -57,8 +66,14 @@ network_policies:
       - host: "minio"
         port: 9000
         enforcement: enforce
+        allowed_ips:
+          - "172.30.0.0/16"
+          - "10.128.0.0/14"
       - host: "minio.sschifma-cpg-to-acp.svc.cluster.local"
         port: 9000
         enforcement: enforce
+        allowed_ips:
+          - "172.30.0.0/16"
+          - "10.128.0.0/14"
     binaries:
       - path: "**"

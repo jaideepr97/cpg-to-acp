@@ -12,6 +12,9 @@ network_policies:
       - host: "**.svc.cluster.local"
         port: 8080
         enforcement: log
+        allowed_ips:
+          - "172.30.0.0/16"
+          - "10.128.0.0/14"
     binaries:
       - path: "**"
   cluster_services:
@@ -20,8 +23,14 @@ network_policies:
       - host: "**.svc.cluster.local"
         port: 8082
         enforcement: log
+        allowed_ips:
+          - "172.30.0.0/16"
+          - "10.128.0.0/14"
       - host: "**.svc.cluster.local"
         port: 8090
         enforcement: log
+        allowed_ips:
+          - "172.30.0.0/16"
+          - "10.128.0.0/14"
     binaries:
       - path: "**"
