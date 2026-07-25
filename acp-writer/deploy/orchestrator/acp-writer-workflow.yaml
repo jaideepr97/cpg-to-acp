@@ -70,7 +70,7 @@ spec:
             functionRef:
               refName: scanpatient
               arguments:
-                ips_bundle: "${ .ips_bundle }"
+                ips_ref: "${ .ips_ref }"
             actionDataFilter:
               results: "${ . }"
               toStateData: "${ .patientData }"
