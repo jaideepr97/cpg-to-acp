@@ -81,6 +81,25 @@ minio:
 
 **Files:** All files in `deploy/openshell-policies/`
 
+### 6. SSRF protection blocks cluster-internal services
+
+**Problem:** The OpenShell proxy blocks all connections to RFC 1918 (private) IP addresses by default as SSRF protection. Cluster-internal services (MaaS, MinIO, SonataFlow) resolve to ClusterIPs (`172.30.x.x`) or pod IPs (`10.128.x.x`), which are private addresses. Even when the policy explicitly allows the endpoint, the SSRF guard rejects the resolved IP.
+
+**Workaround:** Add `allowed_ips` CIDR lists to each cluster-internal endpoint in the policy:
+```yaml
+endpoints:
+  - host: "minio"
+    port: 9000
+    enforcement: enforce
+    allowed_ips:
+      - "172.30.0.0/16"   # service CIDR
+      - "10.128.0.0/14"   # pod CIDR
+```
+
+**Files:** All files in `deploy/openshell-policies/`
+
+**Future:** OpenShell issue [#1555](https://github.com/NVIDIA/OpenShell/issues/1555) proposes auto-populating `allowed_ips` for explicitly declared policy endpoints that resolve to private addresses.
+
 ## What works well
 
 - **Landlock filesystem isolation** — kernel-level enforcement, 17 rules per sandbox
