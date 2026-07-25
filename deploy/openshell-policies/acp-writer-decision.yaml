@@ -15,6 +15,12 @@ network_policies:
         allowed_ips:
           - "172.30.0.0/16"
           - "10.128.0.0/14"
+      - host: "*"
+        port: 8080
+        enforcement: log
+        allowed_ips:
+          - "172.30.0.0/16"
+          - "10.128.0.0/14"
     binaries:
       - path: "**"
   mlflow:

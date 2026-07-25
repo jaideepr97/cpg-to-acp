@@ -15,6 +15,12 @@ network_policies:
         allowed_ips:
           - "172.30.0.0/16"
           - "10.128.0.0/14"
+      - host: "*"
+        port: 8080
+        enforcement: log
+        allowed_ips:
+          - "172.30.0.0/16"
+          - "10.128.0.0/14"
     binaries:
       - path: "**"
   mlflow:
@@ -28,8 +34,14 @@ network_policies:
   acp_writer:
     name: acp-writer-api
     endpoints:
+      - host: "acp-writer-api"
+        port: 8080
+        enforcement: enforce
+        allowed_ips:
+          - "172.30.0.0/16"
+          - "10.128.0.0/14"
       - host: "**.svc.cluster.local"
-        port: 8082
+        port: 8080
         enforcement: enforce
         allowed_ips:
           - "172.30.0.0/16"
