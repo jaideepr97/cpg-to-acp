@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, Request
 
-from cpg_contracts import get_phi_store, store_artifact
+from cpg_contracts import get_phi_store, resolve_ref, store_artifact
 from acp_writer.nodes.condition_scanner import condition_scanner
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,9 @@ def health():
 async def scan(request: Request):
     """Extract patient conditions, medications, demographics from IPS Bundle."""
     data = await request.json()
-    ips_bundle = data.get("ips_bundle", {})
+    ips_bundle = resolve_ref(data, "ips_bundle", _phi_store)
+    if not ips_bundle and "ips_ref" in data:
+        ips_bundle = _phi_store.get(data["ips_ref"]) if _phi_store else {}
     result = condition_scanner({"ips_bundle": ips_bundle})
 
     _, ref = store_artifact(_phi_store, f"{uuid4()}/ips_bundle.json", ips_bundle)
