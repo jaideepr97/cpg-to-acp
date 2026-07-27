@@ -25,6 +25,25 @@ Both cpg-ingester and acp-writer are multi-agent LangGraph pipelines with advers
 
 ---
 
+## Phase Index
+
+| Phase | Name | Status | Description |
+|---|---|---|---|
+| 2 | OpenShift + OpenShell + Platform Foundation | Complete | Deploy to OpenShift, OpenShell sandboxing, MaaS inference, MLflow tracing, agent framework selection |
+| 3.0 | Contracts and Shared Infrastructure | Complete | Recommendation contract, CPG metadata contract, knowledge ingestion API, decision model contract |
+| 3.1 | cpg-ingester Multi-Agent Pipeline | Complete | Multi-agent LangGraph pipeline: filtering, classification, DMN creation, recommendation extraction, delivery |
+| 3.2 | acp-writer Multi-Agent Composition | Complete | 11-node pipeline: condition scanning, guideline resolution, DMN execution, plan composition, FHIR generation |
+| 3.3 | Integration, Governance, and E2E Testing | Complete | Pod-per-security-profile, SonataFlow orchestration, MinIO artifact store, OpenShell sandboxes, MCP Gateway, cross-pipeline E2E |
+| 4 | UI + UX + Demo-Ready | Not started | React/PatternFly UIs for cpg-ingester and acp-writer, mock-EHR with SMART on FHIR launch |
+| 5 | Prompt Evaluation + Quality Improvement | Not started | Systematic evaluation of all prompts against CPG corpus, baseline metrics, user feedback loop, iterative improvement |
+| 6 | BPMN + Automation | Not started | Generate BPMN process definitions from care plans, automation service execution |
+| 7 | Governance + Safety + Evaluation | Not started | Clinical review gates, NeMo Guardrails, EvalHub scoring/gating, red-teaming, terminology enforcement |
+| 8 | Identity, Auth & Access Control | Not started | Keycloak OIDC, RBAC, SPIFFE/SPIRE agent identity, credential scoping |
+| 9 | Interactive Editing + Advanced UX | Not started | DMN editing, recommendation editing, care plan activity editing, conflict resolution UI |
+| — | Backlog | Ongoing | Phase-independent items: contract integrity, FHIR output quality, DMN/FEEL validation, resilience, performance, testing, platform infrastructure, CPG input expansion |
+
+---
+
 ## Phases
 
 ### Phase 2 — OpenShift + OpenShell + Platform Foundation (complete)
@@ -250,11 +269,11 @@ Full conflict resolution (interactive clinician UI, structured conflict types, r
 
 #### Deferred to later phases
 
-- Interactive editing of DMN (Phase 8 — needs DMN editor or chat interaction)
-- Interactive editing of recommendations (Phase 8)
-- Interactive editing of care plan activities (Phase 8)
-- User-added clinical documentation for care plan context (Phase 8)
-- Interactive conflict resolution (Phase 8 — needs structured conflict types)
+- Interactive editing of DMN (Phase 9 — needs DMN editor or chat interaction)
+- Interactive editing of recommendations (Phase 9)
+- Interactive editing of care plan activities (Phase 9)
+- User-added clinical documentation for care plan context (Phase 9)
+- Interactive conflict resolution (Phase 9 — needs structured conflict types)
 
 #### Exit Criteria
 
@@ -267,7 +286,39 @@ Full conflict resolution (interactive clinician UI, structured conflict types, r
 
 ---
 
-### Phase 5 — BPMN + Automation
+### Phase 5 — Prompt Evaluation + Quality Improvement
+
+**Goal:** Systematically evaluate all LLM prompts across both pipelines, establish quality baselines, collect user feedback from the demo UI, and iteratively improve prompt quality before building higher-level features on top.
+
+> **Why here:** Phase 4 delivers the demo UI, enabling clinicians to interact with the system and provide feedback. This phase uses that feedback plus systematic evaluation to improve extraction and composition quality before Phase 6 (BPMN) builds on top of the current output.
+
+#### Work Items
+
+| Area | Work | Notes |
+|---|---|---|
+| **cpg-ingester** | Evaluate structure analyzer + content filter prompts against a corpus of CPGs (synthetic + real) | Measure: section classification accuracy, false positive/negative rates on filtering |
+| **cpg-ingester** | Evaluate DMN creator prompts — clinical accuracy, FEEL expression correctness, decision table completeness | Compare generated DMN against manually authored golden DMN for the same CPG sections |
+| **cpg-ingester** | Evaluate recommendation extractor prompts — completeness, accuracy of certainty grading, content fidelity | Measure: recommendations missed, fabricated content, grading errors |
+| **cpg-ingester** | Evaluate reviewer prompts (DMN semantic, rec semantic) — false escalation rate, missed defects | Tune CRITICAL/MINOR threshold; measure reviewer precision/recall |
+| **acp-writer** | Evaluate plan composer prompts — goal/activity clinical appropriateness, medication accuracy, dosing correctness | Clinician review of generated care plans against CPG source material |
+| **acp-writer** | Evaluate FHIR generation prompts — bundle correctness, terminology accuracy, structural compliance | Compare against $validate results and manual FHIR review |
+| **acp-writer** | Evaluate FHIR semantic reviewer — false approval rate, missed defects, feedback quality for revision loop | Measure how often the reviewer catches real issues vs passes broken bundles |
+| **shared** | Establish baseline metrics for all prompts before improvements | Document current quality numbers so improvements are measurable |
+| **shared** | Collect and categorize user feedback from demo UI sessions | Structured feedback: what was wrong, which CPG section, which pipeline step |
+| **shared** | Iterative prompt improvement — apply feedback, re-evaluate, measure improvement | Track prompt versions and quality metrics over iterations |
+| **testing** | Multi-CPG evaluation — run evaluation across hypertension, diabetes, and at least one real CPG | Verify prompts generalize beyond the synthetic hypertension CPG |
+
+#### Exit Criteria
+
+- Baseline quality metrics established for all prompts in both pipelines
+- At least one round of user feedback collected and applied
+- Measurable improvement in extraction quality (fewer missed recommendations, fewer DMN errors)
+- Prompts evaluated against at least 3 CPGs (synthetic hypertension, synthetic diabetes, one real)
+- Quality metrics documented for future regression tracking
+
+---
+
+### Phase 6 — BPMN + Automation
 
 **Goal:** Add BPMN generation to make care plans actionable. Connect acp-writer to the automation service.
 
@@ -290,7 +341,7 @@ Full conflict resolution (interactive clinician UI, structured conflict types, r
 
 ---
 
-### Phase 6 — Governance + Safety + Evaluation
+### Phase 7 — Governance + Safety + Evaluation
 
 **Goal:** Quality gates, guardrails, and evaluation pipelines.
 
@@ -332,7 +383,7 @@ Full conflict resolution (interactive clinician UI, structured conflict types, r
 
 ---
 
-### Phase 7 — Identity, Auth & Access Control
+### Phase 8 — Identity, Auth & Access Control
 
 **Goal:** Establish full user authentication, role-based access control, and agent credential scoping. Replace the lightweight Phase 4 auth with production-grade identity infrastructure.
 
@@ -361,7 +412,7 @@ Full conflict resolution (interactive clinician UI, structured conflict types, r
 
 ---
 
-### Phase 8 — Scale + Polish
+### Phase 9 — Scale + Polish
 
 **Goal:** Multiple CPGs at scale, interactive editing, conflict resolution, and production polish.
 
@@ -395,12 +446,13 @@ Full conflict resolution (interactive clinician UI, structured conflict types, r
 | Phase 3.0 | Complete | cpg-contracts v1.0 (recommendations, guidelines, search) |
 | Phase 3.1 | Complete | LangGraph (cpg-ingester agents) |
 | Phase 3.2 | Complete | pgvector, LangGraph (acp-writer agents), AI Transparency IG |
-| Phase 3.3 | In progress | MCP Gateway, SonataFlow, MinIO, async callbacks, API gateway, pod-per-security-profile |
+| Phase 3.3 | Complete | MCP Gateway, SonataFlow, MinIO, async callbacks, API gateway, pod-per-security-profile |
 | Phase 4 | Not started | React, PatternFly 6, TypeScript, SMART on FHIR (lightweight), Medplum (evaluate) |
-| Phase 5 | Not started | — (BPMN generation, no new platform tech) |
-| Phase 6 | Not started | NeMo Guardrails, EvalHub, Garak, vLLM, Praxis |
-| Phase 7 | Not started | Keycloak (full), SPIFFE/SPIRE |
-| Phase 8 | Not started | — (scale and polish, no new platform tech) |
+| Phase 5 | Not started | Prompt evaluation corpus, quality metrics, user feedback loop |
+| Phase 6 | Not started | — (BPMN generation, no new platform tech) |
+| Phase 7 | Not started | NeMo Guardrails, EvalHub, Garak, vLLM, Praxis |
+| Phase 8 | Not started | Keycloak (full), SPIFFE/SPIRE |
+| Phase 9 | Not started | — (scale and polish, no new platform tech) |
 
 ## Parallel Development Tracks
 
@@ -410,8 +462,8 @@ Each area can advance semi-independently within a phase. Cross-cutting dependenc
 2. **OpenShift deployment (Phase 2)** — blocks OpenShell, MaaS
 3. **Recommendation contract (Phase 3.0)** — blocks both Phase 3.1 and Phase 3.2. This is the single gate before cpg-ingester and acp-writer can advance independently.
 4. **UI technology decision (Phase 4 Spike A)** — blocks all UI development in Phase 4.
-5. **BPMN contract in shared/ (Phase 5)** — blocks automation service integration
-6. **Keycloak full deployment (Phase 7)** — blocks production auth. Lightweight SMART on FHIR auth in Phase 4 does not require full Keycloak.
+5. **BPMN contract in shared/ (Phase 6)** — blocks automation service integration
+6. **Keycloak full deployment (Phase 8)** — blocks production auth. Lightweight SMART on FHIR auth in Phase 4 does not require full Keycloak.
 
 Within Phase 3, the cpg-ingester track (3.1) and acp-writer track (3.2) are designed to advance independently after the shared contracts (3.0) are defined. Neither blocks the other — cpg-ingester validates recommendations against the contract schema, acp-writer tests against hand-crafted recommendation data.
 
@@ -476,7 +528,7 @@ Work that can be picked up at any time, independent of the current phase. These 
 | Item | Phase | Status | Notes |
 |---|---|---|---|
 | Agent framework evaluation | 2 | ✅ Complete | LangGraph selected. See `dev_docs/spikes/spike-agent-framework.md` |
-| Praxis investigation | 2 | ✅ Complete | Too early. Track for Phase 6. See `dev_docs/spikes/spike-praxis.md` |
+| Praxis investigation | 2 | ✅ Complete | Too early. Track for Phase 7. See `dev_docs/spikes/spike-praxis.md` |
 | Effective FHIR CarePlan goals | 3 | ✅ Complete | Implemented in acp-writer Plan Composer |
 | AI Transparency on FHIR IG | 3 | ✅ Complete | AIAST/CLINAST_AIRPT implemented |
 | Recommendation contract format | 3 | ✅ Complete | `cpg_contracts.recommendations` v1.0 |
