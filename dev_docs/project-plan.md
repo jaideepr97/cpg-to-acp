@@ -34,13 +34,13 @@ Both cpg-ingester and acp-writer are multi-agent LangGraph pipelines with advers
 | 3.1 | cpg-ingester Multi-Agent Pipeline | Complete | Multi-agent LangGraph pipeline: filtering, classification, DMN creation, recommendation extraction, delivery |
 | 3.2 | acp-writer Multi-Agent Composition | Complete | 11-node pipeline: condition scanning, guideline resolution, DMN execution, plan composition, FHIR generation |
 | 3.3 | Integration, Governance, and E2E Testing | Complete | Pod-per-security-profile, SonataFlow orchestration, MinIO artifact store, OpenShell sandboxes, MCP Gateway, cross-pipeline E2E |
-| 4 | UI + UX + Demo-Ready | Not started | React/PatternFly UIs for cpg-ingester and acp-writer, mock-EHR with SMART on FHIR launch |
-| 5 | Prompt Evaluation + Quality Improvement | Not started | Systematic evaluation of all prompts against CPG corpus, baseline metrics, user feedback loop, iterative improvement |
-| 6 | BPMN + Automation | Not started | Generate BPMN process definitions from care plans, automation service execution |
-| 7 | Governance + Safety + Evaluation | Not started | Clinical review gates, NeMo Guardrails, EvalHub scoring/gating, red-teaming, terminology enforcement |
-| 8 | Identity, Auth & Access Control | Not started | Keycloak OIDC, RBAC, SPIFFE/SPIRE agent identity, credential scoping |
-| 9 | Interactive Editing + Advanced UX | Not started | DMN editing, recommendation editing, care plan activity editing, conflict resolution UI |
-| — | Backlog | Ongoing | Phase-independent items: contract integrity, FHIR output quality, DMN/FEEL validation, resilience, performance, testing, platform infrastructure, CPG input expansion |
+| 4 | UI + UX = Demo-Ready | Not started | React/PatternFly UIs for cpg-ingester and acp-writer, mock-EHR with SMART on FHIR launch |
+| 5 | Prompt Evaluation + Quality Improvement | Not started | Systematic evaluation of all prompts against CPG corpus, baseline metrics, iterative improvement |
+| 6 | Activity Automation (BPMN++) | Not started | Generate BPMN process definitions from care plans, automation service execution |
+| 7 | Governance + Safety + Evaluation | Not started | Clinical safety hardening, security fixes, AI guardrails, quality scoring, EvalHub gating, model evaluation |
+| 8 | Identity, Auth & Access Control | Not started | Keycloak OIDC, RBAC, SPIFFE/SPIRE agent identity, credential scoping, audit trail |
+| 9 | Interactive Editing + Advanced UX | Not started | Multi-CPG at scale, conflict resolution, interactive editing, clinical documentation, BPMN execution |
+| — | Cross-Cutting Enhancements & Technical Debt | Ongoing | Phase-independent items: contract integrity, FHIR output quality, DMN/FEEL validation, resilience, performance, testing, platform infrastructure |
 
 ---
 
@@ -114,20 +114,18 @@ Phases 2 through 3.3 are complete. See [Appendix: Completed Phases](#appendix-co
 
 #### Work Items
 
-| Area | Work | Notes |
-|---|---|---|
-| **cpg-ingester** | Evaluate structure analyzer + content filter prompts against a corpus of CPGs (synthetic + real) | Measure: section classification accuracy, false positive/negative rates on filtering |
-| **cpg-ingester** | Evaluate DMN creator prompts — clinical accuracy, FEEL expression correctness, decision table completeness | Compare generated DMN against manually authored golden DMN for the same CPG sections |
-| **cpg-ingester** | Evaluate recommendation extractor prompts — completeness, accuracy of certainty grading, content fidelity | Measure: recommendations missed, fabricated content, grading errors |
-| **cpg-ingester** | Evaluate reviewer prompts (DMN semantic, rec semantic) — false escalation rate, missed defects | Tune CRITICAL/MINOR threshold; measure reviewer precision/recall |
-| **acp-writer** | Evaluate plan composer prompts — goal/activity clinical appropriateness, medication accuracy, dosing correctness | Clinician review of generated care plans against CPG source material |
-| **acp-writer** | Evaluate FHIR generation prompts — bundle correctness, terminology accuracy, structural compliance | Compare against $validate results and manual FHIR review |
-| **acp-writer** | Evaluate FHIR semantic reviewer — false approval rate, missed defects, feedback quality for revision loop | Measure how often the reviewer catches real issues vs passes broken bundles |
-| **shared** | Establish baseline metrics for all prompts before improvements | Document current quality numbers so improvements are measurable |
-| **shared** | Collect and categorize user feedback from demo UI sessions | Structured feedback: what was wrong, which CPG section, which pipeline step |
-| **shared** | Iterative prompt improvement — apply feedback, re-evaluate, measure improvement | Track prompt versions and quality metrics over iterations |
-| **cpg-ingester** | Review and improve Docling usage — evaluate parsing quality across CPG formats, ensure images/charts/diagrams are extracted and interpreted (vision model), add OCR for scanned PDFs | Currently Docling detects image regions but doesn't interpret content; scanned PDFs need OCR support |
-| **testing** | Multi-CPG evaluation — run evaluation across hypertension, diabetes, and at least one real CPG | Verify prompts generalize beyond the synthetic hypertension CPG |
+| Work | Notes |
+|---|---|
+| **Establish prompt evaluation pattern and reporting approach** (spike) — Define common metrics, scoring approach, and reporting format for prompt evaluation across both pipelines | Informs all subsequent evaluation stories; goal is consistency, not a reusable tool |
+| **Evaluate and improve structure analyzer + content filter prompts** — Section classification accuracy, false positive/negative rates | Baseline → identify issues → improve → re-measure |
+| **Evaluate and improve DMN creator prompts** — Clinical accuracy, FEEL expression correctness, decision table completeness vs golden DMN | Baseline → identify issues → improve → re-measure |
+| **Evaluate and improve recommendation extractor prompts** — Completeness, accuracy of certainty grading, content fidelity | Baseline → identify issues → improve → re-measure |
+| **Evaluate and improve reviewer prompts (DMN semantic, rec semantic)** — False escalation rate, missed defects, CRITICAL/MINOR threshold tuning | Baseline → identify issues → improve → re-measure |
+| **Evaluate and improve plan composer prompts** — Goal/activity clinical appropriateness, medication accuracy, dosing correctness | Baseline → identify issues → improve → re-measure |
+| **Evaluate and improve FHIR generation prompts** — Bundle correctness, terminology accuracy, structural compliance vs $validate | Baseline → identify issues → improve → re-measure |
+| **Evaluate and improve FHIR semantic reviewer prompts** — False approval rate, missed defects, feedback quality for revision loop | Baseline → identify issues → improve → re-measure |
+| **Review and improve Docling usage** — Evaluate parsing quality across CPG formats, image/chart interpretation (vision model), OCR for scanned PDFs | Currently Docling detects image regions but doesn't interpret content |
+| **Multi-CPG evaluation** — Run evaluation across hypertension, diabetes, and at least one real CPG | Verify prompts generalize beyond the synthetic hypertension CPG |
 
 #### Exit Criteria
 
@@ -168,38 +166,23 @@ Phases 2 through 3.3 are complete. See [Appendix: Completed Phases](#appendix-co
 
 #### Work Items
 
-| Area | Work | Technology |
-|---|---|---|
-| **acp-writer** | Clinical review gates fail closed — reviewer parse errors flag instead of silently approving; FHIR review loop consumes feedback; deterministic validation gates the server write | — |
-| **acp-writer** | Enforce terminology API verification — wire lookup into Plan Composer; Terminology Validator repairs/flags unresolvable codes | — |
-| **cpg-ingester** | Escalated items surfaced — propagate escalation back to manifest; include in human-review output instead of dropping | — |
-| **cpg-ingester** | Assembly delivers only validated DMN — stop writing pre-validation DMN to disk; prevent disk-fallback from shipping unvalidated/escalated attempts | — |
-| **cpg-ingester** | Fix SSRF in delivery — pin acp-writer destination to env/config; do not accept URL from request body | — |
-| **acp-writer** | Gate sample data seeding behind dev/demo flag — `_setup_sample_data()` should not auto-inject fixtures on every fresh boot in production | — |
-| **platform** | MinIO IAM policies for PHI bucket access — per-pod credentials so pods only access the buckets they need (cpg-artifacts vs cpg-phi) | MinIO |
-| **platform** | NeMo Guardrails on agent I/O — healthcare-specific rules | NeMo Guardrails |
-| **platform** | EvalHub — golden test sets per CPG, extraction fidelity scorers, plan quality scorers | EvalHub |
-| **platform** | EvalHub gates that block deployment of degraded models/pipelines | EvalHub |
-| **platform** | Garak red-teaming for healthcare-specific adversarial scenarios | Garak |
-| **platform** | Migrate inference gateway to Praxis (if available) | Praxis |
-| **platform** | **Evaluate:** Using smaller self-hosted models (via vLLM) instead of frontier models for cost and latency | vLLM |
-| **cpg-ingester** | Validation pipeline: compare extracted DMN against golden test cases | — |
-| **acp-writer** | Validate CarePlan output against AI Transparency on FHIR IG | — |
-| **acp-writer** | CarePlan quality scoring (automated + clinician review) | — |
-| **testing** | Golden test suite — regression suite for full pipeline: single-CPG medication, single-CPG lifestyle, multi-CPG diabetes+hypertension, no-guidelines | Parameterized tests verifying structural patterns (not exact text). Gate behind inference endpoint. Integrate into EvalHub for deployment gating. |
+| Work | Notes |
+|---|---|
+| **Harden clinical review pipeline to fail safe** — Review gates fail closed on parse errors, only validated DMN delivered, escalated items surfaced for human review, terminology API verification | The pipeline should never silently pass bad clinical content |
+| **Security hardening for clinical data** — Fix SSRF in delivery endpoint, gate sample data seeding behind dev/demo flag, MinIO per-pod IAM policies for PHI bucket access | Close known security gaps before production |
+| **AI guardrails and adversarial testing** — NeMo Guardrails on agent I/O (healthcare-specific rules), Garak red-teaming for healthcare adversarial scenarios | Protect against bad/malicious input and output |
+| **Golden test suite and quality scoring** — Parameterized regression suite (single-CPG medication, single-CPG lifestyle, multi-CPG, no-guidelines), CarePlan quality scoring (automated + clinician review), AI Transparency on FHIR IG validation | Measure pipeline and output quality systematically |
+| **EvalHub integration and deployment gating** — Golden test sets per CPG, extraction fidelity scorers, plan quality scorers, deployment gates that block degraded models/pipelines | Quality measurement blocks bad deployments |
+| **Evaluate self-hosted models vs frontier** (spike) — Smaller models via vLLM for cost, latency, and data locality | Research, not a deliverable |
 
 #### Exit Criteria
 
-- Clinical review gates fail closed (not open) on parse errors
-- Terminology codes API-verified before reaching FHIR server
-- Escalated clinical content surfaced for human review
-- Only validated DMN delivered to acp-writer
-- SSRF in delivery endpoint fixed
-- Sample data seeding gated behind explicit flag
-- MinIO per-pod IAM policies enforced
+- Clinical review gates fail closed; terminology codes API-verified
+- Escalated content surfaced; only validated DMN delivered
+- Security fixes applied (SSRF, sample data gating, MinIO IAM)
 - Guardrails actively filtering agent I/O
+- Golden test suite measuring quality across CPGs
 - EvalHub gates preventing degraded deployments
-- Three audit trails: MLflow (tracing), OpenShell (sandbox), automation (execution)
 - AI Transparency on FHIR compliance
 - Self-hosted model evaluation complete
 
@@ -213,16 +196,11 @@ Phases 2 through 3.3 are complete. See [Appendix: Completed Phases](#appendix-co
 
 #### Work Items
 
-| Area | Work | Technology |
-|---|---|---|
-| **platform** | Deploy Keycloak on OpenShift (full), configure OIDC provider | Keycloak |
-| **platform** | Define roles (clinician, admin, reviewer) and map to permissions | Keycloak RBAC |
-| **platform** | Agent identity via SPIFFE/SPIRE | SPIFFE/SPIRE |
-| **platform** | OpenShell credential scoping — agents run with user-scoped tokens, not shared service accounts | OpenShell + Keycloak |
-| **platform** | Audit trail linking actions to authenticated identities | MLflow + OpenShell |
-| **acp-writer** | Integrate OIDC auth into UI and API (upgrade from Phase 4 lightweight auth) | — |
-| **cpg-ingester** | Integrate OIDC auth into UI and API | — |
-| **mock-EHR** | Configure HAPI FHIR for token-based access | — |
+| Work | Notes |
+|---|---|
+| **Identity infrastructure — Keycloak, roles, and agent identity** — Deploy Keycloak on OpenShift (full OIDC provider), define roles (clinician, admin, reviewer) with Keycloak RBAC, agent identity via SPIFFE/SPIRE | Stand up production identity, replacing Phase 4 lightweight auth |
+| **Integrate OIDC auth into all application components** — Wire Keycloak OIDC into acp-writer UI/API, cpg-ingester UI/API, and HAPI FHIR (token-based access) | All UIs require authentication; all APIs enforce token-based access |
+| **Credential scoping and audit trail** — OpenShell credential scoping (user-scoped tokens via OpenShell + Keycloak, not shared service accounts), audit trail linking actions to authenticated identities (MLflow tracing + OpenShell sandbox audit) | Agents run with scoped credentials; every action traceable |
 
 #### Exit Criteria
 
@@ -240,21 +218,19 @@ Phases 2 through 3.3 are complete. See [Appendix: Completed Phases](#appendix-co
 
 #### Work Items
 
-| Area | Work | Notes |
-|---|---|---|
-| **integration** | Expand to 3-5 real CPGs (VA/DoD) | — |
-| **acp-writer** | Multi-plan merging when multiple CPGs apply | Conflict detection |
-| **acp-writer** | Conflict resolution with clinician input | Interactive clinician resolution UI, structured conflict types (same target, contradictory, overlapping), resolution tracking in Provenance, multi-CPG conflict support. See design doc § Conflict Resolution. |
-| **cpg-ingester UI** | Interactive DMN editing (chat-based or visual editor) | — |
-| **cpg-ingester UI** | Interactive recommendation editing | — |
-| **acp-writer UI** | Interactive care plan editing | — |
-| **acp-writer UI** | User-added clinical documentation for care plan context | Free text input |
-| **automation** | Add BPMN execution engine or BPMN-to-Ansible converter | Ansible/SonataFlow |
+| Work | Notes |
+|---|---|
+| **Multi-CPG at scale with conflict resolution** — Expand to 3-5 real CPGs (VA/DoD), multi-plan merging when multiple CPGs apply, conflict resolution with clinician input (structured conflict types: same target, contradictory, overlapping), interactive resolution UI, resolution tracking in Provenance | Move beyond single-CPG to handle real-world guideline overlap |
+| **Interactive editing across both UIs** — DMN editing (chat-based or visual editor) and recommendation editing in cpg-ingester UI, care plan activity editing in acp-writer UI | Let users refine AI-generated artifacts, not just accept/reject |
+| **User-added clinical documentation for care plan context** — Free-text clinical input from clinicians to augment care plan context with patient-specific information not in structured FHIR data | — |
+| **BPMN execution engine** — Add execution capability to the automation service (SonataFlow, BPMN-to-Ansible converter, or other BPMN-conformant engine). Builds on Phase 6 receive/store foundation. | Completes the automation story started in Phase 6 |
 
 #### Exit Criteria
 
 - 3-5 CPGs with multi-plan merging and conflict resolution
 - Interactive editing in both UIs
+- Clinician-added documentation augments care plans
+- BPMN execution operational
 - Production-ready
 
 ---
@@ -329,13 +305,10 @@ Work that can be picked up at any time, independent of the current phase. These 
 | FHIR approval lifecycle E2E test | Not started | acp-writer | Care plans are written as `draft`. The approve/reject flow (draft → active / entered-in-error) exists in code and works locally but has not been tested end-to-end through SonataFlow on OpenShift. May need a separate SonataFlow workflow or a manual trigger endpoint. |
 | E2E test automation script | Not started | testing | Update `scripts/run-e2e-openshift.sh` with SonataFlow-based pipeline execution, OpenShell sandbox deployment, and results verification. Current E2E is manual CLI commands. |
 | | | | **— Platform & infrastructure —** |
-| Rename technology-specific variables | Not started | all | Variables like LITELLM_URL, litellm_url should use role-based names (LLM_BASE_URL, INFERENCE_URL). Technology names create confusion during provider transitions (LiteLLM → MaaS). |
-| Transition from LiteLLM to MaaS | Not started | platform | Phase 2 deployed LiteLLM on-cluster as the inference proxy. MaaS gateway is now operational but LiteLLM references remain in code and config. Complete the transition. |
+| Transition from LiteLLM to MaaS (including variable renames) | Not started | all | Phase 2 deployed LiteLLM on-cluster as the inference proxy. MaaS gateway is now operational but LiteLLM references remain in code and config. Complete the transition. Includes renaming technology-specific variables (LITELLM_URL → LLM_BASE_URL). |
 | MaaS with Vertex AI (Claude) | Not started | platform | Configure MaaS ExternalModel to route to Claude on Vertex AI. Requires a GCP service account key (not ADC user credentials) with the Vertex AI User role, and `oauth2` auth type on the ExternalProvider. OpenAI routing is already working; this adds Claude as a second provider option on-cluster. |
 | Enhance tracing in MLflow | Not started | all | Make sure that the use of MLflow is optimized and that traces are useful. |
-| OpenShell transparent service routing | Not started | deploy | Current integration uses an nginx hostname-translation router to bridge K8s services → OpenShell gateway. Future: OpenShell mutating webhook or supervisor init container injection for transparent pod integration. See `dev_docs/design/openshell-integration-findings.md`. |
-| OpenShell botocore proxy compatibility | Not started | deploy | boto3 S3 PUT fails through OpenShell CONNECT proxy (response not relayed). Workaround: presigned URL + requests. File upstream issue with OpenShell. See `dev_docs/design/openshell-integration-findings.md`. |
-| OpenShell short hostname matching | Not started | deploy | OPA engine requires exact hostname match — short K8s DNS names don't match FQDN wildcards. Currently duplicating entries. Request upstream support for DNS-aware matching. |
+| OpenShell upstream issues (transparent routing, botocore proxy, short hostnames) | Not started | deploy | Three related OpenShell limitations needing upstream engagement: (1) nginx hostname-translation router should become mutating webhook or init container injection, (2) boto3 S3 PUT fails through CONNECT proxy — workaround: presigned URLs, (3) OPA requires exact hostname match — short K8s DNS names don't match FQDN wildcards. See `dev_docs/design/openshell-integration-findings.md`. |
 
 ---
 
