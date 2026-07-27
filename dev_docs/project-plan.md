@@ -306,6 +306,7 @@ Full conflict resolution (interactive clinician UI, structured conflict types, r
 | **shared** | Establish baseline metrics for all prompts before improvements | Document current quality numbers so improvements are measurable |
 | **shared** | Collect and categorize user feedback from demo UI sessions | Structured feedback: what was wrong, which CPG section, which pipeline step |
 | **shared** | Iterative prompt improvement — apply feedback, re-evaluate, measure improvement | Track prompt versions and quality metrics over iterations |
+| **cpg-ingester** | Review and improve Docling usage — evaluate parsing quality across CPG formats, ensure images/charts/diagrams are extracted and interpreted (vision model), add OCR for scanned PDFs | Currently Docling detects image regions but doesn't interpret content; scanned PDFs need OCR support |
 | **testing** | Multi-CPG evaluation — run evaluation across hypertension, diabetes, and at least one real CPG | Verify prompts generalize beyond the synthetic hypertension CPG |
 
 #### Exit Criteria
@@ -518,8 +519,6 @@ Work that can be picked up at any time, independent of the current phase. These 
 | OpenShell short hostname matching | Not started | deploy | OPA engine requires exact hostname match — short K8s DNS names don't match FQDN wildcards. Currently duplicating entries. Request upstream support for DNS-aware matching. |
 | | | | **— CPG input expansion —** |
 | Improve conflict resolution in care plans | Not started | acp-writer | Current conflict handling is placeholder detection only. Needs interactive clinician resolution UI, structured conflict types (same target, contradictory, overlapping), resolution tracking in Provenance, multi-CPG conflict support. See design doc § Conflict Resolution. |
-| cpg-ingester: images/charts/diagrams | Not started | cpg-ingester | Extract and interpret visual content from CPGs (treatment algorithm flowcharts, dosing charts, diagrams). Requires a vision model — Docling detects image regions but doesn't interpret content. |
-| cpg-ingester: OCR for scanned PDFs | Not started | cpg-ingester | Add tesseract or EasyOCR support for scanned PDF pages. Docling's text extraction works for digital-native PDFs but older/scanned guidelines need OCR. |
 
 ---
 
