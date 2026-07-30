@@ -432,6 +432,24 @@ Medplum supports external identity providers via standard OAuth2/OIDC:
 
 Each user gets a `Practitioner` resource linked to their `User` resource, and an appropriate `AccessPolicy`.
 
+### Token Management
+
+Medplum requires OAuth Bearer tokens for all FHIR API calls. Default token lifetime is **1 hour** (3600 seconds). Refresh tokens last **2 weeks** but require the `offline_access` scope. Token lifetimes are configurable per-`ClientApplication` via the `accessTokenLifetime` and `refreshTokenLifetime` fields (in seconds).
+
+**Three auth contexts and how each handles tokens:**
+
+| Context | Auth Method | Token Management |
+|---|---|---|
+| **Load script** (bash/curl) | `authorization_code` with PKCE | Token obtained at start, used within the same process. 1-hour default is plenty — the script completes in seconds. |
+| **Mock-EHR UI** (React) | `MedplumClient` from `@medplum/core` | Built-in auto-refresh: refreshes token within a 5-minute grace period before expiry. Requires `offline_access` scope for refresh tokens. No background timer — call `refreshIfExpired()` on resume from idle. |
+| **acp-writer backend** (Python) | `client_credentials` grant | Use the acp-writer `ClientApplication`'s `client_id` + `client_secret` (created by load script). No user interaction needed. Cache the token, re-fetch when approaching expiry. |
+
+**acp-writer auth implementation**: The fhir_server_writer currently sends unauthenticated requests. When integrating with Medplum, it needs:
+1. `FHIR_CLIENT_ID` and `FHIR_CLIENT_SECRET` environment variables (values from load script output)
+2. Token acquisition: `POST /oauth2/token` with `grant_type=client_credentials`
+3. Token caching with expiry-based refresh
+4. `Authorization: Bearer <token>` header on all FHIR requests
+
 ## Implementation Plan
 
 ### Phase 1: Medplum Infrastructure
