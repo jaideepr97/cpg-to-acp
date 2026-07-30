@@ -1,0 +1,95 @@
+# Medplum server stack for the mock-EHR.
+# Provides: FHIR R4 server, OAuth, SMART on FHIR.
+#
+# Usage:
+#   podman-compose -f mock-EHR/deploy/compose-medplum.yml up -d
+#
+# The root compose.yml includes this file — you typically don't run it standalone.
+
+services:
+  medplum-postgres:
+    image: postgres:16
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: medplum
+      POSTGRES_PASSWORD: medplum
+    command:
+      - "postgres"
+      - "-c"
+      - "listen_addresses=*"
+      - "-c"
+      - "statement_timeout=60000"
+      - "-c"
+      - "default_transaction_isolation=REPEATABLE READ"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements,auto_explain"
+    volumes:
+      - medplum-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medplum"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  medplum-redis:
+    image: redis:7
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass medplum
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "medplum", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  medplum-server:
+    image: medplum/medplum-server:5.1.27
+    restart: unless-stopped
+    ports:
+      - "8103:8103"
+    depends_on:
+      medplum-postgres:
+        condition: service_healthy
+      medplum-redis:
+        condition: service_healthy
+    command: ["env"]
+    environment:
+      MEDPLUM_PORT: "8103"
+      MEDPLUM_BASE_URL: "http://localhost:8103/"
+      MEDPLUM_APP_BASE_URL: "http://localhost:3000/"
+      MEDPLUM_STORAGE_BASE_URL: "http://localhost:8103/storage/"
+      MEDPLUM_DATABASE_HOST: medplum-postgres
+      MEDPLUM_DATABASE_PORT: "5432"
+      MEDPLUM_DATABASE_DBNAME: medplum
+      MEDPLUM_DATABASE_USERNAME: medplum
+      MEDPLUM_DATABASE_PASSWORD: medplum
+      MEDPLUM_REDIS_HOST: medplum-redis
+      MEDPLUM_REDIS_PORT: "6379"
+      MEDPLUM_REDIS_PASSWORD: medplum
+      MEDPLUM_BINARY_STORAGE: "file:./binary/"
+      MEDPLUM_SUPPORT_EMAIL: '"CareView EHR" <support@example.com>'
+      MEDPLUM_GOOGLE_CLIENT_ID: ""
+      MEDPLUM_GOOGLE_CLIENT_SECRET: ""
+      MEDPLUM_RECAPTCHA_SITE_KEY: ""
+      MEDPLUM_RECAPTCHA_SECRET_KEY: ""
+      MEDPLUM_MAX_JSON_SIZE: "1mb"
+      MEDPLUM_MAX_BATCH_SIZE: "50mb"
+      MEDPLUM_BOT_LAMBDA_ROLE_ARN: ""
+      MEDPLUM_BOT_LAMBDA_LAYER_NAME: "medplum-bot-layer"
+      MEDPLUM_VM_CONTEXT_BOTS_ENABLED: "true"
+      MEDPLUM_DEFAULT_BOT_RUNTIME_VERSION: "vmcontext"
+      MEDPLUM_ALLOWED_ORIGINS: "*"
+      MEDPLUM_INTROSPECTION_ENABLED: "true"
+      MEDPLUM_SHUTDOWN_TIMEOUT_MILLISECONDS: "30000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:8103/healthcheck').then(r=>{if(!r.ok)throw 1}).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  medplum-postgres-data:

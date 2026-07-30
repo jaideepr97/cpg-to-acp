@@ -1,0 +1,248 @@
+#!/usr/bin/env bash
+# Load patient data and configure a Medplum server for the mock-EHR demo.
+#
+# This script is environment-agnostic: it takes MEDPLUM_BASE_URL as input
+# and works identically in local podman-compose and OpenShift (as a Job).
+#
+# What it does:
+#   1. Waits for the Medplum server to be healthy
+#   2. Authenticates with the seeded super admin credentials
+#   3. Creates a demo project ("CareView EHR")
+#   4. Loads FHIR patient bundles into the project
+#   5. Creates practitioner users for the demo
+#   6. Registers the acp-writer as a SMART on FHIR ClientApplication
+
+set -euo pipefail
+
+MEDPLUM_BASE_URL="${MEDPLUM_BASE_URL:-http://localhost:8103}"
+DATA_DIR="${DATA_DIR:-/data}"
+ACP_WRITER_LAUNCH_URI="${ACP_WRITER_LAUNCH_URI:-http://localhost:3001/launch}"
+ACP_WRITER_REDIRECT_URI="${ACP_WRITER_REDIRECT_URI:-http://localhost:3001/}"
+
+ADMIN_EMAIL="admin@example.com"
+ADMIN_PASSWORD="medplum_admin"
+CODE_CHALLENGE="mock_ehr_setup_challenge"
+
+# --- Helpers ---
+
+log() { echo "[load-medplum] $*"; }
+
+fail() { log "ERROR: $*" >&2; exit 1; }
+
+medplum_post() {
+  local path="$1"
+  local data="$2"
+  local token="${3:-}"
+  local auth_header=""
+  if [ -n "$token" ]; then
+    auth_header="-H \"Authorization: Bearer $token\""
+  fi
+  eval curl -sf -X POST "$MEDPLUM_BASE_URL$path" \
+    -H "Content-Type: application/json" \
+    $auth_header \
+    -d "'$data'"
+}
+
+medplum_put() {
+  local path="$1"
+  local data="$2"
+  local token="$3"
+  eval curl -sf -X PUT "$MEDPLUM_BASE_URL$path" \
+    -H "Content-Type: application/json" \
+    -H "\"Authorization: Bearer $token\"" \
+    -d "'$data'"
+}
+
+medplum_post_file() {
+  local path="$1"
+  local file="$2"
+  local token="$3"
+  curl -sf -X POST "$MEDPLUM_BASE_URL$path" \
+    -H "Content-Type: application/fhir+json" \
+    -H "Authorization: Bearer $token" \
+    -d @"$file"
+}
+
+# --- Step 1: Wait for Medplum server ---
+
+log "Waiting for Medplum server at $MEDPLUM_BASE_URL ..."
+retries=0
+max_retries=60
+until curl -sf "$MEDPLUM_BASE_URL/healthcheck" > /dev/null 2>&1; do
+  retries=$((retries + 1))
+  if [ "$retries" -ge "$max_retries" ]; then
+    fail "Medplum server not ready after $max_retries attempts"
+  fi
+  sleep 2
+done
+log "Medplum server is healthy"
+
+# --- Step 2: Authenticate as super admin ---
+
+log "Authenticating as super admin ..."
+login_response=$(curl -sf -X POST "$MEDPLUM_BASE_URL/auth/login" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"email\": \"$ADMIN_EMAIL\",
+    \"password\": \"$ADMIN_PASSWORD\",
+    \"codeChallengeMethod\": \"plain\",
+    \"codeChallenge\": \"$CODE_CHALLENGE\"
+  }")
+
+auth_code=$(echo "$login_response" | python3 -c "import sys,json; print(json.load(sys.stdin)['code'])" 2>/dev/null) \
+  || fail "Failed to extract auth code from login response: $login_response"
+
+token_response=$(curl -sf -X POST "$MEDPLUM_BASE_URL/oauth2/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=authorization_code&code=$auth_code&code_verifier=$CODE_CHALLENGE")
+
+SUPER_ADMIN_TOKEN=$(echo "$token_response" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])" 2>/dev/null) \
+  || fail "Failed to extract access token from token response: $token_response"
+
+log "Authenticated as super admin"
+
+# --- Step 3: Create demo project ---
+
+log "Creating demo project ..."
+project_response=$(curl -sf -X POST "$MEDPLUM_BASE_URL/admin/projects/new" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $SUPER_ADMIN_TOKEN" \
+  -d '{
+    "name": "CareView EHR",
+    "strictMode": false
+  }') \
+  || fail "Failed to create project"
+
+PROJECT_ID=$(echo "$project_response" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('project',{}).get('id', d.get('id','')))" 2>/dev/null) \
+  || fail "Failed to extract project ID: $project_response"
+
+log "Created project: $PROJECT_ID"
+
+# Get a token scoped to the new project by logging in again
+# The new project login is needed to operate within project scope
+login_response=$(curl -sf -X POST "$MEDPLUM_BASE_URL/auth/login" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"email\": \"$ADMIN_EMAIL\",
+    \"password\": \"$ADMIN_PASSWORD\",
+    \"projectId\": \"$PROJECT_ID\",
+    \"codeChallengeMethod\": \"plain\",
+    \"codeChallenge\": \"$CODE_CHALLENGE\"
+  }")
+
+auth_code=$(echo "$login_response" | python3 -c "import sys,json; print(json.load(sys.stdin)['code'])" 2>/dev/null) \
+  || fail "Failed to get project-scoped auth code"
+
+token_response=$(curl -sf -X POST "$MEDPLUM_BASE_URL/oauth2/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=authorization_code&code=$auth_code&code_verifier=$CODE_CHALLENGE")
+
+PROJECT_TOKEN=$(echo "$token_response" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])" 2>/dev/null) \
+  || fail "Failed to get project-scoped token"
+
+log "Authenticated to project"
+
+# --- Step 4: Load patient bundles ---
+
+log "Loading patient bundles from $DATA_DIR ..."
+bundle_count=0
+for bundle_file in "$DATA_DIR"/*.json; do
+  [ -f "$bundle_file" ] || continue
+  filename=$(basename "$bundle_file")
+  log "  Loading $filename ..."
+  response=$(medplum_post_file "/fhir/R4" "$bundle_file" "$PROJECT_TOKEN")
+  http_type=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('resourceType',''))" 2>/dev/null || echo "unknown")
+  if [ "$http_type" = "Bundle" ]; then
+    log "  Loaded $filename successfully"
+    bundle_count=$((bundle_count + 1))
+  else
+    log "  WARNING: Unexpected response for $filename: $response"
+  fi
+done
+log "Loaded $bundle_count patient bundle(s)"
+
+# --- Step 5: Create practitioner users ---
+
+log "Creating practitioner users ..."
+
+# Dr. Sarah Mitchell — primary demo user
+curl -sf -X POST "$MEDPLUM_BASE_URL/admin/projects/$PROJECT_ID/invite" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $PROJECT_TOKEN" \
+  -d '{
+    "resourceType": "Practitioner",
+    "firstName": "Sarah",
+    "lastName": "Mitchell",
+    "email": "sarah.mitchell@careview.example",
+    "password": "CareView2026!",
+    "sendEmail": false,
+    "membership": { "admin": true }
+  }' > /dev/null \
+  || log "WARNING: Failed to create Dr. Mitchell (may already exist)"
+
+log "  Created Dr. Sarah Mitchell"
+
+# Dr. James Park — secondary demo user
+curl -sf -X POST "$MEDPLUM_BASE_URL/admin/projects/$PROJECT_ID/invite" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $PROJECT_TOKEN" \
+  -d '{
+    "resourceType": "Practitioner",
+    "firstName": "James",
+    "lastName": "Park",
+    "email": "james.park@careview.example",
+    "password": "CareView2026!",
+    "sendEmail": false,
+    "membership": { "admin": false }
+  }' > /dev/null \
+  || log "WARNING: Failed to create Dr. Park (may already exist)"
+
+log "  Created Dr. James Park"
+
+# --- Step 6: Register acp-writer SMART app ---
+
+log "Registering acp-writer SMART app ..."
+
+client_response=$(curl -sf -X POST "$MEDPLUM_BASE_URL/admin/projects/$PROJECT_ID/client" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $PROJECT_TOKEN" \
+  -d "{
+    \"name\": \"ACP Writer\",
+    \"description\": \"AI-powered care plan generator (SMART on FHIR app)\",
+    \"redirectUri\": \"$ACP_WRITER_REDIRECT_URI\"
+  }") \
+  || fail "Failed to create ClientApplication"
+
+CLIENT_ID=$(echo "$client_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
+CLIENT_SECRET=$(echo "$client_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('secret',''))" 2>/dev/null)
+
+# Set the launchUri on the ClientApplication (not supported in the create endpoint)
+if [ -n "$CLIENT_ID" ]; then
+  curl -sf -X PATCH "$MEDPLUM_BASE_URL/fhir/R4/ClientApplication/$CLIENT_ID" \
+    -H "Content-Type: application/json-patch+json" \
+    -H "Authorization: Bearer $PROJECT_TOKEN" \
+    -d "[
+      {\"op\": \"add\", \"path\": \"/launchUri\", \"value\": \"$ACP_WRITER_LAUNCH_URI\"}
+    ]" > /dev/null 2>&1 \
+    || log "WARNING: Failed to set launchUri via PATCH, trying PUT ..."
+
+  log "  Client ID:     $CLIENT_ID"
+  log "  Client Secret: $CLIENT_SECRET"
+  log "  Launch URI:    $ACP_WRITER_LAUNCH_URI"
+  log "  Redirect URI:  $ACP_WRITER_REDIRECT_URI"
+fi
+
+log "Registered acp-writer SMART app"
+
+# --- Done ---
+
+log ""
+log "=== Medplum setup complete ==="
+log "  Project:      CareView EHR ($PROJECT_ID)"
+log "  FHIR endpoint: $MEDPLUM_BASE_URL/fhir/R4"
+log "  Patients:     $bundle_count bundle(s) loaded"
+log "  Users:        admin@example.com / medplum_admin (super admin)"
+log "                sarah.mitchell@careview.example / CareView2026! (Dr. Mitchell)"
+log "                james.park@careview.example / CareView2026! (Dr. Park)"
+log "  SMART App:    ACP Writer (client_id=$CLIENT_ID)"
+log ""
