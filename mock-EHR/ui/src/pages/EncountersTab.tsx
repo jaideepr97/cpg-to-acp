@@ -8,7 +8,7 @@ export function EncountersTab() {
     <SearchControl
       search={{
         resourceType: 'Encounter',
-        fields: ['type', 'status', 'period', 'class'],
+        fields: ['type', 'status', 'date', 'class'],
         filters: [{ code: 'patient', operator: Operator.EQUALS, value: `Patient/${patientId}` }],
         sortRules: [{ code: '-_lastUpdated' }],
       }}

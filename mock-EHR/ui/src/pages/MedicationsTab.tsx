@@ -8,7 +8,7 @@ export function MedicationsTab() {
     <SearchControl
       search={{
         resourceType: 'MedicationRequest',
-        fields: ['medication', 'status', 'intent', 'authored-on'],
+        fields: ['code', 'status', 'intent', 'authoredon'],
         filters: [{ code: 'patient', operator: Operator.EQUALS, value: `Patient/${patientId}` }],
         sortRules: [{ code: '-_lastUpdated' }],
       }}
