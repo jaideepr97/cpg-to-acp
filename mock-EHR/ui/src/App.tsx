@@ -63,7 +63,7 @@ export function App() {
         <Route path="/signin" element={<Navigate to="/Patient" replace />} />
         <Route path="/Patient" element={<PatientListPage />} />
         <Route path="/Patient/:patientId" element={<PatientChartPage />}>
-          <Route index element={<TimelineTab />} />
+          <Route index element={<Navigate to="timeline" replace />} />
           <Route path="timeline" element={<TimelineTab />} />
           <Route path="MedicationRequest" element={<MedicationsTab />} />
           <Route path="DiagnosticReport" element={<LabsTab />} />

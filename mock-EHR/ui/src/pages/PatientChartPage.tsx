@@ -16,7 +16,7 @@ const KEEP_SECTIONS = new Set([
 ]);
 
 const TABS = [
-  { label: 'Timeline', value: '' },
+  { label: 'Timeline', value: 'timeline' },
   { label: 'Visits', value: 'Encounter' },
   { label: 'Meds', value: 'MedicationRequest' },
   { label: 'Labs', value: 'DiagnosticReport' },
