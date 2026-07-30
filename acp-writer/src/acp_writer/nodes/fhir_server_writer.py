@@ -19,7 +19,7 @@ from acp_writer.state import CarePlanComposerState
 
 logger = logging.getLogger(__name__)
 
-FHIR_SERVER_URL = os.environ.get("FHIR_SERVER_URL", "http://localhost:8080/fhir")
+FHIR_SERVER_URL = os.environ.get("FHIR_SERVER_URL", "http://localhost:8103/fhir/R4")
 
 _care_plans: dict[str, dict] = {}
 
