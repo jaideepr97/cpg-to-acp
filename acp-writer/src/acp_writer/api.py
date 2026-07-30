@@ -99,6 +99,23 @@ def _parse_dmn_metadata(dmn_xml: str) -> DecisionModelSummary:
                 type=var.get("typeRef", "string"),
             ))
 
+    if not inputs:
+        seen_names: set[str] = set()
+        for decision in root.findall(f"{{{DMN_NS}}}decision"):
+            dt = decision.find(f"{{{DMN_NS}}}decisionTable")
+            if dt is not None:
+                for inp in dt.findall(f"{{{DMN_NS}}}input"):
+                    input_expr = inp.find(f"{{{DMN_NS}}}inputExpression")
+                    if input_expr is not None:
+                        text_el = input_expr.find(f"{{{DMN_NS}}}text")
+                        var_name = text_el.text.strip() if text_el is not None and text_el.text else inp.get("label", "")
+                        if var_name and var_name not in seen_names:
+                            seen_names.add(var_name)
+                            inputs.append(DecisionVariable(
+                                name=var_name,
+                                type=input_expr.get("typeRef", "string"),
+                            ))
+
     outputs = []
     for decision in root.findall(f"{{{DMN_NS}}}decision"):
         dt = decision.find(f"{{{DMN_NS}}}decisionTable")
