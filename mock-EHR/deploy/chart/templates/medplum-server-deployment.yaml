@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-medplum-server
+  labels:
+    app.kubernetes.io/name: medplum-server
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: fhir-server
+    app.kubernetes.io/part-of: cpg-to-acp
+spec:
+  replicas: {{ .Values.medplumServer.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: medplum-server
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: medplum-server
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: fhir-server
+        app.kubernetes.io/part-of: cpg-to-acp
+    spec:
+      containers:
+        - name: medplum-server
+          image: {{ .Values.medplumServer.image }}
+          command: ["env"]
+          ports:
+            - containerPort: {{ .Values.medplumServer.port }}
+          env:
+            - name: MEDPLUM_PORT
+              value: "{{ .Values.medplumServer.port }}"
+            - name: MEDPLUM_BASE_URL
+              value: {{ .Values.medplumServer.baseUrl | default (printf "http://%s-medplum-server:%d/" .Release.Name (.Values.medplumServer.port | int)) | quote }}
+            - name: MEDPLUM_APP_BASE_URL
+              value: {{ .Values.medplumServer.appBaseUrl | default (printf "http://%s-medplum-app:%d/" .Release.Name (.Values.medplumApp.port | int)) | quote }}
+            - name: MEDPLUM_STORAGE_BASE_URL
+              value: {{ printf "http://%s-medplum-server:%d/storage/" .Release.Name (.Values.medplumServer.port | int) | quote }}
+            - name: MEDPLUM_DATABASE_HOST
+              value: {{ .Release.Name }}-postgres
+            - name: MEDPLUM_DATABASE_PORT
+              value: "{{ .Values.postgres.service.port }}"
+            - name: MEDPLUM_DATABASE_DBNAME
+              value: medplum
+            - name: MEDPLUM_DATABASE_USERNAME
+              value: medplum
+            - name: MEDPLUM_DATABASE_PASSWORD
+              value: medplum
+            - name: MEDPLUM_REDIS_HOST
+              value: {{ .Release.Name }}-redis
+            - name: MEDPLUM_REDIS_PORT
+              value: "{{ .Values.redis.service.port }}"
+            - name: MEDPLUM_REDIS_PASSWORD
+              value: medplum
+            - name: MEDPLUM_BINARY_STORAGE
+              value: "file:./binary/"
+            - name: MEDPLUM_MAX_JSON_SIZE
+              value: "1mb"
+            - name: MEDPLUM_MAX_BATCH_SIZE
+              value: "50mb"
+            - name: MEDPLUM_VM_CONTEXT_BOTS_ENABLED
+              value: "true"
+            - name: MEDPLUM_ALLOWED_ORIGINS
+              value: "*"
+            - name: MEDPLUM_INTROSPECTION_ENABLED
+              value: "true"
+          resources:
+            {{- toYaml .Values.medplumServer.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /healthcheck
+              port: {{ .Values.medplumServer.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthcheck
+              port: {{ .Values.medplumServer.port }}
+            initialDelaySeconds: 60
+            periodSeconds: 30

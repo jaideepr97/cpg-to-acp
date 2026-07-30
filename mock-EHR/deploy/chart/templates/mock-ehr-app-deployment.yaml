@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-mock-ehr-app
+  labels:
+    app.kubernetes.io/name: mock-ehr-app
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: ehr-ui
+    app.kubernetes.io/part-of: cpg-to-acp
+spec:
+  replicas: {{ .Values.mockEhrApp.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mock-ehr-app
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mock-ehr-app
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: ehr-ui
+        app.kubernetes.io/part-of: cpg-to-acp
+    spec:
+      containers:
+        - name: mock-ehr-app
+          image: {{ .Values.image.registry }}/{{ .Values.image.namespace }}/{{ .Values.mockEhrApp.image.name }}:{{ .Values.mockEhrApp.image.tag }}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: {{ .Values.mockEhrApp.port }}
+          resources:
+            {{- toYaml .Values.mockEhrApp.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.mockEhrApp.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.mockEhrApp.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 30
