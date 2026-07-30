@@ -5,6 +5,7 @@ for on-demand data extraction. Records full audit trail.
 """
 
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -43,7 +44,7 @@ def _extract_input_value(
 
     Returns (value, fhir_reference) tuple.
     """
-    key = var_name.lower().strip()
+    key = re.sub(r"([a-z])([A-Z])", r"\1 \2", var_name).lower().strip()
 
     for model_output in prior_results.values():
         for decision_name, decision_val in model_output.items():
