@@ -5,6 +5,7 @@ import type { Patient } from '@medplum/fhirtypes';
 import { useMemo } from 'react';
 import { Outlet, useNavigate, useParams } from 'react-router';
 import { SmartLaunchButton } from '../components/SmartLaunchButton';
+import { VitalsSectionCustom } from '../components/VitalsSectionCustom';
 
 const KEEP_SECTIONS = new Set([
   'demographics',
@@ -19,6 +20,7 @@ const TABS = [
   { label: 'Timeline', value: 'timeline' },
   { label: 'Visits', value: 'Encounter' },
   { label: 'Meds', value: 'MedicationRequest' },
+  { label: 'Vitals', value: 'Observation' },
   { label: 'Labs', value: 'DiagnosticReport' },
   { label: 'Allergies', value: 'AllergyIntolerance' },
   { label: 'Care Plans', value: 'CarePlan' },
@@ -30,7 +32,10 @@ export function PatientChartPage() {
   const patient = useResource<Patient>({ reference: `Patient/${patientId}` });
 
   const sections = useMemo(
-    () => getDefaultSections().filter((s) => KEEP_SECTIONS.has(s.key)),
+    () =>
+      getDefaultSections()
+        .filter((s) => KEEP_SECTIONS.has(s.key))
+        .map((s) => (s.key === 'vitals' ? VitalsSectionCustom : s)),
     []
   );
 

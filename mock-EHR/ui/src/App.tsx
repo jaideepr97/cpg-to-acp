@@ -14,6 +14,7 @@ import { CarePlansTab } from './pages/CarePlansTab';
 import { EncountersTab } from './pages/EncountersTab';
 import { LabsTab } from './pages/LabsTab';
 import { MedicationsTab } from './pages/MedicationsTab';
+import { ObservationsTab } from './pages/ObservationsTab';
 import { PatientChartPage } from './pages/PatientChartPage';
 import { PatientListPage } from './pages/PatientListPage';
 import { SignInPage } from './pages/SignInPage';
@@ -66,6 +67,7 @@ export function App() {
           <Route index element={<Navigate to="timeline" replace />} />
           <Route path="timeline" element={<TimelineTab />} />
           <Route path="MedicationRequest" element={<MedicationsTab />} />
+          <Route path="Observation" element={<ObservationsTab />} />
           <Route path="DiagnosticReport" element={<LabsTab />} />
           <Route path="AllergyIntolerance" element={<AllergiesTab />} />
           <Route path="CarePlan" element={<CarePlansTab />} />

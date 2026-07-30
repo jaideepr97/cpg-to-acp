@@ -248,6 +248,7 @@
       "resource": {
         "resourceType": "DiagnosticReport",
         "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/v2-0074", "code": "LAB", "display": "Laboratory"}]}],
         "code": {"coding": [{"system": "http://loinc.org", "code": "51990-0", "display": "Basic metabolic panel"}], "text": "Basic Metabolic Panel"},
         "subject": {"reference": "urn:uuid:a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"},
         "effectiveDateTime": "2026-07-10",
@@ -264,6 +265,7 @@
       "resource": {
         "resourceType": "DiagnosticReport",
         "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/v2-0074", "code": "LAB", "display": "Laboratory"}]}],
         "code": {"coding": [{"system": "http://loinc.org", "code": "4548-4", "display": "Hemoglobin A1c"}], "text": "HbA1c"},
         "subject": {"reference": "urn:uuid:a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"},
         "effectiveDateTime": "2026-07-10",
