@@ -17,7 +17,7 @@ set -euo pipefail
 MEDPLUM_BASE_URL="${MEDPLUM_BASE_URL:-http://localhost:8103}"
 DATA_DIR="${DATA_DIR:-/data}"
 ACP_WRITER_LAUNCH_URI="${ACP_WRITER_LAUNCH_URI:-http://localhost:3001/launch}"
-ACP_WRITER_REDIRECT_URI="${ACP_WRITER_REDIRECT_URI:-http://localhost:3001/}"
+ACP_WRITER_REDIRECT_URI="${ACP_WRITER_REDIRECT_URI:-http://localhost:3001/app}"
 
 CODE_CHALLENGE="mock_ehr_setup_challenge"
 

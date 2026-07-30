@@ -4,7 +4,8 @@ import { SmartAppLaunchLink } from '@medplum/react';
 import { useMedplum } from '@medplum/react-hooks';
 import { IconSparkles } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
-import { SMART_CLIENT_ID } from '../config';
+
+const SMART_APP_NAME = 'ACP Writer';
 
 interface SmartLaunchButtonProps {
   patientId: string;
@@ -15,10 +16,9 @@ export function SmartLaunchButton({ patientId }: SmartLaunchButtonProps) {
   const [client, setClient] = useState<ClientApplication | null>(null);
 
   useEffect(() => {
-    if (!SMART_CLIENT_ID) return;
     medplum
-      .readResource('ClientApplication', SMART_CLIENT_ID)
-      .then(setClient)
+      .searchOne('ClientApplication', { name: SMART_APP_NAME })
+      .then((result) => setClient(result ?? null))
       .catch(() => setClient(null));
   }, [medplum]);
 
