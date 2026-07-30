@@ -1,0 +1,9 @@
+FROM registry.access.redhat.com/ubi9/python-312:latest
+
+USER 0
+COPY deploy/load-medplum.sh /load-medplum.sh
+COPY data/ /data/
+RUN chmod +x /load-medplum.sh && chmod -R g=u /data
+USER 1001
+
+ENTRYPOINT ["/bin/bash", "/load-medplum.sh"]
