@@ -24,7 +24,8 @@ spec:
       containers:
         - name: redis
           image: {{ .Values.redis.image }}
-          command: ["redis-server", "--requirepass", "medplum"]
+          command: ["redis-server", "--requirepass", "medplum", "--save", "", "--stop-writes-on-bgsave-error", "no"]
+          imagePullPolicy: Always
           ports:
             - containerPort: {{ .Values.redis.service.port }}
           resources:

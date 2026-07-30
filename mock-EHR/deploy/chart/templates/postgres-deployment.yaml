@@ -24,6 +24,7 @@ spec:
       containers:
         - name: postgres
           image: {{ .Values.postgres.image }}
+          imagePullPolicy: Always
           ports:
             - containerPort: {{ .Values.postgres.service.port }}
           env:
@@ -31,6 +32,8 @@ spec:
               value: medplum
             - name: POSTGRES_PASSWORD
               value: medplum
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           args:
             - "postgres"
             - "-c"

@@ -3,7 +3,7 @@ image:
   namespace: sschifma-cpg-to-acp
 
 postgres:
-  image: postgres:16
+  image: image-registry.openshift-image-registry.svc:5000/sschifma-cpg-to-acp/postgres-16:16
   replicas: 1
   resources:
     requests:
@@ -19,7 +19,7 @@ postgres:
     port: 5432
 
 redis:
-  image: redis:7
+  image: image-registry.openshift-image-registry.svc:5000/sschifma-cpg-to-acp/redis-7:7
   replicas: 1
   resources:
     requests:
@@ -32,7 +32,7 @@ redis:
     port: 6379
 
 medplumServer:
-  image: medplum/medplum-server:5.1.27
+  image: image-registry.openshift-image-registry.svc:5000/sschifma-cpg-to-acp/medplum-server-upstream:5.1.27
   replicas: 1
   port: 8103
   resources:
@@ -48,7 +48,7 @@ medplumServer:
     port: 8103
 
 medplumApp:
-  image: medplum/medplum-app:5.1.27
+  image: image-registry.openshift-image-registry.svc:5000/sschifma-cpg-to-acp/medplum-app-upstream:5.1.27
   replicas: 1
   port: 3000
   resources:

@@ -24,6 +24,7 @@ spec:
       containers:
         - name: medplum-app
           image: {{ .Values.medplumApp.image }}
+          imagePullPolicy: Always
           ports:
             - containerPort: {{ .Values.medplumApp.port }}
           resources:

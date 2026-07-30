@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-medplum-server-config
+  labels:
+    app.kubernetes.io/name: medplum-server
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: fhir-server
+    app.kubernetes.io/part-of: cpg-to-acp
+data:
+  medplum.config.json: |
+    {
+      "port": {{ .Values.medplumServer.port }},
+      "baseUrl": {{ .Values.medplumServer.baseUrl | default (printf "http://%s-medplum-server:%d/" .Release.Name (.Values.medplumServer.port | int)) | quote }},
+      "appBaseUrl": {{ .Values.medplumServer.appBaseUrl | default (printf "http://%s-medplum-app:%d/" .Release.Name (.Values.medplumApp.port | int)) | quote }},
+      "storageBaseUrl": {{ printf "http://%s-medplum-server:%d/storage/" .Release.Name (.Values.medplumServer.port | int) | quote }},
+      "binaryStorage": "file:./binary/",
+      "database": {
+        "host": "{{ .Release.Name }}-postgres",
+        "port": {{ .Values.postgres.service.port }},
+        "dbname": "medplum",
+        "username": "medplum",
+        "password": "medplum"
+      },
+      "redis": {
+        "host": "{{ .Release.Name }}-redis",
+        "port": {{ .Values.redis.service.port }},
+        "password": "medplum"
+      },
+      "maxJsonSize": "1mb",
+      "maxBatchSize": "50mb",
+      "vmContextBotsEnabled": true,
+      "allowedOrigins": "*",
+      "introspectionEnabled": true,
+      "shutdownTimeoutMilliseconds": 30000
+    }
