@@ -7,6 +7,22 @@ function formatDate(obs: Observation): string {
   return new Date(dt).toLocaleDateString();
 }
 
+const SHORT_NAMES: Record<string, string> = {
+  '85354-9': 'BP',
+  '8867-4': 'HR',
+  '8310-5': 'Temp',
+  '9279-1': 'RR',
+  '8302-2': 'Ht',
+  '29463-7': 'Wt',
+  '39156-5': 'BMI',
+  '2708-6': 'O2 Sat',
+};
+
+function vitalLabel(obs: Observation): string {
+  const code = obs.code?.coding?.[0]?.code ?? '';
+  return SHORT_NAMES[code] ?? obs.code?.text ?? obs.code?.coding?.[0]?.display ?? '?';
+}
+
 function formatVital(obs: Observation): string {
   if (obs.component) {
     const sys = obs.component.find((c) => c.code?.coding?.[0]?.code === '8480-6');
@@ -46,7 +62,7 @@ function VitalsComponent({
         <div key={obs.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
           <span>
             <span style={{ color: 'var(--mantine-color-dimmed)', marginRight: 8 }}>
-              {obs.code?.text ?? obs.code?.coding?.[0]?.display ?? '?'}
+              {vitalLabel(obs)}
             </span>
             <strong>{formatVital(obs)}</strong>
           </span>
