@@ -66,12 +66,12 @@ export function App() {
         <Route path="/Patient/:patientId" element={<PatientChartPage />}>
           <Route index element={<Navigate to="timeline" replace />} />
           <Route path="timeline" element={<TimelineTab />} />
-          <Route path="MedicationRequest" element={<MedicationsTab />} />
-          <Route path="Observation" element={<ObservationsTab />} />
-          <Route path="DiagnosticReport" element={<LabsTab />} />
-          <Route path="AllergyIntolerance" element={<AllergiesTab />} />
-          <Route path="CarePlan" element={<CarePlansTab />} />
-          <Route path="Encounter" element={<EncountersTab />} />
+          <Route path="encounters" element={<EncountersTab />} />
+          <Route path="medications" element={<MedicationsTab />} />
+          <Route path="vitals" element={<ObservationsTab />} />
+          <Route path="labs" element={<LabsTab />} />
+          <Route path="allergies" element={<AllergiesTab />} />
+          <Route path="careplans" element={<CarePlansTab />} />
         </Route>
         <Route path="/Schedule" element={<StubPage resourceType="Schedule" />} />
         <Route path="/Communication" element={<StubPage resourceType="Communication" />} />

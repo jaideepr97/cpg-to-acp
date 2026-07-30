@@ -18,12 +18,12 @@ const KEEP_SECTIONS = new Set([
 
 const TABS = [
   { label: 'Timeline', value: 'timeline' },
-  { label: 'Visits', value: 'Encounter' },
-  { label: 'Meds', value: 'MedicationRequest' },
-  { label: 'Vitals', value: 'Observation' },
-  { label: 'Labs', value: 'DiagnosticReport' },
-  { label: 'Allergies', value: 'AllergyIntolerance' },
-  { label: 'Care Plans', value: 'CarePlan' },
+  { label: 'Visits', value: 'encounters' },
+  { label: 'Meds', value: 'medications' },
+  { label: 'Vitals', value: 'vitals' },
+  { label: 'Labs', value: 'labs' },
+  { label: 'Allergies', value: 'allergies' },
+  { label: 'Care Plans', value: 'careplans' },
 ];
 
 export function PatientChartPage() {
