@@ -69,6 +69,7 @@ services:
     environment:
       - KOGITO_URL=http://kogito:8081
       - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - FHIR_SERVER_URL=http://hapi-fhir:8080/fhir
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8082/health"]
       interval: 5s
