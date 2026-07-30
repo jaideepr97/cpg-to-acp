@@ -27,7 +27,7 @@ helm upgrade --install "${RELEASE_PREFIX}-acp-writer" \
   --set decisionService.url="http://${RELEASE_PREFIX}-decision-svc-decision-service:8081" \
   "$@"
 
-echo "=== Installing mock-EHR (HAPI FHIR) ==="
+echo "=== Installing mock-EHR (Medplum) ==="
 helm upgrade --install "${RELEASE_PREFIX}-mock-ehr" \
   "$REPO_ROOT/mock-EHR/deploy/chart" \
   --namespace "$NAMESPACE" \

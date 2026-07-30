@@ -100,9 +100,9 @@ done
 
 echo ""
 echo "2. Infrastructure services"
-check "HAPI FHIR reachable" \
+check "Medplum FHIR server reachable" \
     oc exec deploy/acp-writer-mcp -n "$NAMESPACE" -- \
-    python3 -c "import urllib.request; urllib.request.urlopen('http://cpg-mock-ehr-hapi-fhir:8080/fhir/metadata', timeout=10)"
+    python3 -c "import urllib.request; urllib.request.urlopen('http://cpg-mock-ehr-medplum-server:8103/healthcheck', timeout=10)"
 
 check "Kogito decision engine reachable" \
     oc exec deploy/acp-writer-mcp -n "$NAMESPACE" -- \
