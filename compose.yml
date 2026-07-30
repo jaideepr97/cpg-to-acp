@@ -99,6 +99,18 @@ services:
       - ./mock-EHR/data:/data:ro
     entrypoint: ["/bin/bash", "/load-medplum.sh"]
 
+  mock-ehr-app:
+    build:
+      context: ./mock-EHR/ui
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      medplum-server:
+        condition: service_healthy
+
+  # --- Application services ---
+
   kogito:
     build:
       context: ./acp-writer/decision-service
