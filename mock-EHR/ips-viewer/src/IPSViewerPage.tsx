@@ -1,5 +1,3 @@
-import FHIR from 'fhirclient';
-import type Client from 'fhirclient/lib/Client';
 import { useEffect, useState } from 'react';
 
 interface FHIRResource {
@@ -73,14 +71,28 @@ export function IPSViewerPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    FHIR.oauth2.ready()
-      .then(async (client: Client) => {
-        const patientId = client.patient.id;
-        if (!patientId) throw new Error('No patient context');
-        const bundle = await client.request(`Patient/${patientId}/$summary`);
-        setIps(parseIPS(bundle));
+    const iss = sessionStorage.getItem('ips_iss');
+    const token = sessionStorage.getItem('ips_token');
+    const patientId = sessionStorage.getItem('ips_patient_id');
+
+    if (!iss || !token || !patientId) {
+      setError('No launch context. This app must be launched from the EHR.');
+      setLoading(false);
+      return;
+    }
+
+    fetch(`${iss}Patient/${patientId}/$summary`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (resp) => {
+        if (!resp.ok) {
+          const body = await resp.text();
+          throw new Error(`${resp.status} ${resp.statusText}\nURL: ${iss}Patient/${patientId}/$summary\n${body}`);
+        }
+        return resp.json();
       })
-      .catch((err: Error) => setError(err.message))
+      .then((bundle) => setIps(parseIPS(bundle)))
+      .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
 

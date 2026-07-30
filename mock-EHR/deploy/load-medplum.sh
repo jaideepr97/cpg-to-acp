@@ -195,7 +195,7 @@ log "Registered acp-writer SMART app"
 # Write client ID to a shared config file for the IPS viewer
 SMART_CONFIG_DIR="${SMART_CONFIG_DIR:-}"
 if [ -n "$SMART_CONFIG_DIR" ] && [ -n "$CLIENT_ID" ]; then
-  echo "{\"clientId\":\"$CLIENT_ID\"}" > "$SMART_CONFIG_DIR/smart-config.json"
+  echo "{\"clientId\":\"$CLIENT_ID\",\"clientSecret\":\"$CLIENT_SECRET\"}" > "$SMART_CONFIG_DIR/smart-config.json"
   log "  Wrote SMART config to $SMART_CONFIG_DIR/smart-config.json"
 fi
 
