@@ -1,12 +1,9 @@
 import { Loader } from '@mantine/core';
-import type { Patient } from '@medplum/fhirtypes';
 import { PatientTimeline } from '@medplum/react';
-import { useResource } from '@medplum/react-hooks';
-import { useParams } from 'react-router';
+import { usePatient } from '../hooks/usePatient';
 
 export function TimelineTab() {
-  const { patientId } = useParams();
-  const patient = useResource<Patient>({ reference: `Patient/${patientId}` });
+  const patient = usePatient();
   if (!patient) {
     return <Loader />;
   }

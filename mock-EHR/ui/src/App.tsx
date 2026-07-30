@@ -1,5 +1,5 @@
-import { AppShell } from '@medplum/react';
-import { useMedplumProfile } from '@medplum/react-hooks';
+import { Loading, AppShell } from '@medplum/react';
+import { useMedplum, useMedplumProfile } from '@medplum/react-hooks';
 import {
   IconCalendarEvent,
   IconClipboardCheck,
@@ -7,6 +7,7 @@ import {
   IconStethoscope,
   IconUsers,
 } from '@tabler/icons-react';
+import { Suspense } from 'react';
 import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router';
 import { APP_NAME } from './config';
 import { AllergiesTab } from './pages/AllergiesTab';
@@ -22,9 +23,14 @@ import { StubPage } from './pages/StubPage';
 import { TimelineTab } from './pages/TimelineTab';
 
 export function App() {
+  const medplum = useMedplum();
   const profile = useMedplumProfile();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+
+  if (medplum.isLoading()) {
+    return null;
+  }
 
   if (!profile) {
     return (
@@ -59,24 +65,26 @@ export function App() {
         },
       ]}
     >
-      <Routes>
-        <Route path="/" element={<Navigate to="/Patient" replace />} />
-        <Route path="/signin" element={<Navigate to="/Patient" replace />} />
-        <Route path="/Patient" element={<PatientListPage />} />
-        <Route path="/Patient/:patientId" element={<PatientChartPage />}>
-          <Route index element={<Navigate to="timeline" replace />} />
-          <Route path="timeline" element={<TimelineTab />} />
-          <Route path="encounters" element={<EncountersTab />} />
-          <Route path="medications" element={<MedicationsTab />} />
-          <Route path="vitals" element={<ObservationsTab />} />
-          <Route path="labs" element={<LabsTab />} />
-          <Route path="allergies" element={<AllergiesTab />} />
-          <Route path="careplans" element={<CarePlansTab />} />
-        </Route>
-        <Route path="/Schedule" element={<StubPage resourceType="Schedule" />} />
-        <Route path="/Communication" element={<StubPage resourceType="Communication" />} />
-        <Route path="/Task" element={<StubPage resourceType="Task" />} />
-      </Routes>
+      <Suspense fallback={<Loading />}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/Patient" replace />} />
+          <Route path="/signin" element={<Navigate to="/Patient" replace />} />
+          <Route path="/Patient" element={<PatientListPage />} />
+          <Route path="/Patient/:patientId" element={<PatientChartPage />}>
+            <Route index element={<Navigate to="timeline" replace />} />
+            <Route path="timeline" element={<TimelineTab />} />
+            <Route path="encounters" element={<EncountersTab />} />
+            <Route path="medications" element={<MedicationsTab />} />
+            <Route path="vitals" element={<ObservationsTab />} />
+            <Route path="labs" element={<LabsTab />} />
+            <Route path="allergies" element={<AllergiesTab />} />
+            <Route path="careplans" element={<CarePlansTab />} />
+          </Route>
+          <Route path="/Schedule" element={<StubPage resourceType="Schedule" />} />
+          <Route path="/Communication" element={<StubPage resourceType="Communication" />} />
+          <Route path="/Task" element={<StubPage resourceType="Task" />} />
+        </Routes>
+      </Suspense>
     </AppShell>
   );
 }

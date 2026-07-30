@@ -23,8 +23,9 @@ export function PatientListPage() {
     <Document>
       <SearchControl
         search={search}
-        onClick={(e) => navigate(`/Patient/${e.resource.id}`)}
-        onChange={(e) => navigate(`/Patient${formatSearchQuery(e.definition)}`)}
+        onClick={(e) => navigate(`/Patient/${e.resource.id}`)?.catch(console.error)}
+        onAuxClick={(e) => window.open(`/Patient/${e.resource.id}`, '_blank')}
+        onChange={(e) => navigate(`/Patient${formatSearchQuery(e.definition)}`)?.catch(console.error)}
       />
     </Document>
   );

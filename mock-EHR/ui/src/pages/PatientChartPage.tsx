@@ -1,11 +1,12 @@
 import { Loader, ScrollArea } from '@mantine/core';
-import { LinkTabs, PatientSummary, getDefaultSections } from '@medplum/react';
-import { useResource } from '@medplum/react-hooks';
-import type { Patient } from '@medplum/fhirtypes';
-import { useMemo } from 'react';
+import type { OperationOutcome } from '@medplum/fhirtypes';
+import { isOk } from '@medplum/core';
+import { Document, LinkTabs, OperationOutcomeAlert, PatientSummary, getDefaultSections } from '@medplum/react';
+import { useMemo, useState } from 'react';
 import { Outlet, useNavigate, useParams } from 'react-router';
 import { SmartLaunchButton } from '../components/SmartLaunchButton';
 import { VitalsSectionCustom } from '../components/VitalsSectionCustom';
+import { usePatient } from '../hooks/usePatient';
 
 const KEEP_SECTIONS = new Set([
   'demographics',
@@ -29,7 +30,8 @@ const TABS = [
 export function PatientChartPage() {
   const { patientId } = useParams();
   const navigate = useNavigate();
-  const patient = useResource<Patient>({ reference: `Patient/${patientId}` });
+  const [outcome, setOutcome] = useState<OperationOutcome>();
+  const patient = usePatient({ setOutcome });
 
   const sections = useMemo(
     () =>
@@ -38,6 +40,14 @@ export function PatientChartPage() {
         .map((s) => (s.key === 'vitals' ? VitalsSectionCustom : s)),
     []
   );
+
+  if (outcome && !isOk(outcome)) {
+    return (
+      <Document>
+        <OperationOutcomeAlert outcome={outcome} />
+      </Document>
+    );
+  }
 
   if (!patient) {
     return <Loader />;
@@ -50,7 +60,7 @@ export function PatientChartPage() {
           patient={patient}
           sections={sections}
           onClickResource={(resource) =>
-            navigate(`/Patient/${patientId}/${resource.resourceType}/${resource.id}`)
+            navigate(`/Patient/${patientId}/${resource.resourceType}/${resource.id}`)?.catch(console.error)
           }
         />
         <SmartLaunchButton patientId={patientId!} />
