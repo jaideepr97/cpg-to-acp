@@ -3,10 +3,9 @@
   "type": "transaction",
   "entry": [
     {
-      "fullUrl": "urn:uuid:patient-1",
+      "fullUrl": "urn:uuid:e4376e0c-1169-53e8-9eed-390d9fa0d320",
       "resource": {
         "resourceType": "Patient",
-        "id": "patient-1",
         "identifier": [
           {
             "system": "http://example.org/fhir/ids",
@@ -16,22 +15,23 @@
         "name": [
           {
             "family": "Reynolds",
-            "given": ["James"]
+            "given": [
+              "James"
+            ]
           }
         ],
         "gender": "male",
         "birthDate": "1971-03-15"
       },
       "request": {
-        "method": "PUT",
-        "url": "Patient/patient-1"
+        "method": "POST",
+        "url": "Patient"
       }
     },
     {
-      "fullUrl": "urn:uuid:condition-htn-1",
+      "fullUrl": "urn:uuid:cf669c91-aa08-5167-ad4b-11f16ee8aa5a",
       "resource": {
         "resourceType": "Condition",
-        "id": "condition-htn-1",
         "clinicalStatus": {
           "coding": [
             {
@@ -75,20 +75,19 @@
           "text": "Essential hypertension"
         },
         "subject": {
-          "reference": "Patient/patient-1"
+          "reference": "urn:uuid:e4376e0c-1169-53e8-9eed-390d9fa0d320"
         },
         "onsetDateTime": "2026-06-01"
       },
       "request": {
-        "method": "PUT",
-        "url": "Condition/condition-htn-1"
+        "method": "POST",
+        "url": "Condition"
       }
     },
     {
-      "fullUrl": "urn:uuid:condition-dm2-1",
+      "fullUrl": "urn:uuid:3df5aa68-644f-54fc-a532-8a53962a1751",
       "resource": {
         "resourceType": "Condition",
-        "id": "condition-dm2-1",
         "clinicalStatus": {
           "coding": [
             {
@@ -132,20 +131,19 @@
           "text": "Type 2 diabetes mellitus"
         },
         "subject": {
-          "reference": "Patient/patient-1"
+          "reference": "urn:uuid:e4376e0c-1169-53e8-9eed-390d9fa0d320"
         },
         "onsetDateTime": "2022-08-15"
       },
       "request": {
-        "method": "PUT",
-        "url": "Condition/condition-dm2-1"
+        "method": "POST",
+        "url": "Condition"
       }
     },
     {
-      "fullUrl": "urn:uuid:observation-bp-1",
+      "fullUrl": "urn:uuid:89a8adf1-187a-55e8-a89a-d969df1d0121",
       "resource": {
         "resourceType": "Observation",
-        "id": "observation-bp-1",
         "status": "final",
         "category": [
           {
@@ -169,7 +167,7 @@
           "text": "Blood Pressure"
         },
         "subject": {
-          "reference": "Patient/patient-1"
+          "reference": "urn:uuid:e4376e0c-1169-53e8-9eed-390d9fa0d320"
         },
         "effectiveDateTime": "2026-07-01T10:30:00Z",
         "component": [
@@ -210,15 +208,14 @@
         ]
       },
       "request": {
-        "method": "PUT",
-        "url": "Observation/observation-bp-1"
+        "method": "POST",
+        "url": "Observation"
       }
     },
     {
-      "fullUrl": "urn:uuid:medstmt-metformin-1",
+      "fullUrl": "urn:uuid:2819a48a-607c-5533-9ded-224ff39e45a2",
       "resource": {
         "resourceType": "MedicationStatement",
-        "id": "medstmt-metformin-1",
         "status": "active",
         "medicationCodeableConcept": {
           "coding": [
@@ -231,7 +228,7 @@
           "text": "Metformin 500mg"
         },
         "subject": {
-          "reference": "Patient/patient-1"
+          "reference": "urn:uuid:e4376e0c-1169-53e8-9eed-390d9fa0d320"
         },
         "effectivePeriod": {
           "start": "2022-09-01"
@@ -260,8 +257,8 @@
         ]
       },
       "request": {
-        "method": "PUT",
-        "url": "MedicationStatement/medstmt-metformin-1"
+        "method": "POST",
+        "url": "MedicationStatement"
       }
     }
   ]

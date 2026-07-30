@@ -3,10 +3,9 @@
   "type": "transaction",
   "entry": [
     {
-      "fullUrl": "urn:uuid:patient-2",
+      "fullUrl": "urn:uuid:8376d58d-b8ee-5e2c-9c34-2f0ddc60bf58",
       "resource": {
         "resourceType": "Patient",
-        "id": "patient-2",
         "identifier": [
           {
             "system": "http://example.org/fhir/ids",
@@ -16,22 +15,23 @@
         "name": [
           {
             "family": "Chen",
-            "given": ["Maria"]
+            "given": [
+              "Maria"
+            ]
           }
         ],
         "gender": "female",
         "birthDate": "1981-09-22"
       },
       "request": {
-        "method": "PUT",
-        "url": "Patient/patient-2"
+        "method": "POST",
+        "url": "Patient"
       }
     },
     {
-      "fullUrl": "urn:uuid:condition-htn-2",
+      "fullUrl": "urn:uuid:e0d77860-0aab-5d7b-a54c-b73dec4b1c6d",
       "resource": {
         "resourceType": "Condition",
-        "id": "condition-htn-2",
         "clinicalStatus": {
           "coding": [
             {
@@ -75,20 +75,19 @@
           "text": "Essential hypertension"
         },
         "subject": {
-          "reference": "Patient/patient-2"
+          "reference": "urn:uuid:8376d58d-b8ee-5e2c-9c34-2f0ddc60bf58"
         },
         "onsetDateTime": "2026-06-15"
       },
       "request": {
-        "method": "PUT",
-        "url": "Condition/condition-htn-2"
+        "method": "POST",
+        "url": "Condition"
       }
     },
     {
-      "fullUrl": "urn:uuid:observation-bp-2",
+      "fullUrl": "urn:uuid:21998421-fbd5-517a-bf5f-85e01149890e",
       "resource": {
         "resourceType": "Observation",
-        "id": "observation-bp-2",
         "status": "final",
         "category": [
           {
@@ -112,7 +111,7 @@
           "text": "Blood Pressure"
         },
         "subject": {
-          "reference": "Patient/patient-2"
+          "reference": "urn:uuid:8376d58d-b8ee-5e2c-9c34-2f0ddc60bf58"
         },
         "effectiveDateTime": "2026-07-05T09:15:00Z",
         "component": [
@@ -153,8 +152,8 @@
         ]
       },
       "request": {
-        "method": "PUT",
-        "url": "Observation/observation-bp-2"
+        "method": "POST",
+        "url": "Observation"
       }
     }
   ]

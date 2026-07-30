@@ -19,8 +19,6 @@ DATA_DIR="${DATA_DIR:-/data}"
 ACP_WRITER_LAUNCH_URI="${ACP_WRITER_LAUNCH_URI:-http://localhost:3001/launch}"
 ACP_WRITER_REDIRECT_URI="${ACP_WRITER_REDIRECT_URI:-http://localhost:3001/}"
 
-ADMIN_EMAIL="admin@example.com"
-ADMIN_PASSWORD="medplum_admin"
 CODE_CHALLENGE="mock_ehr_setup_challenge"
 
 # --- Helpers ---
@@ -28,30 +26,6 @@ CODE_CHALLENGE="mock_ehr_setup_challenge"
 log() { echo "[load-medplum] $*"; }
 
 fail() { log "ERROR: $*" >&2; exit 1; }
-
-medplum_post() {
-  local path="$1"
-  local data="$2"
-  local token="${3:-}"
-  local auth_header=""
-  if [ -n "$token" ]; then
-    auth_header="-H \"Authorization: Bearer $token\""
-  fi
-  eval curl -sf -X POST "$MEDPLUM_BASE_URL$path" \
-    -H "Content-Type: application/json" \
-    $auth_header \
-    -d "'$data'"
-}
-
-medplum_put() {
-  local path="$1"
-  local data="$2"
-  local token="$3"
-  eval curl -sf -X PUT "$MEDPLUM_BASE_URL$path" \
-    -H "Content-Type: application/json" \
-    -H "\"Authorization: Bearer $token\"" \
-    -d "'$data'"
-}
 
 medplum_post_file() {
   local path="$1"
@@ -77,70 +51,54 @@ until curl -sf "$MEDPLUM_BASE_URL/healthcheck" > /dev/null 2>&1; do
 done
 log "Medplum server is healthy"
 
-# --- Step 2: Authenticate as super admin ---
+# --- Step 2-3: Create project and authenticate ---
+# Medplum uses a two-step registration flow: /auth/newuser -> /auth/newproject
+# This creates a new user, a new project, and returns an auth code in one flow.
 
-log "Authenticating as super admin ..."
-login_response=$(curl -sf -X POST "$MEDPLUM_BASE_URL/auth/login" \
+PROJECT_EMAIL="admin@careview.example"
+PROJECT_PASSWORD="CareView2026!"
+
+log "Creating demo project (CareView EHR) ..."
+
+newuser_response=$(curl -sf -X POST "$MEDPLUM_BASE_URL/auth/newuser" \
   -H "Content-Type: application/json" \
   -d "{
-    \"email\": \"$ADMIN_EMAIL\",
-    \"password\": \"$ADMIN_PASSWORD\",
+    \"firstName\": \"Admin\",
+    \"lastName\": \"CareView\",
+    \"email\": \"$PROJECT_EMAIL\",
+    \"password\": \"$PROJECT_PASSWORD\",
+    \"recaptchaToken\": \"\",
     \"codeChallengeMethod\": \"plain\",
     \"codeChallenge\": \"$CODE_CHALLENGE\"
-  }")
+  }") \
+  || fail "Failed to create user"
 
-auth_code=$(echo "$login_response" | python3 -c "import sys,json; print(json.load(sys.stdin)['code'])" 2>/dev/null) \
-  || fail "Failed to extract auth code from login response: $login_response"
+LOGIN_ID=$(echo "$newuser_response" | python3 -c "import sys,json; print(json.load(sys.stdin)['login'])" 2>/dev/null) \
+  || fail "Failed to extract login ID: $newuser_response"
 
-token_response=$(curl -sf -X POST "$MEDPLUM_BASE_URL/oauth2/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=authorization_code&code=$auth_code&code_verifier=$CODE_CHALLENGE")
-
-SUPER_ADMIN_TOKEN=$(echo "$token_response" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])" 2>/dev/null) \
-  || fail "Failed to extract access token from token response: $token_response"
-
-log "Authenticated as super admin"
-
-# --- Step 3: Create demo project ---
-
-log "Creating demo project ..."
-project_response=$(curl -sf -X POST "$MEDPLUM_BASE_URL/admin/projects/new" \
+newproject_response=$(curl -sf -X POST "$MEDPLUM_BASE_URL/auth/newproject" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $SUPER_ADMIN_TOKEN" \
-  -d '{
-    "name": "CareView EHR",
-    "strictMode": false
-  }') \
+  -d "{
+    \"login\": \"$LOGIN_ID\",
+    \"projectName\": \"CareView EHR\"
+  }") \
   || fail "Failed to create project"
 
-PROJECT_ID=$(echo "$project_response" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('project',{}).get('id', d.get('id','')))" 2>/dev/null) \
-  || fail "Failed to extract project ID: $project_response"
-
-log "Created project: $PROJECT_ID"
-
-# Get a token scoped to the new project by logging in again
-# The new project login is needed to operate within project scope
-login_response=$(curl -sf -X POST "$MEDPLUM_BASE_URL/auth/login" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"email\": \"$ADMIN_EMAIL\",
-    \"password\": \"$ADMIN_PASSWORD\",
-    \"projectId\": \"$PROJECT_ID\",
-    \"codeChallengeMethod\": \"plain\",
-    \"codeChallenge\": \"$CODE_CHALLENGE\"
-  }")
-
-auth_code=$(echo "$login_response" | python3 -c "import sys,json; print(json.load(sys.stdin)['code'])" 2>/dev/null) \
-  || fail "Failed to get project-scoped auth code"
+auth_code=$(echo "$newproject_response" | python3 -c "import sys,json; print(json.load(sys.stdin)['code'])" 2>/dev/null) \
+  || fail "Failed to extract auth code: $newproject_response"
 
 token_response=$(curl -sf -X POST "$MEDPLUM_BASE_URL/oauth2/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=authorization_code&code=$auth_code&code_verifier=$CODE_CHALLENGE")
 
 PROJECT_TOKEN=$(echo "$token_response" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])" 2>/dev/null) \
-  || fail "Failed to get project-scoped token"
+  || fail "Failed to get project token: $token_response"
 
-log "Authenticated to project"
+PROJECT_ID=$(echo "$token_response" | python3 -c "import sys,json; ref=json.load(sys.stdin).get('project',{}).get('reference',''); print(ref.split('/')[-1] if '/' in ref else ref)" 2>/dev/null) \
+  || fail "Failed to extract project ID from token response"
+
+log "Created project: CareView EHR ($PROJECT_ID)"
+log "Project admin: $PROJECT_EMAIL"
 
 # --- Step 4: Load patient bundles ---
 
@@ -241,7 +199,7 @@ log "=== Medplum setup complete ==="
 log "  Project:      CareView EHR ($PROJECT_ID)"
 log "  FHIR endpoint: $MEDPLUM_BASE_URL/fhir/R4"
 log "  Patients:     $bundle_count bundle(s) loaded"
-log "  Users:        admin@example.com / medplum_admin (super admin)"
+log "  Users:        admin@careview.example / CareView2026! (project admin)"
 log "                sarah.mitchell@careview.example / CareView2026! (Dr. Mitchell)"
 log "                james.park@careview.example / CareView2026! (Dr. Park)"
 log "  SMART App:    ACP Writer (client_id=$CLIENT_ID)"
