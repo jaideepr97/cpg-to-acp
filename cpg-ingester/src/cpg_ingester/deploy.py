@@ -13,14 +13,19 @@ logger = logging.getLogger(__name__)
 
 
 @mlflow.trace(name="deploy_dmn")
-def deploy_dmn(dmn_path: Path, acp_writer_url: str) -> DecisionModelSummary:
+def deploy_dmn(dmn_path: Path, acp_writer_url: str, source_cpg: str | None = None) -> DecisionModelSummary:
     """POST a DMN file to the acp-writer decisions API."""
     dmn_xml = dmn_path.read_text()
+
+    params = {}
+    if source_cpg:
+        params["source_cpg"] = source_cpg
 
     r = requests.post(
         f"{acp_writer_url}/api/v1/decisions/models",
         data=dmn_xml,
         headers={"Content-Type": "application/xml"},
+        params=params,
         timeout=30,
     )
     r.raise_for_status()
@@ -36,7 +41,8 @@ def deploy_dmn(dmn_path: Path, acp_writer_url: str) -> DecisionModelSummary:
 @click.command()
 @click.argument("dmn_files", nargs=-1, type=click.Path(exists=True, path_type=Path))
 @click.option("--acp-writer-url", default="http://localhost:8082", help="ACP Writer base URL.")
-def main(dmn_files: tuple[Path, ...], acp_writer_url: str):
+@click.option("--source-cpg", default=None, help="CPG ID to link deployed models to.")
+def main(dmn_files: tuple[Path, ...], acp_writer_url: str, source_cpg: str | None):
     """Deploy DMN files to the acp-writer service."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -46,7 +52,7 @@ def main(dmn_files: tuple[Path, ...], acp_writer_url: str):
 
     for dmn_path in dmn_files:
         try:
-            summary = deploy_dmn(dmn_path, acp_writer_url)
+            summary = deploy_dmn(dmn_path, acp_writer_url, source_cpg=source_cpg)
             click.echo(f"  Deployed: {summary.name} ({summary.id})")
         except requests.HTTPError as e:
             click.echo(f"  FAILED: {dmn_path.name} — {e}", err=True)

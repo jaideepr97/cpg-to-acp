@@ -249,7 +249,7 @@ async def update_careplan_status(careplan_id: str, request: Request):
 
 
 @app.post("/api/v1/decisions/models", status_code=201)
-async def deploy_decision_model(request: Request):
+async def deploy_decision_model(request: Request, source_cpg: str | None = None):
     content_type = request.headers.get("content-type", "")
     body = await request.body()
     dmn_xml = body.decode("utf-8")
@@ -259,12 +259,15 @@ async def deploy_decision_model(request: Request):
     except ET.ParseError as e:
         raise HTTPException(status_code=400, detail=f"Invalid DMN XML: {e}")
 
+    if source_cpg:
+        summary.source_cpg = source_cpg
+
     _dynamic_models[summary.id] = {
         "summary": summary,
         "dmn_xml": dmn_xml,
     }
 
-    logger.info("Deployed decision model: %s (%s)", summary.name, summary.id)
+    logger.info("Deployed decision model: %s (%s, source_cpg=%s)", summary.name, summary.id, source_cpg)
     return summary.model_dump(mode="json")
 
 

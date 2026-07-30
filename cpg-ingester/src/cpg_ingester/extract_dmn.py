@@ -63,7 +63,8 @@ def extract_dmn(cpg_markdown: str, client: OpenAI, model: str) -> list[str]:
 @click.option("--api-key", default="sk-change-me", help="LiteLLM master key.")
 @click.option("--deploy", is_flag=True, help="Push extracted DMN to acp-writer after writing.")
 @click.option("--acp-writer-url", default="http://localhost:8082", help="ACP Writer URL (used with --deploy).")
-def main(input_markdown: Path, output_dir: Path, litellm_url: str, model: str, api_key: str, deploy: bool, acp_writer_url: str):
+@click.option("--source-cpg", default=None, help="CPG ID to link deployed models to (used with --deploy).")
+def main(input_markdown: Path, output_dir: Path, litellm_url: str, model: str, api_key: str, deploy: bool, acp_writer_url: str, source_cpg: str | None):
     """Extract DMN decision tables from parsed CPG Markdown."""
     logging.basicConfig(level=logging.INFO)
 
@@ -88,7 +89,7 @@ def main(input_markdown: Path, output_dir: Path, litellm_url: str, model: str, a
         from cpg_ingester.deploy import deploy_dmn
         click.echo(f"\nDeploying to {acp_writer_url}...")
         for out_path in out_paths:
-            summary = deploy_dmn(out_path, acp_writer_url)
+            summary = deploy_dmn(out_path, acp_writer_url, source_cpg=source_cpg)
             click.echo(f"  Deployed: {summary.name} ({summary.id})")
 
 
