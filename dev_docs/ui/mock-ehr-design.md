@@ -112,16 +112,19 @@ Environment-agnostic bash script that bootstraps a complete Medplum instance:
 
 1. Waits for Medplum server health
 2. Creates a "CareView EHR" project via `/auth/newuser` + `/auth/newproject` flow
-3. Loads all FHIR transaction bundles from the data directory
-4. Creates practitioner users (Dr. Sarah Mitchell, Dr. James Park)
-5. Registers the IPS Viewer (or future acp-writer) as a SMART `ClientApplication` with `launchUri` and `redirectUri`
-6. Writes `smart-config.json` with client ID/secret for the IPS Viewer
+3. Loads hand-crafted FHIR transaction bundles from `$DATA_DIR/*.json`
+4. Refreshes auth token, then loads Synthea bundles from `$DATA_DIR/synthea/*.json`
+5. Creates practitioner users (Dr. Sarah Mitchell, Dr. James Park)
+6. Registers the IPS Viewer (or future acp-writer) as a SMART `ClientApplication` with `launchUri` and `redirectUri`
+7. Writes `smart-config.json` with client ID/secret for the IPS Viewer
 
-Takes `MEDPLUM_BASE_URL`, `DATA_DIR`, `ACP_WRITER_LAUNCH_URI`, `ACP_WRITER_REDIRECT_URI`, and `SMART_CONFIG_DIR` as environment variables.
+Token refresh between hand-crafted and Synthea loading prevents expiry on long runs. Curl timeout is 600s per bundle for slower hardware. Takes `MEDPLUM_BASE_URL`, `DATA_DIR`, `ACP_WRITER_LAUNCH_URI`, `ACP_WRITER_REDIRECT_URI`, and `SMART_CONFIG_DIR` as environment variables.
 
 ### Patient Data
 
-Three hand-crafted FHIR R4 transaction bundles in `mock-EHR/data/`:
+8 patients total: 3 hand-crafted + 5 Synthea-generated.
+
+#### Hand-crafted patients (`mock-EHR/data/`)
 
 | Bundle | Patient | Resources | Scenario |
 |---|---|---|---|
@@ -129,13 +132,29 @@ Three hand-crafted FHIR R4 transaction bundles in `mock-EHR/data/`:
 | `patient-bundle-lifestyle.json` | Maria Chen, 45F | Patient, 1 Condition, 1 Observation | HTN only, no meds. Lifestyle-only path. |
 | `patient-bundle-comprehensive.json` | Robert Thompson, 68M | Patient, 2 Encounters, 3 Conditions, 3 MedicationRequests, 2 AllergyIntolerances, 7 Observations, 2 DiagnosticReports, 1 CarePlan | HTN + T2DM + CKD. Exercises all UI tabs. |
 
-Data quality aligns with Synthea conventions:
+#### Synthea-generated patients (`mock-EHR/data/synthea/`)
+
+Generated with [Synthea](https://github.com/synthetichealth/synthea) (Java 21, seed-based for reproducibility). Each bundle includes full clinical data: encounters, conditions, observations, medications, procedures, immunizations, diagnostic reports, care plans, claims.
+
+| Patient | Age/Gender | Resources | Size | Key conditions |
+|---|---|---|---|---|
+| Pat3 Terry | 43M | 185 | 592K | Prediabetes, anemia, obesity |
+| Eloy Conn | 48M | 120 | 418K | General adult health |
+| Delois Mills | 62F | 145 | 469K | General adult health |
+| Orlando Kautzer | 51M | 208 | 637K | General adult health |
+| Duane Marks | 66M | 216 | 683K | General adult health |
+
+Bundles must stay under ~1MB for reliable loading into Medplum (larger bundles hit request body size limits). Generated with `--exporter.years_of_history=1-2` to keep sizes manageable. To generate more: install Java 17+, download `synthea-with-dependencies.jar`, run with a seed and age/history filters.
+
+#### Data format notes
+
 - `MedicationRequest` (not MedicationStatement) with `intent: "order"`, `authoredOn`, `reasonReference`, `dosageInstruction`
 - Patient resources include address, telecom, maritalStatus, typed MRN identifier
 - Conditions include `recordedDate`
 - Observations include `issued`
 - DiagnosticReports include `category: LAB` (required by Medplum's LabsSection client-side filter)
-- All bundles use `POST` method with `urn:uuid:` internal references (Medplum doesn't support `PUT` with client-specified IDs)
+- Hand-crafted bundles use `POST` with `urn:uuid:` internal references (Medplum doesn't support `PUT` with client-specified IDs)
+- Synthea bundles use `POST` natively and include `urn:uuid:` references for all internal cross-resource links
 
 ## Lessons Learned
 
@@ -211,7 +230,7 @@ For the IPS Viewer credentials (which are generated at load time): `--set ipsVie
 
 1. **Medplum version pinning**: All `@medplum/*` packages and Docker images pinned to **`5.1.27`**. Medplum patches include features (not just bug fixes) and Alpha features may break. Review for upgrade every 2-3 months. Do not skip minor versions (5.1 → 5.2, not 5.1 → 5.3).
 
-2. **Patient data strategy**: Hybrid approach. Hand-crafted patients for primary demo scenarios (predictable DMN paths). Synthea for 6+ background patients (not yet generated — requires Java 17+). Target 8+ total.
+2. **Patient data strategy**: Hybrid approach. 3 hand-crafted patients for primary demo scenarios (predictable DMN paths) + 5 Synthea-generated patients for background data richness. Total: 8 patients. Synthea bundles kept under ~1MB to avoid Medplum body size limits.
 
 3. **EHR name**: "CareView EHR" — defined in `config.ts`, flows to `AppShell` header and sign-in page. Keep configurable; marketing may change it.
 
@@ -221,7 +240,7 @@ For the IPS Viewer credentials (which are generated at load time): `--set ipsVie
 
 ## Remaining Work
 
-- **More patients**: Generate 5-6 Synthea patients for background data richness (requires Java 17+)
-- **Enrich Reynolds/Chen**: Add encounters, allergies, more observations to match Thompson's data quality
+- **Enrich Reynolds/Chen**: Add encounters, allergies, more observations to match Thompson's data quality (low priority — Synthea patients provide data richness)
 - **CSS modules**: Extract inline styles to CSS modules for dark mode and responsive support (low priority)
 - **acp-writer integration**: When the real acp-writer UI is built, register it as the SMART app in place of the IPS Viewer
+- **Load script idempotency**: The load script fails on re-run because the project/users already exist. Consider adding upsert logic or a "skip if exists" check.
