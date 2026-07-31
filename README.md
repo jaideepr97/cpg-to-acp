@@ -135,7 +135,25 @@ Verify the models are deployed:
 curl -sf http://localhost:8082/api/v1/decisions/models | python3 -m json.tool
 ```
 
-### 5. Generate a care plan
+### 5. Register the CPG
+
+The guideline resolver matches patient conditions against registered CPGs. Register the CPG metadata so the pipeline knows which guidelines apply:
+
+```bash
+curl -X POST http://localhost:8082/api/v1/guidelines \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cpg_id": "cpg-hypertension-v1",
+    "title": "Synthetic Hypertension CPG",
+    "scope": "Essential (primary) hypertension, Type 2 diabetes mellitus",
+    "version": "1.0",
+    "publication_date": "2024-01-01"
+  }'
+```
+
+The `scope` field is matched against patient condition display text — include all conditions the guideline covers.
+
+### 6. Generate a care plan
 
 Post patient data (FHIR Bundle) to the acp-writer API:
 ```bash
@@ -150,7 +168,7 @@ curl -X POST http://localhost:8082/api/v1/careplans \
   -d @mock-EHR/data/patient-bundle-lifestyle.json | python3 -m json.tool
 ```
 
-### 6. Tear down
+### 7. Tear down
 
 ```bash
 podman-compose down   # or: docker compose down
@@ -163,6 +181,7 @@ podman-compose down   # or: docker compose down
 | Parse CPG | cpg-ingester | Docling |
 | Extract DMN | cpg-ingester | LLM via LiteLLM (OpenAI GPT-5.6 or Claude) |
 | Deploy DMN | cpg-ingester → acp-writer API | — |
+| Register CPG | acp-writer API | — |
 | Generate CarePlan | acp-writer → decision-service (JIT) | Drools/Kogito |
 
 All pipeline steps are traced in [MLflow](http://localhost:5000) when running locally.

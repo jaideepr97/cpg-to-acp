@@ -99,6 +99,23 @@ def _parse_dmn_metadata(dmn_xml: str) -> DecisionModelSummary:
                 type=var.get("typeRef", "string"),
             ))
 
+    if not inputs:
+        seen_names: set[str] = set()
+        for decision in root.findall(f"{{{DMN_NS}}}decision"):
+            dt = decision.find(f"{{{DMN_NS}}}decisionTable")
+            if dt is not None:
+                for inp in dt.findall(f"{{{DMN_NS}}}input"):
+                    input_expr = inp.find(f"{{{DMN_NS}}}inputExpression")
+                    if input_expr is not None:
+                        text_el = input_expr.find(f"{{{DMN_NS}}}text")
+                        var_name = text_el.text.strip() if text_el is not None and text_el.text else inp.get("label", "")
+                        if var_name and var_name not in seen_names:
+                            seen_names.add(var_name)
+                            inputs.append(DecisionVariable(
+                                name=var_name,
+                                type=input_expr.get("typeRef", "string"),
+                            ))
+
     outputs = []
     for decision in root.findall(f"{{{DMN_NS}}}decision"):
         dt = decision.find(f"{{{DMN_NS}}}decisionTable")
@@ -249,7 +266,7 @@ async def update_careplan_status(careplan_id: str, request: Request):
 
 
 @app.post("/api/v1/decisions/models", status_code=201)
-async def deploy_decision_model(request: Request):
+async def deploy_decision_model(request: Request, source_cpg: str | None = None):
     content_type = request.headers.get("content-type", "")
     body = await request.body()
     dmn_xml = body.decode("utf-8")
@@ -259,12 +276,15 @@ async def deploy_decision_model(request: Request):
     except ET.ParseError as e:
         raise HTTPException(status_code=400, detail=f"Invalid DMN XML: {e}")
 
+    if source_cpg:
+        summary.source_cpg = source_cpg
+
     _dynamic_models[summary.id] = {
         "summary": summary,
         "dmn_xml": dmn_xml,
     }
 
-    logger.info("Deployed decision model: %s (%s)", summary.name, summary.id)
+    logger.info("Deployed decision model: %s (%s, source_cpg=%s)", summary.name, summary.id, source_cpg)
     return summary.model_dump(mode="json")
 
 
