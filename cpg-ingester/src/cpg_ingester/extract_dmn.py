@@ -23,7 +23,25 @@ Rules:
 - Use string, number, and boolean types as appropriate.
 - Input columns use FEEL unary tests (e.g., >=140, "Yes", true).
 - Mark the hit policy as FIRST (F) since rules have priority ordering.
-- Keep it simple — just the decision table, no BKMs or complex DRDs.
+- Keep it simple — no BKMs or complex DRDs.
+
+Structure requirements (the decision engine needs these to wire inputs):
+- Each input MUST have a top-level <inputData> element with a <variable> child.
+- Each <decision> MUST contain <informationRequirement> elements with \
+<requiredInput href="#inputDataId"/> linking to the <inputData> elements.
+- The <decision> MUST also have a <variable> child declaring its output.
+
+Example structure:
+  <inputData id="input_bp" name="Systolic BP">
+    <variable name="Systolic BP" typeRef="number"/>
+  </inputData>
+  <decision id="decision_1" name="BP Assessment">
+    <variable name="BP Assessment" typeRef="string"/>
+    <informationRequirement>
+      <requiredInput href="#input_bp"/>
+    </informationRequirement>
+    <decisionTable hitPolicy="FIRST">...</decisionTable>
+  </decision>
 """
 
 USER_PROMPT_TEMPLATE = """\
