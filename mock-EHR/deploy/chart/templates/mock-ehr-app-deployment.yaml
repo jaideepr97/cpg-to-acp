@@ -41,3 +41,12 @@ spec:
               port: {{ .Values.mockEhrApp.port }}
             initialDelaySeconds: 10
             periodSeconds: 30
+          volumeMounts:
+            - name: config
+              mountPath: /usr/share/nginx/html/config.json
+              subPath: config.json
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Release.Name }}-mock-ehr-app-config
