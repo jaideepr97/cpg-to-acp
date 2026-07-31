@@ -41,3 +41,12 @@ spec:
               port: {{ .Values.ipsViewer.port }}
             initialDelaySeconds: 10
             periodSeconds: 30
+          volumeMounts:
+            - name: smart-config
+              mountPath: /usr/share/nginx/html/smart-config.json
+              subPath: smart-config.json
+              readOnly: true
+      volumes:
+        - name: smart-config
+          configMap:
+            name: {{ .Release.Name }}-ips-viewer-config
