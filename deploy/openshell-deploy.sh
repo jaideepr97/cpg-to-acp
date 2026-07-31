@@ -231,7 +231,9 @@ deploy_sandboxes() {
         "uvicorn acp_writer.services.fhir_server:app --host 0.0.0.0 --port 8080" \
         "${common_env[@]}" \
         "PYTHONPATH=/app/src" \
-        "FHIR_SERVER_URL=http://cpg-mock-ehr-medplum-server:8103/fhir/R4"
+        "FHIR_SERVER_URL=http://cpg-mock-ehr-medplum-server:8103/fhir/R4" \
+        "FHIR_CLIENT_ID=${FHIR_CLIENT_ID:-}" \
+        "FHIR_CLIENT_SECRET=${FHIR_CLIENT_SECRET:-}"
 }
 
 case "${1:-deploy}" in

@@ -53,6 +53,14 @@ spec:
             - name: FHIR_SERVER_URL
               value: {{ $pod.env.fhirServerUrl | quote }}
             {{- end }}
+            {{- if $pod.env.fhirClientId }}
+            - name: FHIR_CLIENT_ID
+              value: {{ $pod.env.fhirClientId | quote }}
+            {{- end }}
+            {{- if $pod.env.fhirClientSecret }}
+            - name: FHIR_CLIENT_SECRET
+              value: {{ $pod.env.fhirClientSecret | quote }}
+            {{- end }}
             {{- end }}
           readinessProbe:
             httpGet:
