@@ -23,7 +23,25 @@ Rules:
 - Use string, number, and boolean types as appropriate.
 - Input columns use FEEL unary tests (e.g., >=140, "Yes", true).
 - Mark the hit policy as FIRST (F) since rules have priority ordering.
-- Keep it simple — just the decision table, no BKMs or complex DRDs.
+- Keep it simple — no BKMs or complex DRDs.
+
+Structure requirements (the decision engine needs these to wire inputs):
+- Each input MUST have a top-level <inputData> element with a <variable> child.
+- Each <decision> MUST contain <informationRequirement> elements with \
+<requiredInput href="#inputDataId"/> linking to the <inputData> elements.
+- The <decision> MUST also have a <variable> child declaring its output.
+
+Example structure:
+  <inputData id="input_bp" name="Systolic BP">
+    <variable name="Systolic BP" typeRef="number"/>
+  </inputData>
+  <decision id="decision_1" name="BP Assessment">
+    <variable name="BP Assessment" typeRef="string"/>
+    <informationRequirement>
+      <requiredInput href="#input_bp"/>
+    </informationRequirement>
+    <decisionTable hitPolicy="FIRST">...</decisionTable>
+  </decision>
 """
 
 USER_PROMPT_TEMPLATE = """\
@@ -63,7 +81,8 @@ def extract_dmn(cpg_markdown: str, client: OpenAI, model: str) -> list[str]:
 @click.option("--api-key", default="sk-change-me", help="LiteLLM master key.")
 @click.option("--deploy", is_flag=True, help="Push extracted DMN to acp-writer after writing.")
 @click.option("--acp-writer-url", default="http://localhost:8082", help="ACP Writer URL (used with --deploy).")
-def main(input_markdown: Path, output_dir: Path, litellm_url: str, model: str, api_key: str, deploy: bool, acp_writer_url: str):
+@click.option("--source-cpg", default=None, help="CPG ID to link deployed models to (used with --deploy).")
+def main(input_markdown: Path, output_dir: Path, litellm_url: str, model: str, api_key: str, deploy: bool, acp_writer_url: str, source_cpg: str | None):
     """Extract DMN decision tables from parsed CPG Markdown."""
     logging.basicConfig(level=logging.INFO)
 
@@ -88,7 +107,7 @@ def main(input_markdown: Path, output_dir: Path, litellm_url: str, model: str, a
         from cpg_ingester.deploy import deploy_dmn
         click.echo(f"\nDeploying to {acp_writer_url}...")
         for out_path in out_paths:
-            summary = deploy_dmn(out_path, acp_writer_url)
+            summary = deploy_dmn(out_path, acp_writer_url, source_cpg=source_cpg)
             click.echo(f"  Deployed: {summary.name} ({summary.id})")
 
 
