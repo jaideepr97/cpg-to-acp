@@ -31,10 +31,28 @@ medplum_post_file() {
   local path="$1"
   local file="$2"
   local token="$3"
-  curl -sf -X POST "$MEDPLUM_BASE_URL$path" \
+  curl -s -X POST "$MEDPLUM_BASE_URL$path" \
     -H "Content-Type: application/fhir+json" \
     -H "Authorization: Bearer $token" \
+    --max-time 600 \
     -d @"$file"
+}
+
+refresh_token() {
+  local login_resp auth_code token_resp
+  login_resp=$(curl -sf -X POST "$MEDPLUM_BASE_URL/auth/login" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"email\": \"$PROJECT_EMAIL\",
+      \"password\": \"$PROJECT_PASSWORD\",
+      \"codeChallengeMethod\": \"plain\",
+      \"codeChallenge\": \"$CODE_CHALLENGE\"
+    }")
+  auth_code=$(echo "$login_resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['code'])" 2>/dev/null) || return 1
+  token_resp=$(curl -sf -X POST "$MEDPLUM_BASE_URL/oauth2/token" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -d "grant_type=authorization_code&code=$auth_code&code_verifier=$CODE_CHALLENGE")
+  PROJECT_TOKEN=$(echo "$token_resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])" 2>/dev/null) || return 1
 }
 
 # --- Step 1: Wait for Medplum server ---
@@ -118,6 +136,28 @@ for bundle_file in "$DATA_DIR"/*.json; do
   fi
 done
 log "Loaded $bundle_count patient bundle(s)"
+
+# Load Synthea-generated patients if present
+if [ -d "$DATA_DIR/synthea" ]; then
+  log "Refreshing token for Synthea loading ..."
+  refresh_token || log "WARNING: Token refresh failed, using existing token"
+  synthea_count=0
+  for bundle_file in "$DATA_DIR/synthea"/*.json; do
+    [ -f "$bundle_file" ] || continue
+    filename=$(basename "$bundle_file")
+    log "  Loading Synthea: $filename ..."
+    response=$(medplum_post_file "/fhir/R4" "$bundle_file" "$PROJECT_TOKEN")
+    http_type=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('resourceType',''))" 2>/dev/null || echo "unknown")
+    if [ "$http_type" = "Bundle" ]; then
+      log "  Loaded $filename successfully"
+      synthea_count=$((synthea_count + 1))
+    else
+      log "  WARNING: Unexpected response for $filename"
+    fi
+  done
+  log "Loaded $synthea_count Synthea patient(s)"
+  bundle_count=$((bundle_count + synthea_count))
+fi
 
 # --- Step 5: Create practitioner users ---
 
