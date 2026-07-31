@@ -308,11 +308,20 @@ fi
 
 log "Registered acp-writer SMART app"
 
-# Write client ID to a shared config file for the IPS viewer
+# Write client credentials for downstream services
 SMART_CONFIG_DIR="${SMART_CONFIG_DIR:-}"
 if [ -n "$SMART_CONFIG_DIR" ] && [ -n "$CLIENT_ID" ]; then
   echo "{\"clientId\":\"$CLIENT_ID\",\"clientSecret\":\"$CLIENT_SECRET\"}" > "$SMART_CONFIG_DIR/smart-config.json"
   log "  Wrote SMART config to $SMART_CONFIG_DIR/smart-config.json"
+fi
+
+FHIR_ENV_DIR="${FHIR_ENV_DIR:-}"
+if [ -n "$FHIR_ENV_DIR" ] && [ -n "$CLIENT_ID" ]; then
+  cat > "$FHIR_ENV_DIR/medplum-fhir.env" << ENVEOF
+FHIR_CLIENT_ID=$CLIENT_ID
+FHIR_CLIENT_SECRET=$CLIENT_SECRET
+ENVEOF
+  log "  Wrote FHIR credentials to $FHIR_ENV_DIR/medplum-fhir.env"
 fi
 
 # --- Done ---

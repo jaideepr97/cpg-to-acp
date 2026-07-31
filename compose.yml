@@ -94,9 +94,13 @@ services:
     environment:
       MEDPLUM_BASE_URL: "http://medplum-server:8103"
       DATA_DIR: "/data"
+      SMART_CONFIG_DIR: "/config/ips-viewer"
+      FHIR_ENV_DIR: "/config"
     volumes:
       - ./mock-EHR/deploy/load-medplum.sh:/load-medplum.sh:ro
       - ./mock-EHR/data:/data:ro
+      - ./mock-EHR/ips-viewer/public:/config/ips-viewer
+      - ./.medplum:/config
     entrypoint: ["/bin/bash", "/load-medplum.sh"]
 
   medplum-app:
@@ -179,6 +183,9 @@ services:
       - LITELLM_URL=http://litellm:4000
       - LITELLM_API_KEY=sk-change-me
       - FHIR_SERVER_URL=http://medplum-server:8103/fhir/R4
+    env_file:
+      - path: .medplum/medplum-fhir.env
+        required: false
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8082/health"]
       interval: 5s
