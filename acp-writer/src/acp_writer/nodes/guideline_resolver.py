@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 SNOMED_SYSTEM = "http://snomed.info/sct"
 ICD10_SYSTEM = "http://hl7.org/fhir/sid/icd-10-cm"
-DECISION_ENGINE_URL = os.environ.get("DECISION_ENGINE_URL", "http://acp-decision-engine:8080")
+DECISION_ENGINE_URL = os.environ.get("DECISION_ENGINE_URL", "")
 
 
 def _condition_matches_scope(condition_codes: list[dict], scope: str | None) -> bool:
@@ -110,13 +110,17 @@ def guideline_resolver(state: CarePlanComposerState) -> dict:
             "dmn_dependency_graph": [],
         }
 
-    try:
-        resp = requests.get(f"{DECISION_ENGINE_URL}/api/v1/decisions/models", timeout=10)
-        resp.raise_for_status()
-        all_models = resp.json()
-    except Exception as e:
-        logger.warning("Failed to query decision engine for models: %s", e)
-        all_models = []
+    if DECISION_ENGINE_URL:
+        try:
+            resp = requests.get(f"{DECISION_ENGINE_URL}/api/v1/decisions/models", timeout=10)
+            resp.raise_for_status()
+            all_models = resp.json()
+        except Exception as e:
+            logger.warning("Failed to query decision engine for models: %s", e)
+            all_models = []
+    else:
+        from acp_writer.api import _dynamic_models
+        all_models = [entry["summary"].model_dump(mode="json") for entry in _dynamic_models.values()]
 
     applicable_models = []
     for model in all_models:
