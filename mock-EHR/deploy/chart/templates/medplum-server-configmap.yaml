@@ -29,7 +29,7 @@ data:
         "port": {{ .Values.redis.service.port }},
         "password": "medplum"
       },
-      "maxJsonSize": "1mb",
+      "maxJsonSize": "5mb",
       "maxBatchSize": "50mb",
       "vmContextBotsEnabled": true,
       "allowedOrigins": "*",
