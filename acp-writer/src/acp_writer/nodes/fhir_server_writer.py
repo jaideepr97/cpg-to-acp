@@ -1,14 +1,19 @@
-"""FHIR Server Writer — POST transaction Bundle to HAPI FHIR server.
+"""FHIR Server Writer — POST transaction Bundle to a FHIR R4 server.
 
 Validates OperationOutcome response and stores care plan reference.
 Supports approve/reject workflow with AI Transparency tag transitions.
 Care plans are POSTed as "draft" and updated to "active" or
 "entered-in-error" on the server on approve/reject.
+
+Auth: If FHIR_CLIENT_ID and FHIR_CLIENT_SECRET are set, uses OAuth
+client_credentials to obtain a Bearer token. Otherwise sends
+unauthenticated requests (for HAPI FHIR or local dev).
 """
 
 import json
 import logging
 import os
+import time
 import uuid
 
 import mlflow
@@ -20,8 +25,48 @@ from acp_writer.state import CarePlanComposerState
 logger = logging.getLogger(__name__)
 
 FHIR_SERVER_URL = os.environ.get("FHIR_SERVER_URL", "http://localhost:8103/fhir/R4")
+FHIR_CLIENT_ID = os.environ.get("FHIR_CLIENT_ID", "")
+FHIR_CLIENT_SECRET = os.environ.get("FHIR_CLIENT_SECRET", "")
 
 _care_plans: dict[str, dict] = {}
+
+_token_cache: dict[str, str | float] = {"token": "", "expires_at": 0.0}
+
+
+def _get_auth_headers() -> dict[str, str]:
+    """Get authorization headers for FHIR server requests.
+
+    Uses client_credentials OAuth if FHIR_CLIENT_ID is configured.
+    Returns empty dict for unauthenticated servers.
+    """
+    if not FHIR_CLIENT_ID or not FHIR_CLIENT_SECRET:
+        return {}
+
+    now = time.time()
+    if _token_cache["token"] and float(_token_cache["expires_at"]) > now + 60:
+        return {"Authorization": f"Bearer {_token_cache['token']}"}
+
+    token_url = FHIR_SERVER_URL.rstrip("/").rsplit("/fhir", 1)[0] + "/oauth2/token"
+    try:
+        r = requests.post(
+            token_url,
+            data={
+                "grant_type": "client_credentials",
+                "client_id": FHIR_CLIENT_ID,
+                "client_secret": FHIR_CLIENT_SECRET,
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=10,
+        )
+        r.raise_for_status()
+        data = r.json()
+        _token_cache["token"] = data["access_token"]
+        _token_cache["expires_at"] = now + data.get("expires_in", 3600)
+        logger.info("Acquired FHIR server OAuth token (expires in %ds)", data.get("expires_in", 3600))
+        return {"Authorization": f"Bearer {_token_cache['token']}"}
+    except Exception as e:
+        logger.warning("Failed to acquire FHIR OAuth token: %s", e)
+        return {}
 
 
 def _parse_server_ids(bundle: dict, response_data: dict) -> dict[str, str]:
@@ -52,10 +97,11 @@ def _update_on_server(server_ref: str, resource: dict) -> bool:
     """PUT an updated resource to the FHIR server. Returns True on success."""
     url = f"{FHIR_SERVER_URL}/{server_ref}"
     try:
+        headers = {"Content-Type": "application/fhir+json", **_get_auth_headers()}
         r = requests.put(
             url,
             json=resource,
-            headers={"Content-Type": "application/fhir+json"},
+            headers=headers,
             timeout=30,
         )
         if r.status_code in (200, 201):
@@ -71,7 +117,7 @@ def _update_on_server(server_ref: str, resource: dict) -> bool:
 
 @mlflow.trace(name="fhir_server_writer")
 def fhir_server_writer(state: CarePlanComposerState) -> dict:
-    """Write the FHIR Bundle to the HAPI FHIR server."""
+    """Write the FHIR Bundle to the FHIR server."""
     logger.info("── FHIR Server Writer ──")
     bundle = state.get("fhir_bundle", {})
     output_dir = state.get("output_dir", "")
@@ -91,10 +137,11 @@ def fhir_server_writer(state: CarePlanComposerState) -> dict:
     }
 
     try:
+        headers = {"Content-Type": "application/fhir+json", **_get_auth_headers()}
         r = requests.post(
             FHIR_SERVER_URL,
             json=bundle,
-            headers={"Content-Type": "application/fhir+json"},
+            headers=headers,
             timeout=30,
         )
 

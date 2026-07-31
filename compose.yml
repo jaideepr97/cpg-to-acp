@@ -178,7 +178,7 @@ services:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
       - LITELLM_URL=http://litellm:4000
       - LITELLM_API_KEY=sk-change-me
-      - FHIR_SERVER_URL=http://hapi-fhir:8080/fhir
+      - FHIR_SERVER_URL=http://medplum-server:8103/fhir/R4
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8082/health"]
       interval: 5s
