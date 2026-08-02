@@ -38,58 +38,6 @@ medplum_post_file() {
     -d @"$file"
 }
 
-load_bundle_in_chunks() {
-  local file="$1"
-  local token="$2"
-  local chunk_size=25
-
-  local total
-  total=$(python3 -c "import json; print(len(json.load(open('$file'))['entry']))" 2>/dev/null)
-  if [ -z "$total" ] || [ "$total" -le "$chunk_size" ]; then
-    medplum_post_file "/fhir/R4" "$file" "$token"
-    return
-  fi
-
-  log "    Loading $total entries in chunks of $chunk_size ..." >&2
-  local tmpdir
-  tmpdir=$(mktemp -d)
-
-  # Split bundle into chunks, each as a standalone batch (not transaction).
-  # In batch mode each entry is processed independently — urn:uuid references
-  # within the same chunk still resolve, but cross-chunk ones silently fail
-  # (which is acceptable for non-critical links like encounter/practitioner refs).
-  # The Patient resource is always in the first chunk so it always gets created.
-  python3 << PYEOF
-import json, os, sys
-
-d = json.load(open('$file'))
-entries = d['entry']
-chunk_size = $chunk_size
-tmpdir = '$tmpdir'
-
-for i in range(0, len(entries), chunk_size):
-    chunk = {'resourceType': 'Bundle', 'type': 'batch', 'entry': entries[i:i+chunk_size]}
-    idx = i // chunk_size
-    with open(os.path.join(tmpdir, f'chunk_{idx:05d}.json'), 'w') as f:
-        json.dump(chunk, f)
-
-num_chunks = (len(entries) + chunk_size - 1) // chunk_size
-print(f'Created {num_chunks} batch chunks', file=sys.stderr)
-PYEOF
-
-  local chunk_num=0
-  for chunk_file in "$tmpdir"/chunk_*.json; do
-    [ -f "$chunk_file" ] || continue
-    chunk_num=$((chunk_num + 1))
-    medplum_post_file "/fhir/R4" "$chunk_file" "$token" > /dev/null 2>&1 || true
-    sleep 3
-  done
-  log "    Loaded $chunk_num chunks" >&2
-
-  rm -rf "$tmpdir"
-  echo '{"resourceType":"Bundle"}'
-}
-
 refresh_token() {
   local login_resp auth_code token_resp
   login_resp=$(curl -sf -X POST "$MEDPLUM_BASE_URL/auth/login" \
@@ -216,13 +164,8 @@ if [ -d "$DATA_DIR/synthea" ]; then
     filename=$(basename "$bundle_file")
     # Skip infrastructure bundles (already loaded above)
     case "$filename" in hospitalInformation*|practitionerInformation*) continue;; esac
-    # Pause between large bundles to avoid Medplum rate limits
-    if [ "$synthea_count" -gt 0 ]; then
-      log "  Waiting 30s for rate limit cooldown ..."
-      sleep 30
-    fi
     log "  Loading Synthea: $filename ..."
-    response=$(load_bundle_in_chunks "$bundle_file" "$PROJECT_TOKEN")
+    response=$(medplum_post_file "/fhir/R4" "$bundle_file" "$PROJECT_TOKEN")
     http_type=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('resourceType',''))" 2>/dev/null || echo "unknown")
     if [ "$http_type" = "Bundle" ]; then
       log "  Loaded $filename successfully"
