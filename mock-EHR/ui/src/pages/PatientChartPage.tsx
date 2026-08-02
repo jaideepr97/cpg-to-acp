@@ -4,6 +4,7 @@ import { isOk } from '@medplum/core';
 import { Document, LinkTabs, OperationOutcomeAlert, PatientSummary, getDefaultSections } from '@medplum/react';
 import { useMemo, useState } from 'react';
 import { Outlet, useNavigate, useParams } from 'react-router';
+import { MedicationsSectionCustom } from '../components/MedicationsSectionCustom';
 import { SmartLaunchButton } from '../components/SmartLaunchButton';
 import { VitalsSectionCustom } from '../components/VitalsSectionCustom';
 import { usePatient } from '../hooks/usePatient';
@@ -37,7 +38,10 @@ export function PatientChartPage() {
     () =>
       getDefaultSections()
         .filter((s) => KEEP_SECTIONS.has(s.key))
-        .map((s) => (s.key === 'vitals' ? VitalsSectionCustom : s)),
+        .map((s) =>
+          s.key === 'vitals' ? VitalsSectionCustom :
+          s.key === 'medications' ? MedicationsSectionCustom : s
+        ),
     []
   );
 

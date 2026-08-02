@@ -16,6 +16,8 @@ function renderMedName(resource: Resource) {
 
 const ADDITIONAL_COLUMNS = [
   { name: 'Medication', renderCell: renderMedName },
+  { name: 'Status', renderCell: (r: Resource) => (r as MedicationRequest).status ?? '' },
+  { name: 'Authored', renderCell: (r: Resource) => (r as MedicationRequest).authoredOn ?? '' },
 ];
 
 export function MedicationsTab() {
@@ -24,7 +26,7 @@ export function MedicationsTab() {
     <SearchControl
       search={{
         resourceType: 'MedicationRequest',
-        fields: ['status', 'intent', 'authoredon'],
+        fields: ['_lastUpdated'],
         filters: [{ code: 'patient', operator: Operator.EQUALS, value: `Patient/${patientId}` }],
         sortRules: [{ code: '-_lastUpdated' }],
       }}
