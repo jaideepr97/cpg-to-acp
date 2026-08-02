@@ -136,6 +136,9 @@ def fhir_server_writer(state: CarePlanComposerState) -> dict:
         "server_ids": {},
     }
 
+    if output_dir:
+        write_artifact(output_dir, "fhir-careplan-bundle.json", bundle)
+
     try:
         headers = {"Content-Type": "application/fhir+json", **_get_auth_headers()}
         r = requests.post(
@@ -161,6 +164,17 @@ def fhir_server_writer(state: CarePlanComposerState) -> dict:
                 "careplan_id": careplan_id,
                 "delivery_status": "delivered",
             }
+        elif r.status_code in (401, 403):
+            logger.warning(
+                "FHIR server auth failed (%d) — CarePlan saved locally but not delivered to server. "
+                "Set FHIR_CLIENT_ID and FHIR_CLIENT_SECRET to enable authenticated writes.",
+                r.status_code,
+            )
+            return {
+                "fhir_server_response": response_data,
+                "careplan_id": careplan_id,
+                "delivery_status": "stored_locally",
+            }
         else:
             logger.warning("FHIR server returned %d: %s", r.status_code, r.text[:200])
             _care_plans[careplan_id]["error"] = r.text[:500]
@@ -171,7 +185,7 @@ def fhir_server_writer(state: CarePlanComposerState) -> dict:
             }
 
     except requests.RequestException as e:
-        logger.warning("FHIR server unavailable: %s — storing locally only", e)
+        logger.warning("FHIR server unavailable: %s — CarePlan saved locally only", e)
         return {
             "fhir_server_response": {},
             "careplan_id": careplan_id,
