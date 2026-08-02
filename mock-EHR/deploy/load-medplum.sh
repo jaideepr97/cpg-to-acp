@@ -290,15 +290,23 @@ client_response=$(curl -sf -X POST "$MEDPLUM_BASE_URL/admin/projects/$PROJECT_ID
 CLIENT_ID=$(echo "$client_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
 CLIENT_SECRET=$(echo "$client_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('secret',''))" 2>/dev/null)
 
-# Set the launchUri on the ClientApplication (not supported in the create endpoint)
+# Set the launchUri on the ClientApplication (not supported in the create endpoint).
+# Use GET + add field + PUT since JSON PATCH is unreliable on Medplum.
 if [ -n "$CLIENT_ID" ]; then
-  curl -sf -X PATCH "$MEDPLUM_BASE_URL/fhir/R4/ClientApplication/$CLIENT_ID" \
-    -H "Content-Type: application/json-patch+json" \
-    -H "Authorization: Bearer $PROJECT_TOKEN" \
-    -d "[
-      {\"op\": \"add\", \"path\": \"/launchUri\", \"value\": \"$ACP_WRITER_LAUNCH_URI\"}
-    ]" > /dev/null 2>&1 \
-    || log "WARNING: Failed to set launchUri via PATCH, trying PUT ..."
+  client_full=$(curl -sf "$MEDPLUM_BASE_URL/fhir/R4/ClientApplication/$CLIENT_ID" \
+    -H "Authorization: Bearer $PROJECT_TOKEN")
+  client_updated=$(echo "$client_full" | python3 -c "
+import sys,json
+r=json.load(sys.stdin)
+r['launchUri']='$ACP_WRITER_LAUNCH_URI'
+print(json.dumps(r))" 2>/dev/null)
+  if [ -n "$client_updated" ]; then
+    curl -sf -X PUT "$MEDPLUM_BASE_URL/fhir/R4/ClientApplication/$CLIENT_ID" \
+      -H "Content-Type: application/fhir+json" \
+      -H "Authorization: Bearer $PROJECT_TOKEN" \
+      -d "$client_updated" > /dev/null 2>&1 \
+      || log "WARNING: Failed to set launchUri"
+  fi
 
   log "  Client ID:     $CLIENT_ID"
   log "  Client Secret: $CLIENT_SECRET"

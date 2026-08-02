@@ -25,8 +25,6 @@ export function SmartLaunchButton({ patientId }: SmartLaunchButtonProps) {
   if (!client) {
     return (
       <Button
-        mt="md"
-        fullWidth
         size="md"
         variant="filled"
         leftSection={<IconSparkles size={18} />}
@@ -45,8 +43,6 @@ export function SmartLaunchButton({ patientId }: SmartLaunchButtonProps) {
       style={{ textDecoration: 'none' }}
     >
       <Button
-        mt="md"
-        fullWidth
         size="md"
         variant="filled"
         leftSection={<IconSparkles size={18} />}

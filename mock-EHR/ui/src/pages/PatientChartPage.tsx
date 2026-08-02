@@ -63,10 +63,12 @@ export function PatientChartPage() {
             navigate(`/Patient/${patientId}/${resource.resourceType}/${resource.id}`)?.catch(console.error)
           }
         />
-        <SmartLaunchButton patientId={patientId!} />
       </ScrollArea>
       <div style={{ flex: 1, overflow: 'auto' }}>
-        <LinkTabs baseUrl={`/Patient/${patientId}`} tabs={TABS} p="sm" />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px' }}>
+          <LinkTabs baseUrl={`/Patient/${patientId}`} tabs={TABS} />
+          <SmartLaunchButton patientId={patientId!} />
+        </div>
         <div style={{ padding: '0 16px 16px' }}>
           <Outlet />
         </div>
