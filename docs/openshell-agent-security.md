@@ -50,7 +50,7 @@ graph TB
     subgraph infra["Infrastructure"]
         MAAS[MaaS<br/><i>LLM Inference</i>]
         KOG[Kogito<br/><i>Decision Runtime</i>]
-        HAPI[HAPI FHIR<br/><i>Patient Data + Care Plans</i>]
+        FHIR[Medplum FHIR<br/><i>Patient Data + Care Plans</i>]
         TERM[Terminology APIs<br/><i>SNOMED, RxNorm, LOINC</i>]
     end
 
@@ -68,7 +68,7 @@ graph TB
     LLM2 -->|HTTPS 443| MAAS
     DMN -->|port 8081| KOG
     FHG -->|HTTPS 443| TERM
-    FHS -->|port 8080| HAPI
+    FHS -->|port 8103| FHIR
     DEL -->|port 8082| FHS
 ```
 
@@ -100,14 +100,14 @@ graph LR
     LLM2 -->|api.openai.com:443| MAAS
     DMN -->|port 8081| KOG((Kogito))
     FHG -->|port 443| TERM((Terminology))
-    FHS -->|port 8080| HAPI((HAPI FHIR))
+    FHS -->|port 8103| FHIR((Medplum FHIR))
     DEL -->|port 8082| ACP((acp-writer))
 
     ING -.-x|DENIED| MAAS
     ASM -.-x|DENIED| MAAS
     PAT -.-x|DENIED| MAAS
-    PAT -.-x|DENIED| HAPI
-    LLM2 -.-x|DENIED| HAPI
+    PAT -.-x|DENIED| FHIR
+    LLM2 -.-x|DENIED| FHIR
 ```
 
 ### Policy details
@@ -122,7 +122,7 @@ graph LR
 | **LLM Reasoning** | MaaS (api.openai.com:443) | FHIR server, Kogito | RO: system; RW: /app, /tmp |
 | **Decision Engine** | Kogito (port 8081) | LLM, FHIR, external | RO: system; RW: /app, /tmp |
 | **FHIR Generation** | Terminology APIs (HTTPS) | LLM, FHIR server, patient data | RO: system; RW: /app, /tmp |
-| **FHIR Server** | HAPI FHIR (port 8080) | LLM, patient data, external | RO: system; RW: /app, /tmp |
+| **FHIR Server** | Medplum FHIR (port 8103) | LLM, patient data, external | RO: system; RW: /app, /tmp |
 
 ### Enforcement layers
 

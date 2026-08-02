@@ -94,7 +94,7 @@ acp-writer composes patient-specific, FHIR-compliant care plans by combining cli
                 │                     AI Transparency completeness
                 ▼
         ┌──────────────────────────┐
-        │  FHIR Server Writer      │  POST Bundle to HAPI FHIR
+        │  FHIR Server Writer      │  POST Bundle to FHIR server
         └──────────────────────────┘  Validate response
 ```
 
@@ -332,7 +332,7 @@ LLM review of the complete FHIR Bundle for clinical coherence.
 
 ### Node 11: FHIR Server Writer
 
-Posts the validated Bundle to the HAPI FHIR server.
+Posts the validated Bundle to the FHIR server (Medplum). Authenticates via OAuth `client_credentials` if `FHIR_CLIENT_ID` and `FHIR_CLIENT_SECRET` are set. Falls back to unauthenticated requests for local dev without credentials (care plan is saved to disk).
 
 - POST transaction Bundle to FHIR server
 - Validate server response (check for OperationOutcome errors)
