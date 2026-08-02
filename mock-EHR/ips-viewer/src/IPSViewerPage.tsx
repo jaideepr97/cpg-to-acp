@@ -12,17 +12,27 @@ interface IPSData {
   medications: FHIRResource[];
   allergies: FHIRResource[];
   observations: FHIRResource[];
+  medicationMap: Map<string, FHIRResource>;
 }
 
 function parseIPS(bundle: FHIRResource): IPSData {
   const entries = (bundle.entry as { resource: FHIRResource }[]) ?? [];
   const resources = entries.map((e) => e.resource);
+
+  const medicationMap = new Map<string, FHIRResource>();
+  for (const r of resources) {
+    if (r.resourceType === 'Medication' && r.id) {
+      medicationMap.set(`Medication/${r.id}`, r);
+    }
+  }
+
   return {
     patient: resources.find((r) => r.resourceType === 'Patient') ?? null,
     conditions: resources.filter((r) => r.resourceType === 'Condition'),
     medications: resources.filter((r) => r.resourceType === 'MedicationRequest' || r.resourceType === 'MedicationStatement'),
     allergies: resources.filter((r) => r.resourceType === 'AllergyIntolerance'),
     observations: resources.filter((r) => r.resourceType === 'Observation'),
+    medicationMap,
   };
 }
 
@@ -31,9 +41,17 @@ function getCodeText(resource: FHIRResource): string {
   return code?.text ?? code?.coding?.[0]?.display ?? '?';
 }
 
-function getMedText(resource: FHIRResource): string {
-  const med = resource.medicationCodeableConcept as { text?: string; coding?: { display?: string }[] } | undefined;
-  return med?.text ?? med?.coding?.[0]?.display ?? '?';
+function getMedText(resource: FHIRResource, medicationMap?: Map<string, FHIRResource>): string {
+  const inline = resource.medicationCodeableConcept as { text?: string; coding?: { display?: string }[] } | undefined;
+  if (inline) return inline.text ?? inline.coding?.[0]?.display ?? '?';
+
+  const ref = resource.medicationReference as { reference?: string; display?: string } | undefined;
+  if (ref?.display) return ref.display;
+  if (ref?.reference && medicationMap) {
+    const med = medicationMap.get(ref.reference);
+    if (med) return getCodeText(med);
+  }
+  return '?';
 }
 
 function getObsValue(resource: FHIRResource): string {
@@ -114,7 +132,7 @@ export function IPSViewerPage() {
       </div>
 
       <Section title="Problem List" items={ips.conditions} renderItem={(r) => getCodeText(r)} />
-      <Section title="Medications" items={ips.medications} renderItem={(r) => getMedText(r)} />
+      <Section title="Medications" items={ips.medications} renderItem={(r) => getMedText(r, ips.medicationMap)} />
       <Section
         title="Allergies"
         items={ips.allergies}
