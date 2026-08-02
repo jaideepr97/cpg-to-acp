@@ -4,6 +4,10 @@ set -e
 NAMESPACE="${NAMESPACE:-sschifma-cpg-to-acp}"
 RELEASE_PREFIX="${RELEASE_PREFIX:-cpg}"
 
+# Prerequisites:
+#   - Run mock-EHR/deploy/setup-openshift.sh first (creates ImageStreams, BuildConfigs, pushes images)
+#   - All images must be built and available in the internal registry
+
 echo "=== CPG-to-ACP OpenShift Deployment ==="
 echo "Namespace:      $NAMESPACE"
 echo "Release prefix: $RELEASE_PREFIX"
