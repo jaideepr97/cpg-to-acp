@@ -63,10 +63,12 @@ pods:
   fhir-server:
     enabled: true
     image: acp-writer-fhir-srv
-    tag: phase3
+    tag: latest
     port: 8080
     env:
-      fhirServerUrl: http://cpg-mock-ehr-hapi-fhir:8080/fhir
+      fhirServerUrl: http://cpg-mock-ehr-medplum-server:8103/fhir/R4
+      fhirClientId: ""
+      fhirClientSecret: ""
     resources:
       requests:
         cpu: 50m

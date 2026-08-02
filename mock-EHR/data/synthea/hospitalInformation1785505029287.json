@@ -1,0 +1,2401 @@
+{
+  "resourceType": "Bundle",
+  "type": "batch",
+  "entry": [ {
+    "fullUrl": "urn:uuid:36c22f55-1572-3827-9927-9c321e3b4251",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "36c22f55-1572-3827-9927-9c321e3b4251",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 26
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "36c22f55-1572-3827-9927-9c321e3b4251"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "MERCER MANOR REHABILITATION LLC",
+      "telecom": [ {
+        "system": "phone",
+        "value": "3095829400"
+      } ],
+      "address": [ {
+        "line": [ "309 NW 9TH AVE" ],
+        "city": "ALEDO",
+        "state": "IL",
+        "postalCode": "612311330",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|36c22f55-1572-3827-9927-9c321e3b4251"
+    }
+  }, {
+    "fullUrl": "urn:uuid:ecdb14db-2b25-3fc3-b996-64b9a26c6bf1",
+    "resource": {
+      "resourceType": "Location",
+      "id": "ecdb14db-2b25-3fc3-b996-64b9a26c6bf1",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "ecdb14db-2b25-3fc3-b996-64b9a26c6bf1"
+      } ],
+      "status": "active",
+      "name": "MERCER MANOR REHABILITATION LLC",
+      "telecom": [ {
+        "system": "phone",
+        "value": "3095829400"
+      } ],
+      "address": {
+        "line": [ "309 NW 9TH AVE" ],
+        "city": "ALEDO",
+        "state": "IL",
+        "postalCode": "612311330",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -90.75865196042709,
+        "latitude": 41.203740093462095
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "36c22f55-1572-3827-9927-9c321e3b4251"
+        },
+        "display": "MERCER MANOR REHABILITATION LLC"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|ecdb14db-2b25-3fc3-b996-64b9a26c6bf1"
+    }
+  }, {
+    "fullUrl": "urn:uuid:716abe62-fa99-31f6-b3f5-6c1fdefa9d0f",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "716abe62-fa99-31f6-b3f5-6c1fdefa9d0f",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 33
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "716abe62-fa99-31f6-b3f5-6c1fdefa9d0f"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "ENCOMPASS HEALTH HOME HEALTH",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2175427138"
+      } ],
+      "address": [ {
+        "line": [ "2970 BAKER ST" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627035901",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|716abe62-fa99-31f6-b3f5-6c1fdefa9d0f"
+    }
+  }, {
+    "fullUrl": "urn:uuid:46908d17-d4da-3dff-8773-9dea70b6b3bd",
+    "resource": {
+      "resourceType": "Location",
+      "id": "46908d17-d4da-3dff-8773-9dea70b6b3bd",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "46908d17-d4da-3dff-8773-9dea70b6b3bd"
+      } ],
+      "status": "active",
+      "name": "ENCOMPASS HEALTH HOME HEALTH",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2175427138"
+      } ],
+      "address": {
+        "line": [ "2970 BAKER ST" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627035901",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.6439575,
+        "latitude": 39.7990175
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "716abe62-fa99-31f6-b3f5-6c1fdefa9d0f"
+        },
+        "display": "ENCOMPASS HEALTH HOME HEALTH"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|46908d17-d4da-3dff-8773-9dea70b6b3bd"
+    }
+  }, {
+    "fullUrl": "urn:uuid:f9b5de8e-e360-36bf-b1d5-0468436ca18f",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "f9b5de8e-e360-36bf-b1d5-0468436ca18f",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 1
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/bed-count-extension",
+        "valueInteger": 75
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "f9b5de8e-e360-36bf-b1d5-0468436ca18f"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "BRIDGE CARE SUITES",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177870000"
+      } ],
+      "address": [ {
+        "line": [ "3089 OLD JACKSONVILLE ROAD" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627046486",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|f9b5de8e-e360-36bf-b1d5-0468436ca18f"
+    }
+  }, {
+    "fullUrl": "urn:uuid:bddeed42-85ec-3837-8471-8ad89fcf9e85",
+    "resource": {
+      "resourceType": "Location",
+      "id": "bddeed42-85ec-3837-8471-8ad89fcf9e85",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "bddeed42-85ec-3837-8471-8ad89fcf9e85"
+      } ],
+      "status": "active",
+      "name": "BRIDGE CARE SUITES",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177870000"
+      } ],
+      "address": {
+        "line": [ "3089 OLD JACKSONVILLE ROAD" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627046486",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.7124024,
+        "latitude": 39.7875073
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "f9b5de8e-e360-36bf-b1d5-0468436ca18f"
+        },
+        "display": "BRIDGE CARE SUITES"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|bddeed42-85ec-3837-8471-8ad89fcf9e85"
+    }
+  }, {
+    "fullUrl": "urn:uuid:005dccff-018b-3c4c-a87f-0c13a971f9ac",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "005dccff-018b-3c4c-a87f-0c13a971f9ac",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 196
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/bed-count-extension",
+        "valueInteger": 562
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "005dccff-018b-3c4c-a87f-0c13a971f9ac"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "MEMORIAL MEDICAL CENTER",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177883000"
+      } ],
+      "address": [ {
+        "line": [ "701 N FIRST ST" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627810001",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|005dccff-018b-3c4c-a87f-0c13a971f9ac"
+    }
+  }, {
+    "fullUrl": "urn:uuid:0468f00b-136d-3127-8b14-c0c5c0a3ed1d",
+    "resource": {
+      "resourceType": "Location",
+      "id": "0468f00b-136d-3127-8b14-c0c5c0a3ed1d",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "0468f00b-136d-3127-8b14-c0c5c0a3ed1d"
+      } ],
+      "status": "active",
+      "name": "MEMORIAL MEDICAL CENTER",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177883000"
+      } ],
+      "address": {
+        "line": [ "701 N FIRST ST" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627810001",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.6439575,
+        "latitude": 39.7990175
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "005dccff-018b-3c4c-a87f-0c13a971f9ac"
+        },
+        "display": "MEMORIAL MEDICAL CENTER"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|0468f00b-136d-3127-8b14-c0c5c0a3ed1d"
+    }
+  }, {
+    "fullUrl": "urn:uuid:67507298-4f38-33d3-82a3-8939067bf16b",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "67507298-4f38-33d3-82a3-8939067bf16b",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 131
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "67507298-4f38-33d3-82a3-8939067bf16b"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "MEMORIAL MEDICAL CENTER",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177883000"
+      } ],
+      "address": [ {
+        "line": [ "701 N 1ST ST" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627810001",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|67507298-4f38-33d3-82a3-8939067bf16b"
+    }
+  }, {
+    "fullUrl": "urn:uuid:7a612e29-ddf5-37f0-a8dd-64d0680a7958",
+    "resource": {
+      "resourceType": "Location",
+      "id": "7a612e29-ddf5-37f0-a8dd-64d0680a7958",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "7a612e29-ddf5-37f0-a8dd-64d0680a7958"
+      } ],
+      "status": "active",
+      "name": "MEMORIAL MEDICAL CENTER",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177883000"
+      } ],
+      "address": {
+        "line": [ "701 N 1ST ST" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627810001",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.65455093133602,
+        "latitude": 39.81015825
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "67507298-4f38-33d3-82a3-8939067bf16b"
+        },
+        "display": "MEMORIAL MEDICAL CENTER"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|7a612e29-ddf5-37f0-a8dd-64d0680a7958"
+    }
+  }, {
+    "fullUrl": "urn:uuid:1e946df4-63ef-3cf7-93cd-c44470b2618f",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "1e946df4-63ef-3cf7-93cd-c44470b2618f",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 53
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 399
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 95
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 76
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "1e946df4-63ef-3cf7-93cd-c44470b2618f"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "NXT LEVEL WELLNESS LLC",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177877500"
+      } ],
+      "address": [ {
+        "line": [ "2025 W ILES AVE" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627044197",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|1e946df4-63ef-3cf7-93cd-c44470b2618f"
+    }
+  }, {
+    "fullUrl": "urn:uuid:a096c81c-6aed-345a-ba71-091a2fec523a",
+    "resource": {
+      "resourceType": "Location",
+      "id": "a096c81c-6aed-345a-ba71-091a2fec523a",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "a096c81c-6aed-345a-ba71-091a2fec523a"
+      } ],
+      "status": "active",
+      "name": "NXT LEVEL WELLNESS LLC",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177877500"
+      } ],
+      "address": {
+        "line": [ "2025 W ILES AVE" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627044197",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.69059842445799,
+        "latitude": 39.77028815
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "1e946df4-63ef-3cf7-93cd-c44470b2618f"
+        },
+        "display": "NXT LEVEL WELLNESS LLC"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|a096c81c-6aed-345a-ba71-091a2fec523a"
+    }
+  }, {
+    "fullUrl": "urn:uuid:79ca63bc-2369-3ae9-ba07-93cb5e0d2c98",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "79ca63bc-2369-3ae9-ba07-93cb5e0d2c98",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 222
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 2291
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 545
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 342
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "79ca63bc-2369-3ae9-ba07-93cb5e0d2c98"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "THE WELLNESS CENTER S.C.",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2175226500"
+      } ],
+      "address": [ {
+        "line": [ "203 N GRAND AVE W" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627041402",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|79ca63bc-2369-3ae9-ba07-93cb5e0d2c98"
+    }
+  }, {
+    "fullUrl": "urn:uuid:924afe1b-21d0-38d8-8170-8c13809e4ba2",
+    "resource": {
+      "resourceType": "Location",
+      "id": "924afe1b-21d0-38d8-8170-8c13809e4ba2",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "924afe1b-21d0-38d8-8170-8c13809e4ba2"
+      } ],
+      "status": "active",
+      "name": "THE WELLNESS CENTER S.C.",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2175226500"
+      } ],
+      "address": {
+        "line": [ "203 N GRAND AVE W" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627041402",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.65733088383838,
+        "latitude": 39.816088
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "79ca63bc-2369-3ae9-ba07-93cb5e0d2c98"
+        },
+        "display": "THE WELLNESS CENTER S.C."
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|924afe1b-21d0-38d8-8170-8c13809e4ba2"
+    }
+  }, {
+    "fullUrl": "urn:uuid:6b431373-ea4b-32da-8eff-452389a0a2db",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "6b431373-ea4b-32da-8eff-452389a0a2db",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 3
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "6b431373-ea4b-32da-8eff-452389a0a2db"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "APERION CARE CAPITOL LLC",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2175271952"
+      } ],
+      "address": [ {
+        "line": [ "555 W CARPENTER ST" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627024905",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|6b431373-ea4b-32da-8eff-452389a0a2db"
+    }
+  }, {
+    "fullUrl": "urn:uuid:ef5b25e4-9800-3630-9e5e-33a67a063da2",
+    "resource": {
+      "resourceType": "Location",
+      "id": "ef5b25e4-9800-3630-9e5e-33a67a063da2",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "ef5b25e4-9800-3630-9e5e-33a67a063da2"
+      } ],
+      "status": "active",
+      "name": "APERION CARE CAPITOL LLC",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2175271952"
+      } ],
+      "address": {
+        "line": [ "555 W CARPENTER ST" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627024905",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.6630293,
+        "latitude": 39.807889
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "6b431373-ea4b-32da-8eff-452389a0a2db"
+        },
+        "display": "APERION CARE CAPITOL LLC"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|ef5b25e4-9800-3630-9e5e-33a67a063da2"
+    }
+  }, {
+    "fullUrl": "urn:uuid:75d6c121-534a-3b4a-823f-027f2a147412",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "75d6c121-534a-3b4a-823f-027f2a147412",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 720
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 966
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 346
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 690
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "75d6c121-534a-3b4a-823f-027f2a147412"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "Springfield, IL Vet Center",
+      "telecom": [ {
+        "system": "phone",
+        "value": "217-492-4955 Or 217-492-4955"
+      } ],
+      "address": [ {
+        "line": [ "2980 Baker Drive" ],
+        "city": "Springfield",
+        "state": "IL",
+        "postalCode": "62703",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|75d6c121-534a-3b4a-823f-027f2a147412"
+    }
+  }, {
+    "fullUrl": "urn:uuid:73ea3794-a37b-3be0-9aac-ad0e25cbc33a",
+    "resource": {
+      "resourceType": "Location",
+      "id": "73ea3794-a37b-3be0-9aac-ad0e25cbc33a",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "73ea3794-a37b-3be0-9aac-ad0e25cbc33a"
+      } ],
+      "status": "active",
+      "name": "Springfield, IL Vet Center",
+      "telecom": [ {
+        "system": "phone",
+        "value": "217-492-4955 Or 217-492-4955"
+      } ],
+      "address": {
+        "line": [ "2980 Baker Drive" ],
+        "city": "Springfield",
+        "state": "IL",
+        "postalCode": "62703",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.64444,
+        "latitude": 39.762154
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "75d6c121-534a-3b4a-823f-027f2a147412"
+        },
+        "display": "Springfield, IL Vet Center"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|73ea3794-a37b-3be0-9aac-ad0e25cbc33a"
+    }
+  }, {
+    "fullUrl": "urn:uuid:e833b89f-933e-3add-8b6d-c6fc8343e46c",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "e833b89f-933e-3add-8b6d-c6fc8343e46c",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 21
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "e833b89f-933e-3add-8b6d-c6fc8343e46c"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "PROMEDICA HOSPICE (FAIRVIEW HEIGHTS)",
+      "telecom": [ {
+        "system": "phone",
+        "value": "6186320304"
+      } ],
+      "address": [ {
+        "line": [ "333 SALEM PLACE, SUITE 165" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627045375",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|e833b89f-933e-3add-8b6d-c6fc8343e46c"
+    }
+  }, {
+    "fullUrl": "urn:uuid:8403e5c2-07a7-377e-a710-772337695961",
+    "resource": {
+      "resourceType": "Location",
+      "id": "8403e5c2-07a7-377e-a710-772337695961",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "8403e5c2-07a7-377e-a710-772337695961"
+      } ],
+      "status": "active",
+      "name": "PROMEDICA HOSPICE (FAIRVIEW HEIGHTS)",
+      "telecom": [ {
+        "system": "phone",
+        "value": "6186320304"
+      } ],
+      "address": {
+        "line": [ "333 SALEM PLACE, SUITE 165" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627045375",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.6555159,
+        "latitude": 39.8219696
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "e833b89f-933e-3add-8b6d-c6fc8343e46c"
+        },
+        "display": "PROMEDICA HOSPICE (FAIRVIEW HEIGHTS)"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|8403e5c2-07a7-377e-a710-772337695961"
+    }
+  }, {
+    "fullUrl": "urn:uuid:b15e2e96-f69c-3904-a992-335bfb71f478",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "b15e2e96-f69c-3904-a992-335bfb71f478",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 198
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 2705
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 720
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 358
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "b15e2e96-f69c-3904-a992-335bfb71f478"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "ADVANCED HEALTHCARE SERVICES, LLC",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177266959"
+      } ],
+      "address": [ {
+        "line": [ "3900 PINTAIL DR STE A" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627117380",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|b15e2e96-f69c-3904-a992-335bfb71f478"
+    }
+  }, {
+    "fullUrl": "urn:uuid:9e43492c-25fe-3c4a-91f0-549f08f0f62c",
+    "resource": {
+      "resourceType": "Location",
+      "id": "9e43492c-25fe-3c4a-91f0-549f08f0f62c",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "9e43492c-25fe-3c4a-91f0-549f08f0f62c"
+      } ],
+      "status": "active",
+      "name": "ADVANCED HEALTHCARE SERVICES, LLC",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177266959"
+      } ],
+      "address": {
+        "line": [ "3900 PINTAIL DR STE A" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627117380",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.71237297250809,
+        "latitude": 39.74319645
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "b15e2e96-f69c-3904-a992-335bfb71f478"
+        },
+        "display": "ADVANCED HEALTHCARE SERVICES, LLC"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|9e43492c-25fe-3c4a-91f0-549f08f0f62c"
+    }
+  }, {
+    "fullUrl": "urn:uuid:675b0130-5556-3e32-9a93-f63a6df36823",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "675b0130-5556-3e32-9a93-f63a6df36823",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 47
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "675b0130-5556-3e32-9a93-f63a6df36823"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "ALTON URGENT CARE WALK IN CLINIC COMPANY",
+      "telecom": [ {
+        "system": "phone",
+        "value": "3139483055"
+      } ],
+      "address": [ {
+        "line": [ "1417 WASHINGTON AVE" ],
+        "city": "ALTON",
+        "state": "IL",
+        "postalCode": "62002",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|675b0130-5556-3e32-9a93-f63a6df36823"
+    }
+  }, {
+    "fullUrl": "urn:uuid:872876ca-a4ff-3a25-a73d-095aaa1977ba",
+    "resource": {
+      "resourceType": "Location",
+      "id": "872876ca-a4ff-3a25-a73d-095aaa1977ba",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "872876ca-a4ff-3a25-a73d-095aaa1977ba"
+      } ],
+      "status": "active",
+      "name": "ALTON URGENT CARE WALK IN CLINIC COMPANY",
+      "telecom": [ {
+        "system": "phone",
+        "value": "3139483055"
+      } ],
+      "address": {
+        "line": [ "1417 WASHINGTON AVE" ],
+        "city": "ALTON",
+        "state": "IL",
+        "postalCode": "62002",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -90.14945881632653,
+        "latitude": 38.899318
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "675b0130-5556-3e32-9a93-f63a6df36823"
+        },
+        "display": "ALTON URGENT CARE WALK IN CLINIC COMPANY"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|872876ca-a4ff-3a25-a73d-095aaa1977ba"
+    }
+  }, {
+    "fullUrl": "urn:uuid:05258b7a-ec22-3753-94ee-a9855c0be65e",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "05258b7a-ec22-3753-94ee-a9855c0be65e",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 3
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "05258b7a-ec22-3753-94ee-a9855c0be65e"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "KINDRED HOSPICE",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2175256200"
+      } ],
+      "address": [ {
+        "line": [ "2815 OLD JACKSONVILLE ROAD, SUITE 202" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627046419",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|05258b7a-ec22-3753-94ee-a9855c0be65e"
+    }
+  }, {
+    "fullUrl": "urn:uuid:aacaa800-d475-341e-8b6f-44c6a0d09807",
+    "resource": {
+      "resourceType": "Location",
+      "id": "aacaa800-d475-341e-8b6f-44c6a0d09807",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "aacaa800-d475-341e-8b6f-44c6a0d09807"
+      } ],
+      "status": "active",
+      "name": "KINDRED HOSPICE",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2175256200"
+      } ],
+      "address": {
+        "line": [ "2815 OLD JACKSONVILLE ROAD, SUITE 202" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627046419",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.70806343232718,
+        "latitude": 39.78720585
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "05258b7a-ec22-3753-94ee-a9855c0be65e"
+        },
+        "display": "KINDRED HOSPICE"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|aacaa800-d475-341e-8b6f-44c6a0d09807"
+    }
+  }, {
+    "fullUrl": "urn:uuid:fb0235ad-08b9-34c6-a87a-2bf47a26ed3d",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "fb0235ad-08b9-34c6-a87a-2bf47a26ed3d",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 47
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 532
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 107
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 48
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "fb0235ad-08b9-34c6-a87a-2bf47a26ed3d"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "YAP FAMILY PRACTICE LTD",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177251422"
+      } ],
+      "address": [ {
+        "line": [ "2979 LINDBERGH BLVD" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627046556",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|fb0235ad-08b9-34c6-a87a-2bf47a26ed3d"
+    }
+  }, {
+    "fullUrl": "urn:uuid:b7ceea2a-77a1-308c-84f9-58c879a8ee29",
+    "resource": {
+      "resourceType": "Location",
+      "id": "b7ceea2a-77a1-308c-84f9-58c879a8ee29",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "b7ceea2a-77a1-308c-84f9-58c879a8ee29"
+      } ],
+      "status": "active",
+      "name": "YAP FAMILY PRACTICE LTD",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177251422"
+      } ],
+      "address": {
+        "line": [ "2979 LINDBERGH BLVD" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627046556",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.70978017853008,
+        "latitude": 39.75315762213167
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "fb0235ad-08b9-34c6-a87a-2bf47a26ed3d"
+        },
+        "display": "YAP FAMILY PRACTICE LTD"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|b7ceea2a-77a1-308c-84f9-58c879a8ee29"
+    }
+  }, {
+    "fullUrl": "urn:uuid:6d70900f-a22a-3d4c-90fb-e95c54f70312",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "6d70900f-a22a-3d4c-90fb-e95c54f70312",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 1036
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/bed-count-extension",
+        "valueInteger": 146
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "6d70900f-a22a-3d4c-90fb-e95c54f70312"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "ANDREW MCFARLAND MENTAL HLTH CTR",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177866900"
+      } ],
+      "address": [ {
+        "line": [ "901 SOUTHWIND RD" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627035125",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|6d70900f-a22a-3d4c-90fb-e95c54f70312"
+    }
+  }, {
+    "fullUrl": "urn:uuid:91387cd6-ab3d-3a28-a538-482b6fe68e93",
+    "resource": {
+      "resourceType": "Location",
+      "id": "91387cd6-ab3d-3a28-a538-482b6fe68e93",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "91387cd6-ab3d-3a28-a538-482b6fe68e93"
+      } ],
+      "status": "active",
+      "name": "ANDREW MCFARLAND MENTAL HLTH CTR",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177866900"
+      } ],
+      "address": {
+        "line": [ "901 SOUTHWIND RD" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627035125",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.642287,
+        "latitude": 39.728385
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "6d70900f-a22a-3d4c-90fb-e95c54f70312"
+        },
+        "display": "ANDREW MCFARLAND MENTAL HLTH CTR"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|91387cd6-ab3d-3a28-a538-482b6fe68e93"
+    }
+  }, {
+    "fullUrl": "urn:uuid:79c53f59-3a6d-37b9-bc43-30930acb5ac4",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "79c53f59-3a6d-37b9-bc43-30930acb5ac4",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 59
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "79c53f59-3a6d-37b9-bc43-30930acb5ac4"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "ADVANCED HEALTHCARE SERVICES, LLC",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177266956"
+      } ],
+      "address": [ {
+        "line": [ "3900 PINTAIL DRIVE, SUITE A" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627117380",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|79c53f59-3a6d-37b9-bc43-30930acb5ac4"
+    }
+  }, {
+    "fullUrl": "urn:uuid:edb8ba6d-0934-3025-a688-87feb8675725",
+    "resource": {
+      "resourceType": "Location",
+      "id": "edb8ba6d-0934-3025-a688-87feb8675725",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "edb8ba6d-0934-3025-a688-87feb8675725"
+      } ],
+      "status": "active",
+      "name": "ADVANCED HEALTHCARE SERVICES, LLC",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177266956"
+      } ],
+      "address": {
+        "line": [ "3900 PINTAIL DRIVE, SUITE A" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627117380",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.71237297250809,
+        "latitude": 39.74319645
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "79c53f59-3a6d-37b9-bc43-30930acb5ac4"
+        },
+        "display": "ADVANCED HEALTHCARE SERVICES, LLC"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|edb8ba6d-0934-3025-a688-87feb8675725"
+    }
+  }, {
+    "fullUrl": "urn:uuid:9358c4e5-0c27-3142-bc6d-d1f3ad2ec739",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "9358c4e5-0c27-3142-bc6d-d1f3ad2ec739",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 13
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "9358c4e5-0c27-3142-bc6d-d1f3ad2ec739"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "ST ANTHONY'S MEMORIAL HOSPITAL OF THE HOSPITAL SISTERS OF THE THIRD O",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2173471333"
+      } ],
+      "address": [ {
+        "line": [ "503 N MAPLE" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "62704",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|9358c4e5-0c27-3142-bc6d-d1f3ad2ec739"
+    }
+  }, {
+    "fullUrl": "urn:uuid:15441350-33a7-345d-898d-28fa49d392d3",
+    "resource": {
+      "resourceType": "Location",
+      "id": "15441350-33a7-345d-898d-28fa49d392d3",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "15441350-33a7-345d-898d-28fa49d392d3"
+      } ],
+      "status": "active",
+      "name": "ST ANTHONY'S MEMORIAL HOSPITAL OF THE HOSPITAL SISTERS OF THE THIRD O",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2173471333"
+      } ],
+      "address": {
+        "line": [ "503 N MAPLE" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "62704",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.6439575,
+        "latitude": 39.7990175
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "9358c4e5-0c27-3142-bc6d-d1f3ad2ec739"
+        },
+        "display": "ST ANTHONY'S MEMORIAL HOSPITAL OF THE HOSPITAL SISTERS OF THE THIRD O"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|15441350-33a7-345d-898d-28fa49d392d3"
+    }
+  }, {
+    "fullUrl": "urn:uuid:475e2d12-0d98-3071-be50-3e9f2a26d77d",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "475e2d12-0d98-3071-be50-3e9f2a26d77d",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 11
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/bed-count-extension",
+        "valueInteger": 70
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "475e2d12-0d98-3071-be50-3e9f2a26d77d"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "ARCADIA CARE AUBURN",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2174386125"
+      } ],
+      "address": [ {
+        "line": [ "304 MAPLE AVENUE" ],
+        "city": "AUBURN",
+        "state": "IL",
+        "postalCode": "626151177",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|475e2d12-0d98-3071-be50-3e9f2a26d77d"
+    }
+  }, {
+    "fullUrl": "urn:uuid:fb335609-a682-3a48-a71e-46fc0210e139",
+    "resource": {
+      "resourceType": "Location",
+      "id": "fb335609-a682-3a48-a71e-46fc0210e139",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "fb335609-a682-3a48-a71e-46fc0210e139"
+      } ],
+      "status": "active",
+      "name": "ARCADIA CARE AUBURN",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2174386125"
+      } ],
+      "address": {
+        "line": [ "304 MAPLE AVENUE" ],
+        "city": "AUBURN",
+        "state": "IL",
+        "postalCode": "626151177",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.74397259999999,
+        "latitude": 39.5949346
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "475e2d12-0d98-3071-be50-3e9f2a26d77d"
+        },
+        "display": "ARCADIA CARE AUBURN"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|fb335609-a682-3a48-a71e-46fc0210e139"
+    }
+  }, {
+    "fullUrl": "urn:uuid:2925ce55-9055-3877-856e-c4211dd09e23",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "2925ce55-9055-3877-856e-c4211dd09e23",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 210
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 2221
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 661
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 172
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "2925ce55-9055-3877-856e-c4211dd09e23"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "HEALTHY SPRINGFIELD 2000",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177882300"
+      } ],
+      "address": [ {
+        "line": [ "2239 E COOK ST" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627031944",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|2925ce55-9055-3877-856e-c4211dd09e23"
+    }
+  }, {
+    "fullUrl": "urn:uuid:1919c936-c067-3edf-80d7-168ce7f05f04",
+    "resource": {
+      "resourceType": "Location",
+      "id": "1919c936-c067-3edf-80d7-168ce7f05f04",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "1919c936-c067-3edf-80d7-168ce7f05f04"
+      } ],
+      "status": "active",
+      "name": "HEALTHY SPRINGFIELD 2000",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177882300"
+      } ],
+      "address": {
+        "line": [ "2239 E COOK ST" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627031944",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.62258630459965,
+        "latitude": 39.79554695
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "2925ce55-9055-3877-856e-c4211dd09e23"
+        },
+        "display": "HEALTHY SPRINGFIELD 2000"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|1919c936-c067-3edf-80d7-168ce7f05f04"
+    }
+  }, {
+    "fullUrl": "urn:uuid:2033ead2-a086-3478-936e-e87902c490fa",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "2033ead2-a086-3478-936e-e87902c490fa",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 29
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/bed-count-extension",
+        "valueInteger": 64
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "2033ead2-a086-3478-936e-e87902c490fa"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "CONCORDIA VILLAGE CARE CENTER",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177939429"
+      } ],
+      "address": [ {
+        "line": [ "4101 WEST ILES AVENUE" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627117051",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|2033ead2-a086-3478-936e-e87902c490fa"
+    }
+  }, {
+    "fullUrl": "urn:uuid:301c441c-2fe9-3b47-8a6f-9074bfee13c6",
+    "resource": {
+      "resourceType": "Location",
+      "id": "301c441c-2fe9-3b47-8a6f-9074bfee13c6",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "301c441c-2fe9-3b47-8a6f-9074bfee13c6"
+      } ],
+      "status": "active",
+      "name": "CONCORDIA VILLAGE CARE CENTER",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177939429"
+      } ],
+      "address": {
+        "line": [ "4101 WEST ILES AVENUE" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627117051",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.73209963538832,
+        "latitude": 39.772481049999996
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "2033ead2-a086-3478-936e-e87902c490fa"
+        },
+        "display": "CONCORDIA VILLAGE CARE CENTER"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|301c441c-2fe9-3b47-8a6f-9074bfee13c6"
+    }
+  }, {
+    "fullUrl": "urn:uuid:1802c806-1b43-36c7-b942-0e3d22df8b31",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "1802c806-1b43-36c7-b942-0e3d22df8b31",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 21
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "1802c806-1b43-36c7-b942-0e3d22df8b31"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "VIBRA PHYSICIANS LLC",
+      "telecom": [ {
+        "system": "phone",
+        "value": "9702789340"
+      } ],
+      "address": [ {
+        "line": [ "4401 UNION ST" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627024931",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|1802c806-1b43-36c7-b942-0e3d22df8b31"
+    }
+  }, {
+    "fullUrl": "urn:uuid:13dcc8dd-d3b9-3c32-8bbc-3a13b38ebc6f",
+    "resource": {
+      "resourceType": "Location",
+      "id": "13dcc8dd-d3b9-3c32-8bbc-3a13b38ebc6f",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "13dcc8dd-d3b9-3c32-8bbc-3a13b38ebc6f"
+      } ],
+      "status": "active",
+      "name": "VIBRA PHYSICIANS LLC",
+      "telecom": [ {
+        "system": "phone",
+        "value": "9702789340"
+      } ],
+      "address": {
+        "line": [ "4401 UNION ST" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627024931",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.6498285,
+        "latitude": 39.8089179
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "1802c806-1b43-36c7-b942-0e3d22df8b31"
+        },
+        "display": "VIBRA PHYSICIANS LLC"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|13dcc8dd-d3b9-3c32-8bbc-3a13b38ebc6f"
+    }
+  }, {
+    "fullUrl": "urn:uuid:d208e996-3ba8-385c-ad75-1ad47e7d57bc",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "d208e996-3ba8-385c-ad75-1ad47e7d57bc",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 334
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "d208e996-3ba8-385c-ad75-1ad47e7d57bc"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "MEMORIAL MEDICAL CENTER",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177883000"
+      } ],
+      "address": [ {
+        "line": [ "701 N 1ST ST" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627810001",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|d208e996-3ba8-385c-ad75-1ad47e7d57bc"
+    }
+  }, {
+    "fullUrl": "urn:uuid:563260df-4a5e-31e0-8c16-b8c39d0ceb58",
+    "resource": {
+      "resourceType": "Location",
+      "id": "563260df-4a5e-31e0-8c16-b8c39d0ceb58",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "563260df-4a5e-31e0-8c16-b8c39d0ceb58"
+      } ],
+      "status": "active",
+      "name": "MEMORIAL MEDICAL CENTER",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177883000"
+      } ],
+      "address": {
+        "line": [ "701 N 1ST ST" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627810001",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.65455093133602,
+        "latitude": 39.81015825
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "d208e996-3ba8-385c-ad75-1ad47e7d57bc"
+        },
+        "display": "MEMORIAL MEDICAL CENTER"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|563260df-4a5e-31e0-8c16-b8c39d0ceb58"
+    }
+  }, {
+    "fullUrl": "urn:uuid:6583030d-8e0e-39d0-ad6d-11da91422993",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "6583030d-8e0e-39d0-ad6d-11da91422993",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 7
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/bed-count-extension",
+        "valueInteger": 109
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "6583030d-8e0e-39d0-ad6d-11da91422993"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "VILLA HEALTH CARE EAST",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177442299"
+      } ],
+      "address": [ {
+        "line": [ "100 MARIAN PARKWAY" ],
+        "city": "SHERMAN",
+        "state": "IL",
+        "postalCode": "626849673",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|6583030d-8e0e-39d0-ad6d-11da91422993"
+    }
+  }, {
+    "fullUrl": "urn:uuid:bc6ea50d-a7af-3206-b536-01a8235d9f31",
+    "resource": {
+      "resourceType": "Location",
+      "id": "bc6ea50d-a7af-3206-b536-01a8235d9f31",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "bc6ea50d-a7af-3206-b536-01a8235d9f31"
+      } ],
+      "status": "active",
+      "name": "VILLA HEALTH CARE EAST",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177442299"
+      } ],
+      "address": {
+        "line": [ "100 MARIAN PARKWAY" ],
+        "city": "SHERMAN",
+        "state": "IL",
+        "postalCode": "626849673",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.6048231,
+        "latitude": 39.8936608
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "6583030d-8e0e-39d0-ad6d-11da91422993"
+        },
+        "display": "VILLA HEALTH CARE EAST"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|bc6ea50d-a7af-3206-b536-01a8235d9f31"
+    }
+  }, {
+    "fullUrl": "urn:uuid:72614d10-620b-3503-a2dd-33773a6e0405",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "72614d10-620b-3503-a2dd-33773a6e0405",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 7
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 0
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/bed-count-extension",
+        "valueInteger": 178
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "72614d10-620b-3503-a2dd-33773a6e0405"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "HERITAGE HEALTH-SPRINGFIELD",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177890930"
+      } ],
+      "address": [ {
+        "line": [ "900 NORTH RUTLEDGE" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627023721",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|72614d10-620b-3503-a2dd-33773a6e0405"
+    }
+  }, {
+    "fullUrl": "urn:uuid:5fbaa71f-ecae-33c6-894a-062f0e6487ab",
+    "resource": {
+      "resourceType": "Location",
+      "id": "5fbaa71f-ecae-33c6-894a-062f0e6487ab",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "5fbaa71f-ecae-33c6-894a-062f0e6487ab"
+      } ],
+      "status": "active",
+      "name": "HERITAGE HEALTH-SPRINGFIELD",
+      "telecom": [ {
+        "system": "phone",
+        "value": "2177890930"
+      } ],
+      "address": {
+        "line": [ "900 NORTH RUTLEDGE" ],
+        "city": "SPRINGFIELD",
+        "state": "IL",
+        "postalCode": "627023721",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.657239,
+        "latitude": 39.810999
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "72614d10-620b-3503-a2dd-33773a6e0405"
+        },
+        "display": "HERITAGE HEALTH-SPRINGFIELD"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|5fbaa71f-ecae-33c6-894a-062f0e6487ab"
+    }
+  }, {
+    "fullUrl": "urn:uuid:3b3daf6d-2128-362e-9904-38b2c30f4b48",
+    "resource": {
+      "resourceType": "Organization",
+      "id": "3b3daf6d-2128-362e-9904-38b2c30f4b48",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization" ]
+      },
+      "extension": [ {
+        "url": "http://synthetichealth.github.io/synthea/utilization-encounters-extension",
+        "valueInteger": 189
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-procedures-extension",
+        "valueInteger": 438
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-labs-extension",
+        "valueInteger": 41
+      }, {
+        "url": "http://synthetichealth.github.io/synthea/utilization-prescriptions-extension",
+        "valueInteger": 51
+      } ],
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "3b3daf6d-2128-362e-9904-38b2c30f4b48"
+      } ],
+      "active": true,
+      "type": [ {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/organization-type",
+          "code": "prov",
+          "display": "Healthcare Provider"
+        } ],
+        "text": "Healthcare Provider"
+      } ],
+      "name": "Springfield VA Outpatient Clinic",
+      "telecom": [ {
+        "system": "phone",
+        "value": "217-529-5046"
+      } ],
+      "address": [ {
+        "line": [ "5850 South 6th Street, Suite A" ],
+        "city": "Springfield",
+        "state": "IL",
+        "postalCode": "62703",
+        "country": "US"
+      } ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "Organization",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|3b3daf6d-2128-362e-9904-38b2c30f4b48"
+    }
+  }, {
+    "fullUrl": "urn:uuid:ff437b36-be75-360f-a0f9-d23af38e8f25",
+    "resource": {
+      "resourceType": "Location",
+      "id": "ff437b36-be75-360f-a0f9-d23af38e8f25",
+      "meta": {
+        "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location" ]
+      },
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "ff437b36-be75-360f-a0f9-d23af38e8f25"
+      } ],
+      "status": "active",
+      "name": "Springfield VA Outpatient Clinic",
+      "telecom": [ {
+        "system": "phone",
+        "value": "217-529-5046"
+      } ],
+      "address": {
+        "line": [ "5850 South 6th Street, Suite A" ],
+        "city": "Springfield",
+        "state": "IL",
+        "postalCode": "62703",
+        "country": "US"
+      },
+      "position": {
+        "longitude": -89.606,
+        "latitude": 39.7495
+      },
+      "managingOrganization": {
+        "identifier": {
+          "system": "https://github.com/synthetichealth/synthea",
+          "value": "3b3daf6d-2128-362e-9904-38b2c30f4b48"
+        },
+        "display": "Springfield VA Outpatient Clinic"
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|ff437b36-be75-360f-a0f9-d23af38e8f25"
+    }
+  }, {
+    "fullUrl": "urn:uuid:bb1ad573-19b8-9cd8-68fb-0e6f684df992",
+    "resource": {
+      "resourceType": "Location",
+      "id": "bb1ad573-19b8-9cd8-68fb-0e6f684df992",
+      "identifier": [ {
+        "system": "https://github.com/synthetichealth/synthea",
+        "value": "bb1ad573-19b8-9cd8-68fb-0e6f684df992"
+      } ],
+      "status": "active",
+      "description": "Patient's Home",
+      "mode": "kind",
+      "physicalType": {
+        "coding": [ {
+          "system": "http://terminology.hl7.org/CodeSystem/location-physical-type",
+          "code": "ho",
+          "display": "House"
+        } ]
+      }
+    },
+    "request": {
+      "method": "POST",
+      "url": "Location",
+      "ifNoneExist": "identifier=https://github.com/synthetichealth/synthea|bb1ad573-19b8-9cd8-68fb-0e6f684df992"
+    }
+  } ]
+}

@@ -1,0 +1,38 @@
+{{- $serverRoute := printf "https://%s-medplum-server-%s.apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com/" .Release.Name .Release.Namespace -}}
+{{- $appRoute := printf "https://%s-medplum-app-%s.apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com/" .Release.Name .Release.Namespace -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-medplum-server-config
+  labels:
+    app.kubernetes.io/name: medplum-server
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: fhir-server
+    app.kubernetes.io/part-of: cpg-to-acp
+data:
+  medplum.config.json: |
+    {
+      "port": {{ .Values.medplumServer.port }},
+      "baseUrl": {{ .Values.medplumServer.baseUrl | default $serverRoute | quote }},
+      "appBaseUrl": {{ .Values.medplumServer.appBaseUrl | default $appRoute | quote }},
+      "storageBaseUrl": {{ printf "%sstorage/" (.Values.medplumServer.baseUrl | default $serverRoute) | quote }},
+      "binaryStorage": "file:./binary/",
+      "database": {
+        "host": "{{ .Release.Name }}-postgres",
+        "port": {{ .Values.postgres.service.port }},
+        "dbname": "medplum",
+        "username": "medplum",
+        "password": "medplum"
+      },
+      "redis": {
+        "host": "{{ .Release.Name }}-redis",
+        "port": {{ .Values.redis.service.port }},
+        "password": "medplum"
+      },
+      "maxJsonSize": "5mb",
+      "maxBatchSize": "50mb",
+      "vmContextBotsEnabled": true,
+      "allowedOrigins": "*",
+      "introspectionEnabled": true,
+      "shutdownTimeoutMilliseconds": 30000
+    }

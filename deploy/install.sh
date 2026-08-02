@@ -4,6 +4,10 @@ set -e
 NAMESPACE="${NAMESPACE:-sschifma-cpg-to-acp}"
 RELEASE_PREFIX="${RELEASE_PREFIX:-cpg}"
 
+# Prerequisites:
+#   - Run mock-EHR/deploy/setup-openshift.sh first (creates ImageStreams, BuildConfigs, pushes images)
+#   - All images must be built and available in the internal registry
+
 echo "=== CPG-to-ACP OpenShift Deployment ==="
 echo "Namespace:      $NAMESPACE"
 echo "Release prefix: $RELEASE_PREFIX"
@@ -27,7 +31,7 @@ helm upgrade --install "${RELEASE_PREFIX}-acp-writer" \
   --set decisionService.url="http://${RELEASE_PREFIX}-decision-svc-decision-service:8081" \
   "$@"
 
-echo "=== Installing mock-EHR (HAPI FHIR) ==="
+echo "=== Installing mock-EHR (Medplum) ==="
 helm upgrade --install "${RELEASE_PREFIX}-mock-ehr" \
   "$REPO_ROOT/mock-EHR/deploy/chart" \
   --namespace "$NAMESPACE" \

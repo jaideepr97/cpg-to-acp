@@ -1,10 +1,12 @@
+{{- $ipsViewerRoute := printf "https://%s-ips-viewer-%s.apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com" .Release.Name .Release.Namespace -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ .Release.Name }}-fhir-loader
+  name: {{ .Release.Name }}-loader
   labels:
-    app.kubernetes.io/name: fhir-loader
+    app.kubernetes.io/name: medplum-loader
     app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: data-loader
     app.kubernetes.io/part-of: cpg-to-acp
   annotations:
     helm.sh/hook: post-install,post-upgrade
@@ -14,13 +16,19 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: fhir-loader
+        app.kubernetes.io/name: medplum-loader
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
       restartPolicy: Never
       containers:
-        - name: fhir-loader
-          image: "{{ .Values.loader.image.registry }}/{{ .Values.loader.image.namespace }}/{{ .Values.loader.image.name }}:{{ .Values.loader.image.tag }}"
+        - name: loader
+          image: {{ .Values.image.registry }}/{{ .Values.image.namespace }}/{{ .Values.loader.image.name }}:{{ .Values.loader.image.tag }}
           env:
-            - name: FHIR_BASE_URL
-              value: "http://{{ .Release.Name }}-hapi-fhir:{{ .Values.hapiFhir.service.port }}/fhir"
+            - name: MEDPLUM_BASE_URL
+              value: http://{{ .Release.Name }}-medplum-server:{{ .Values.medplumServer.service.port }}
+            - name: DATA_DIR
+              value: /data
+            - name: ACP_WRITER_LAUNCH_URI
+              value: {{ $ipsViewerRoute }}/launch
+            - name: ACP_WRITER_REDIRECT_URI
+              value: {{ $ipsViewerRoute }}/app

@@ -31,9 +31,9 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: hapi-fhir
+              app.kubernetes.io/name: medplum-server
       ports:
-        - port: 8080
+        - port: 8103
           protocol: TCP
     - to:
         - namespaceSelector: {}

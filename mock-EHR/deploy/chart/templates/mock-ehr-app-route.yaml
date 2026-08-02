@@ -1,0 +1,20 @@
+{{- if .Values.mockEhrApp.route.enabled }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ .Release.Name }}-mock-ehr-app
+  labels:
+    app.kubernetes.io/name: mock-ehr-app
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: ehr-ui
+    app.kubernetes.io/part-of: cpg-to-acp
+spec:
+  to:
+    kind: Service
+    name: {{ .Release.Name }}-mock-ehr-app
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+{{- end }}

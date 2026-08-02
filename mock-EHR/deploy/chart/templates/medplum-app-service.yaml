@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-medplum-app
+  labels:
+    app.kubernetes.io/name: medplum-app
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: oauth-ui
+    app.kubernetes.io/part-of: cpg-to-acp
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.medplumApp.service.port }}
+      targetPort: {{ .Values.medplumApp.port }}
+      name: http
+  selector:
+    app.kubernetes.io/name: medplum-app
+    app.kubernetes.io/instance: {{ .Release.Name }}

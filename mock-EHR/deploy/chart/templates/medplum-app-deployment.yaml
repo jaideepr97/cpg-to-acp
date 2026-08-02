@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-medplum-app
+  labels:
+    app.kubernetes.io/name: medplum-app
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: oauth-ui
+    app.kubernetes.io/part-of: cpg-to-acp
+spec:
+  replicas: {{ .Values.medplumApp.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: medplum-app
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: medplum-app
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: oauth-ui
+        app.kubernetes.io/part-of: cpg-to-acp
+    spec:
+      containers:
+        - name: medplum-app
+          image: {{ .Values.medplumApp.image }}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: {{ .Values.medplumApp.port }}
+          resources:
+            {{- toYaml .Values.medplumApp.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.medplumApp.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.medplumApp.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 30

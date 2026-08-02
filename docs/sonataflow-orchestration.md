@@ -51,7 +51,7 @@ graph LR
 5. **Compose Plan** (async) — LLM generates care plan with goals and activities
 6. **Generate FHIR** (async) — LLM produces FHIR CarePlan bundle
 7. **Review FHIR** (async) — semantic validation with retry loop (up to 4 iterations)
-8. **Write FHIR** (sync) — POST bundle to HAPI FHIR server
+8. **Write FHIR** (sync) — POST bundle to Medplum FHIR server
 
 ### Sync vs async states
 
