@@ -1,0 +1,23 @@
+# Custom gitleaks rules — extends the default ruleset.
+# Place in the repo root; gitleaks auto-discovers it.
+
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API Key"
+regex = '''sk-proj-[A-Za-z0-9_-]{20,}'''
+keywords = ["sk-proj-"]
+
+[[rules]]
+id = "openai-api-key-legacy"
+description = "OpenAI API Key (legacy format)"
+regex = '''sk-[A-Za-z0-9]{40,}'''
+keywords = ["sk-"]
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic API Key"
+regex = '''sk-ant-[A-Za-z0-9_-]{20,}'''
+keywords = ["sk-ant-"]
+
+[rules.allowlist]
+regexes = ['''sk-change-me''']
