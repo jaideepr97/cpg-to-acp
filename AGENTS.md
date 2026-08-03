@@ -56,6 +56,9 @@ Producers must not assume a specific consumer runtime. Consumers are pluggable b
 
 ### Code Quality
 - Do not introduce security vulnerabilities (OWASP top 10). This project handles clinical data.
+- **Never commit secrets** (API keys, passwords, tokens) to the repository. Use environment variables or Kubernetes Secrets. The repo has two layers of protection:
+  - **GitHub Push Protection** — server-side scanning that blocks pushes containing known secret patterns.
+  - **Gitleaks pre-commit hook** (`.githooks/pre-commit`) — local scanning before each commit. Activate with: `brew install gitleaks && git config core.hooksPath .githooks`
 - Keep components independent. Avoid adding cross-component dependencies unless the contract goes through `shared/`.
 - Prefer standard interfaces (MCP, REST, FHIR, DMN, BPMN) over proprietary integrations.
 

@@ -35,7 +35,7 @@ The system has four application components connected by standards-based contract
 | [`cpg-ingester/`](cpg-ingester/) | Parses CPG documents (via Docling) and produces two outputs: (1) DMN decision tables for computable logic, and (2) recommendations and other non-computable content for the acp-writer's vector store. |
 | [`acp-writer/`](acp-writer/) | Composes patient-specific care plans by invoking DMN decision services (Drools/Kogito), retrieving recommendations from its vector store, and integrating patient data from FHIR. Outputs FHIR CarePlans and BPMN for automatable activities. The decision engine and vector store are internal implementation details. Includes the clinician review UI (SMART on FHIR). |
 | [`automation/`](automation/) | Executes BPMN process definitions produced by the acp-writer. The runtime is pluggable — Ansible playbooks, SonataFlow, or any BPMN-conformant engine. |
-| [`mock-EHR/`](mock-EHR/) | HAPI FHIR server acting as an EHR proxy, plus a simple EHR client that the acp-writer can launch within. Used for development and demonstration. |
+| [`mock-EHR/`](mock-EHR/) | Mock EHR built on Medplum (FHIR R4, OAuth, SMART on FHIR). Includes a clinical-facing React UI ("CareView EHR") and an IPS Viewer SMART app. Used for development and demonstration. See [`mock-EHR/README.md`](mock-EHR/README.md). |
 | [`platform/`](platform/) | Shared infrastructure services (MaaS, MLflow) consumed by multiple application components. On OpenShift AI these are platform capabilities; for local dev this directory provides equivalent deployments. |
 | [`shared/`](shared/) | Shared contracts and utilities across components. Used sparingly to prevent coupling. |
 | [`docs/`](docs/) | User-facing documentation: architecture, security, deployment guides. |
@@ -202,8 +202,25 @@ On OpenShift, MaaS replaces LiteLLM for governed inference routing, and MLflow t
 | Standard | Version | Notes |
 |---|---|---|
 | **DMN** | 1.4 | Latest version supported by Drools/Kogito at conformance level 3. Namespace: `https://www.omg.org/spec/DMN/20191111/MODEL/`. Upgrade to 1.5 when Drools/Kogito formally adds support. |
-| **FHIR** | R4 | Via HAPI FHIR server |
+| **FHIR** | R4 | Via Medplum FHIR server |
 | **BPMN** | 2.0 | Phase 4 |
+
+## Developer Setup
+
+### Secret scanning
+
+This repo has two layers of protection against committing secrets:
+
+1. **GitHub Push Protection** — enabled server-side, blocks pushes containing known API key patterns
+2. **Gitleaks pre-commit hook** — local scanning before each commit
+
+To activate the local hook:
+```bash
+brew install gitleaks
+git config core.hooksPath .githooks
+```
+
+**Never hardcode API keys, passwords, or tokens in source files.** Use environment variables or Kubernetes Secrets. See `AGENTS.md` for the full policy.
 
 ## License
 
