@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Pre-commit hook: scan staged files for secrets using gitleaks.
+# Install: git config core.hooksPath .githooks
+
+if ! command -v gitleaks &> /dev/null; then
+  echo "WARNING: gitleaks not installed — skipping secret scan"
+  echo "  Install with: brew install gitleaks"
+  exit 0
+fi
+
+gitleaks git --pre-commit --staged --verbose 2>&1
+exit_code=$?
+
+if [ $exit_code -ne 0 ]; then
+  echo ""
+  echo "SECRET DETECTED — commit blocked by gitleaks pre-commit hook."
+  echo "If this is a false positive, use: git commit --no-verify"
+  exit 1
+fi
