@@ -9,8 +9,8 @@ LITELLM_URL="http://maas-default-gateway-openshift-default.openshift-ingress.svc
 LLM_MODEL="gpt-5.6-terra"
 LLM_API_KEY="${LLM_API_KEY:?Set LLM_API_KEY environment variable}"
 MINIO_URL="http://minio:9000"
-MINIO_ACCESS="minioadmin"
-MINIO_SECRET="minioadmin-cpg2acp"
+MINIO_ACCESS="${MINIO_ACCESS:?Set MINIO_ACCESS environment variable}"
+MINIO_SECRET="${MINIO_SECRET:?Set MINIO_SECRET environment variable}"
 
 declare -A SANDBOX_PIDS
 

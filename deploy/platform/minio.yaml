@@ -7,8 +7,10 @@ metadata:
     app: minio
 type: Opaque
 stringData:
-  MINIO_ROOT_USER: minioadmin
-  MINIO_ROOT_PASSWORD: minioadmin-cpg2acp
+  MINIO_ROOT_USER: CHANGE_ME
+  MINIO_ROOT_PASSWORD: CHANGE_ME
+  ARTIFACT_STORE_ACCESS_KEY: CHANGE_ME
+  ARTIFACT_STORE_SECRET_KEY: CHANGE_ME
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
