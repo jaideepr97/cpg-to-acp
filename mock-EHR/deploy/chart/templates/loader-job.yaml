@@ -23,6 +23,7 @@ spec:
       containers:
         - name: loader
           image: {{ .Values.image.registry }}/{{ .Values.image.namespace }}/{{ .Values.loader.image.name }}:{{ .Values.loader.image.tag }}
+          imagePullPolicy: Always
           env:
             - name: MEDPLUM_BASE_URL
               value: http://{{ .Release.Name }}-medplum-server:{{ .Values.medplumServer.service.port }}
