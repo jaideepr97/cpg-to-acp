@@ -32,3 +32,23 @@ spec:
               value: {{ $ipsViewerRoute }}/launch
             - name: ACP_WRITER_REDIRECT_URI
               value: {{ $ipsViewerRoute }}/app
+            - name: MEDPLUM_SUPERADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: medplum-user-credentials
+                  key: MEDPLUM_SUPERADMIN_PASSWORD
+            - name: MEDPLUM_ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: medplum-user-credentials
+                  key: MEDPLUM_ADMIN_EMAIL
+            - name: MEDPLUM_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: medplum-user-credentials
+                  key: MEDPLUM_ADMIN_PASSWORD
+            - name: MEDPLUM_PRACTITIONER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: medplum-user-credentials
+                  key: MEDPLUM_PRACTITIONER_PASSWORD

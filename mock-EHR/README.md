@@ -47,7 +47,7 @@ Hand-crafted FHIR Transaction Bundles in `data/`:
 The `deploy/load-medplum.sh` script automates the full Medplum setup:
 
 1. Waits for the Medplum server to be healthy
-2. Authenticates with the seeded super admin (`admin@example.com` / `medplum_admin`)
+2. Changes the seeded super admin password (if `MEDPLUM_SUPERADMIN_PASSWORD` is set)
 3. Creates a "CareView EHR" project
 4. Loads all patient bundles from `data/`
 5. Creates demo practitioner users
@@ -55,15 +55,27 @@ The `deploy/load-medplum.sh` script automates the full Medplum setup:
 
 The script is environment-agnostic — it takes `MEDPLUM_BASE_URL` as input and works in both local podman-compose and OpenShift (as a Job).
 
+### Required environment variables
+
+| Variable | Purpose |
+|---|---|
+| `MEDPLUM_ADMIN_PASSWORD` | Password for the CareView EHR project admin |
+| `MEDPLUM_PRACTITIONER_PASSWORD` | Password for demo practitioner users (Dr. Mitchell, Dr. Park) |
+| `MEDPLUM_SUPERADMIN_PASSWORD` | New password for the Medplum seeded super admin (optional, recommended) |
+| `MEDPLUM_ADMIN_EMAIL` | Admin email (default: `admin@careview.example`) |
+
+On OpenShift, these come from the `medplum-user-credentials` Kubernetes Secret. For local dev, set them as environment variables or in a `.env` file.
+
 ## Demo Users
 
 After loading:
 
-| User | Email | Password | Role |
-|---|---|---|---|
-| Super Admin | `admin@example.com` | `medplum_admin` | Server admin |
-| Dr. Sarah Mitchell | `sarah.mitchell@careview.example` | `CareView2026!` | Primary demo practitioner |
-| Dr. James Park | `james.park@careview.example` | `CareView2026!` | Secondary demo practitioner |
+| User | Email | Role |
+|---|---|---|
+| Dr. Sarah Mitchell | `sarah.mitchell@careview.example` | Primary demo practitioner |
+| Dr. James Park | `james.park@careview.example` | Secondary demo practitioner |
+
+Passwords are configured via environment variables — see above.
 
 ## Verifying
 
@@ -73,7 +85,7 @@ After the data is loaded:
 # Authenticate (get a token)
 CODE=$(curl -sf -X POST http://localhost:8103/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@example.com","password":"medplum_admin","codeChallengeMethod":"plain","codeChallenge":"verify"}' \
+  -d "{\"email\":\"$MEDPLUM_ADMIN_EMAIL\",\"password\":\"$MEDPLUM_ADMIN_PASSWORD\",\"codeChallengeMethod\":\"plain\",\"codeChallenge\":\"verify\"}" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['code'])")
 
 TOKEN=$(curl -sf -X POST http://localhost:8103/oauth2/token \

@@ -69,12 +69,41 @@ until curl -sf "$MEDPLUM_BASE_URL/healthcheck" > /dev/null 2>&1; do
 done
 log "Medplum server is healthy"
 
+# --- Step 1.5: Change seeded super admin password ---
+# Medplum creates admin@example.com / medplum_admin on first boot.
+# Change it immediately to close the window of known-default access.
+MEDPLUM_SUPERADMIN_PASSWORD="${MEDPLUM_SUPERADMIN_PASSWORD:-}"
+if [ -n "$MEDPLUM_SUPERADMIN_PASSWORD" ]; then
+  log "Changing seeded super admin password ..."
+  sa_login=$(curl -sf -X POST "$MEDPLUM_BASE_URL/auth/login" \
+    -H "Content-Type: application/json" \
+    -d '{"email":"admin@example.com","password":"medplum_admin","codeChallengeMethod":"plain","codeChallenge":"sa"}' 2>/dev/null)
+  sa_code=$(echo "$sa_login" | python3 -c "import sys,json; print(json.load(sys.stdin).get('code',''))" 2>/dev/null)
+  if [ -n "$sa_code" ]; then
+    sa_token=$(curl -sf -X POST "$MEDPLUM_BASE_URL/oauth2/token" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      -d "grant_type=authorization_code&code=$sa_code&code_verifier=sa" \
+      | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)
+    if [ -n "$sa_token" ]; then
+      curl -sf -X POST "$MEDPLUM_BASE_URL/auth/changepassword" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $sa_token" \
+        -d "{\"oldPassword\":\"medplum_admin\",\"newPassword\":\"$MEDPLUM_SUPERADMIN_PASSWORD\"}" > /dev/null 2>&1 \
+        && log "  Super admin password changed" \
+        || log "  WARNING: Failed to change super admin password"
+    fi
+  else
+    log "  Super admin password already changed (default login failed)"
+  fi
+fi
+
 # --- Step 2-3: Create project and authenticate ---
 # Medplum uses a two-step registration flow: /auth/newuser -> /auth/newproject
 # This creates a new user, a new project, and returns an auth code in one flow.
 
-PROJECT_EMAIL="admin@careview.example"
-PROJECT_PASSWORD="CareView2026!"
+PROJECT_EMAIL="${MEDPLUM_ADMIN_EMAIL:-admin@careview.example}"
+PROJECT_PASSWORD="${MEDPLUM_ADMIN_PASSWORD:?Set MEDPLUM_ADMIN_PASSWORD environment variable}"
+PRACTITIONER_PASSWORD="${MEDPLUM_PRACTITIONER_PASSWORD:?Set MEDPLUM_PRACTITIONER_PASSWORD environment variable}"
 
 log "Creating demo project (CareView EHR) ..."
 
@@ -186,15 +215,15 @@ log "Creating practitioner users ..."
 curl -sf -X POST "$MEDPLUM_BASE_URL/admin/projects/$PROJECT_ID/invite" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $PROJECT_TOKEN" \
-  -d '{
-    "resourceType": "Practitioner",
-    "firstName": "Sarah",
-    "lastName": "Mitchell",
-    "email": "sarah.mitchell@careview.example",
-    "password": "CareView2026!",
-    "sendEmail": false,
-    "membership": { "admin": true }
-  }' > /dev/null \
+  -d "{
+    \"resourceType\": \"Practitioner\",
+    \"firstName\": \"Sarah\",
+    \"lastName\": \"Mitchell\",
+    \"email\": \"sarah.mitchell@careview.example\",
+    \"password\": \"$PRACTITIONER_PASSWORD\",
+    \"sendEmail\": false,
+    \"membership\": { \"admin\": true }
+  }" > /dev/null \
   || log "WARNING: Failed to create Dr. Mitchell (may already exist)"
 
 log "  Created Dr. Sarah Mitchell"
@@ -203,15 +232,15 @@ log "  Created Dr. Sarah Mitchell"
 curl -sf -X POST "$MEDPLUM_BASE_URL/admin/projects/$PROJECT_ID/invite" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $PROJECT_TOKEN" \
-  -d '{
-    "resourceType": "Practitioner",
-    "firstName": "James",
-    "lastName": "Park",
-    "email": "james.park@careview.example",
-    "password": "CareView2026!",
-    "sendEmail": false,
-    "membership": { "admin": false }
-  }' > /dev/null \
+  -d "{
+    \"resourceType\": \"Practitioner\",
+    \"firstName\": \"James\",
+    \"lastName\": \"Park\",
+    \"email\": \"james.park@careview.example\",
+    \"password\": \"$PRACTITIONER_PASSWORD\",
+    \"sendEmail\": false,
+    \"membership\": { \"admin\": false }
+  }" > /dev/null \
   || log "WARNING: Failed to create Dr. Park (may already exist)"
 
 log "  Created Dr. James Park"
@@ -282,8 +311,8 @@ log "=== Medplum setup complete ==="
 log "  Project:      CareView EHR ($PROJECT_ID)"
 log "  FHIR endpoint: $MEDPLUM_BASE_URL/fhir/R4"
 log "  Patients:     $bundle_count bundle(s) loaded"
-log "  Users:        admin@careview.example / CareView2026! (project admin)"
-log "                sarah.mitchell@careview.example / CareView2026! (Dr. Mitchell)"
-log "                james.park@careview.example / CareView2026! (Dr. Park)"
+log "  Users:        $PROJECT_EMAIL (project admin)"
+log "                sarah.mitchell@careview.example (Dr. Mitchell)"
+log "                james.park@careview.example (Dr. Park)"
 log "  SMART App:    ACP Writer (client_id=$CLIENT_ID)"
 log ""
