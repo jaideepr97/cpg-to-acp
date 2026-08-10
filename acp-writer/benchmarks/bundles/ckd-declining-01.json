@@ -1,0 +1,246 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "patient-ckd-01",
+        "name": [{"family": "Henderson", "given": ["Robert"]}],
+        "gender": "male",
+        "birthDate": "1958-05-10"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "condition-ckd-stage3-01",
+        "clinicalStatus": {
+          "coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active"}]
+        },
+        "code": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "431855005", "display": "Chronic kidney disease stage 3"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "condition-t2dm-01",
+        "clinicalStatus": {
+          "coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active"}]
+        },
+        "code": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "44054006", "display": "Type 2 diabetes mellitus"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "egfr-2025-01-15",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "33914-3", "display": "Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum or Plasma by Creatinine-based formula"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"},
+        "effectiveDateTime": "2025-01-15T09:00:00Z",
+        "valueQuantity": {"value": 52, "unit": "mL/min/1.73m2", "system": "http://unitsofmeasure.org", "code": "mL/min/{1.73_m2}"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "egfr-2025-04-10",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "33914-3", "display": "Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum or Plasma by Creatinine-based formula"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"},
+        "effectiveDateTime": "2025-04-10T10:30:00Z",
+        "valueQuantity": {"value": 49, "unit": "mL/min/1.73m2", "system": "http://unitsofmeasure.org", "code": "mL/min/{1.73_m2}"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "egfr-2025-07-20",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "33914-3", "display": "Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum or Plasma by Creatinine-based formula"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"},
+        "effectiveDateTime": "2025-07-20T08:45:00Z",
+        "valueQuantity": {"value": 47, "unit": "mL/min/1.73m2", "system": "http://unitsofmeasure.org", "code": "mL/min/{1.73_m2}"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "egfr-2025-10-05",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "33914-3", "display": "Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum or Plasma by Creatinine-based formula"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"},
+        "effectiveDateTime": "2025-10-05T11:00:00Z",
+        "valueQuantity": {"value": 45, "unit": "mL/min/1.73m2", "system": "http://unitsofmeasure.org", "code": "mL/min/{1.73_m2}"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "egfr-2026-01-12",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "33914-3", "display": "Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum or Plasma by Creatinine-based formula"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"},
+        "effectiveDateTime": "2026-01-12T09:30:00Z",
+        "valueQuantity": {"value": 43, "unit": "mL/min/1.73m2", "system": "http://unitsofmeasure.org", "code": "mL/min/{1.73_m2}"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "egfr-2026-04-18",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "33914-3", "display": "Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum or Plasma by Creatinine-based formula"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"},
+        "effectiveDateTime": "2026-04-18T14:15:00Z",
+        "valueQuantity": {"value": 41, "unit": "mL/min/1.73m2", "system": "http://unitsofmeasure.org", "code": "mL/min/{1.73_m2}"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "egfr-2026-05-28",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "33914-3", "display": "Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum or Plasma by Creatinine-based formula"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"},
+        "effectiveDateTime": "2026-05-28T10:00:00Z",
+        "valueQuantity": {"value": 40, "unit": "mL/min/1.73m2", "system": "http://unitsofmeasure.org", "code": "mL/min/{1.73_m2}"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "creat-2025-01-15",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "2160-0", "display": "Creatinine [Mass/volume] in Serum or Plasma"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"},
+        "effectiveDateTime": "2025-01-15T09:00:00Z",
+        "valueQuantity": {"value": 1.4, "unit": "mg/dL", "system": "http://unitsofmeasure.org", "code": "mg/dL"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "creat-2025-07-20",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "2160-0", "display": "Creatinine [Mass/volume] in Serum or Plasma"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"},
+        "effectiveDateTime": "2025-07-20T08:45:00Z",
+        "valueQuantity": {"value": 1.5, "unit": "mg/dL", "system": "http://unitsofmeasure.org", "code": "mg/dL"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "creat-2026-05-28",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "2160-0", "display": "Creatinine [Mass/volume] in Serum or Plasma"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"},
+        "effectiveDateTime": "2026-05-28T10:00:00Z",
+        "valueQuantity": {"value": 1.6, "unit": "mg/dL", "system": "http://unitsofmeasure.org", "code": "mg/dL"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "uacr-2025-01-15",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "9318-7", "display": "Albumin/Creatinine [Ratio] in Urine"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"},
+        "effectiveDateTime": "2025-01-15T09:00:00Z",
+        "valueQuantity": {"value": 45, "unit": "mg/g", "system": "http://unitsofmeasure.org", "code": "mg/g{creat}"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "uacr-2025-07-20",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "9318-7", "display": "Albumin/Creatinine [Ratio] in Urine"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"},
+        "effectiveDateTime": "2025-07-20T08:45:00Z",
+        "valueQuantity": {"value": 52, "unit": "mg/g", "system": "http://unitsofmeasure.org", "code": "mg/g{creat}"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "uacr-2026-05-28",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "9318-7", "display": "Albumin/Creatinine [Ratio] in Urine"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"},
+        "effectiveDateTime": "2026-05-28T10:00:00Z",
+        "valueQuantity": {"value": 58, "unit": "mg/g", "system": "http://unitsofmeasure.org", "code": "mg/g{creat}"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-metformin-01",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "861004", "display": "Metformin 1000 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"},
+        "authoredOn": "2024-06-01"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-lisinopril-01",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "314076", "display": "Lisinopril 20 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"},
+        "authoredOn": "2024-08-15"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-atorvastatin-01",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "259255", "display": "Atorvastatin 40 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-ckd-01"},
+        "authoredOn": "2024-06-01"
+      }
+    }
+  ]
+}
