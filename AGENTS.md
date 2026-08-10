@@ -75,6 +75,12 @@ Producers must not assume a specific consumer runtime. Consumers are pluggable b
 - Each component has its own README describing its purpose, setup, and usage.
 - Use **Mermaid** for all diagrams in documentation. Do not use ASCII art, image files, or external diagramming tools for new diagrams.
 
+### Agent Memory (MemoryHub)
+- **At session start**, register with MemoryHub via the `memoryhub` MCP server: call `register_session` with the API key from your MCP server configuration, then `memory(action="search", query="...", project_id="cpg-to-acp")` to load relevant context.
+- **Use MemoryHub** for project-level memory: meeting decisions, architecture context, team agreements, and anything that should persist across sessions and be accessible to all team agents.
+- **Project ID:** `cpg-to-acp`
+- The MemoryHub MCP server is configured in `.claude/settings.json` (not committed — contains the API key). Each contributor sets up their own connection.
+
 ## Technology Context
 
 Key technologies referenced in this project (all subject to change):
