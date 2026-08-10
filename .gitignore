@@ -175,6 +175,7 @@ working/
 
 # Claude Code local settings
 .claude/settings.local.json
+.mcp.json
 
 # Node / UI
 node_modules/
