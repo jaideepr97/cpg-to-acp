@@ -49,7 +49,7 @@ cpg-ingester/ui/           # cpg-ingester React app
 │   └── services/          # API clients
 ├── package.json
 ├── vite.config.ts
-└── Dockerfile
+└── Containerfile
 
 acp-writer/ui/             # acp-writer React app
 ├── src/
@@ -59,7 +59,7 @@ acp-writer/ui/             # acp-writer React app
 │   └── services/
 ├── package.json
 ├── vite.config.ts
-└── Dockerfile
+└── Containerfile
 ```
 
 Two separate React apps (not a monorepo). Each deploys as its own pod, consistent with the existing pod-split architecture.
