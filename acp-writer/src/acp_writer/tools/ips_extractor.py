@@ -1,12 +1,13 @@
 """IPS Extractor — targeted data extraction from IPS Bundle.
 
 Used by DMN Executor for on-demand extraction of specific
-observations, conditions, medications, and allergies by code.
+observations, conditions, medications, allergies, procedures,
+family history, and diagnostic reports by code.
 Returns FHIR resource references for audit trail.
 """
 
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 import mlflow
@@ -81,6 +82,40 @@ def _parse_date_key(date_str: str | None) -> str:
     return date_str
 
 
+def _extract_obs_value(obs_or_component: dict) -> tuple[Any, str | None]:
+    """Extract value from an Observation or component, trying all FHIR value types."""
+    vq = obs_or_component.get("valueQuantity")
+    if vq and vq.get("value") is not None:
+        return vq["value"], vq.get("unit")
+
+    vcc = obs_or_component.get("valueCodeableConcept")
+    if vcc:
+        codings = vcc.get("coding", [])
+        if codings:
+            return codings[0].get("code"), None
+        text = vcc.get("text")
+        if text:
+            return text, None
+
+    vs = obs_or_component.get("valueString")
+    if vs is not None:
+        return vs, None
+
+    vb = obs_or_component.get("valueBoolean")
+    if vb is not None:
+        return vb, None
+
+    vr = obs_or_component.get("valueRange")
+    if vr:
+        low = vr.get("low", {}).get("value")
+        high = vr.get("high", {}).get("value")
+        if low is not None and high is not None:
+            return {"low": low, "high": high}, vr.get("low", {}).get("unit")
+        return low or high, None
+
+    return None, None
+
+
 @mlflow.trace(name="ips_extract_observation")
 def extract_observation(
     ips_bundle: dict, system: str, code: str
@@ -95,29 +130,18 @@ def extract_observation(
 
     for obs in observations:
         effective = _get_effective_date(obs)
-        ref = f"Observation/{obs.get('id', 'unknown')}"
 
         if _has_code(obs, "code", system, code):
-            vq = obs.get("valueQuantity")
-            if vq:
-                candidates.append((
-                    _parse_date_key(effective),
-                    obs,
-                    vq.get("value"),
-                    vq.get("unit"),
-                ))
+            value, unit = _extract_obs_value(obs)
+            if value is not None:
+                candidates.append((_parse_date_key(effective), obs, value, unit))
             continue
 
         for component in obs.get("component", []):
             if _has_code(component, "code", system, code):
-                vq = component.get("valueQuantity")
-                if vq:
-                    candidates.append((
-                        _parse_date_key(effective),
-                        obs,
-                        vq.get("value"),
-                        vq.get("unit"),
-                    ))
+                value, unit = _extract_obs_value(component)
+                if value is not None:
+                    candidates.append((_parse_date_key(effective), obs, value, unit))
 
     if not candidates:
         return ExtractionResult(found=False)
@@ -214,3 +238,114 @@ def extract_allergy(
             )
 
     return ExtractionResult(found=False, value=False)
+
+
+@mlflow.trace(name="ips_extract_procedure")
+def extract_procedure(
+    ips_bundle: dict, system: str, code: str
+) -> ExtractionResult:
+    """Check if a procedure matching the code is present."""
+    procedures = _get_resources(ips_bundle, "Procedure")
+
+    for proc in procedures:
+        if not _has_code(proc, "code", system, code):
+            continue
+
+        status = proc.get("status", "")
+        if status in ("entered-in-error", "not-done"):
+            continue
+
+        return ExtractionResult(
+            found=True,
+            value=True,
+            date=proc.get("performedDateTime") or (
+                proc.get("performedPeriod", {}).get("start")
+            ),
+            fhir_reference=f"Procedure/{proc.get('id', 'unknown')}",
+            resource_type="Procedure",
+        )
+
+    return ExtractionResult(found=False, value=False)
+
+
+@mlflow.trace(name="ips_extract_family_history")
+def extract_family_history(
+    ips_bundle: dict, system: str, code: str
+) -> ExtractionResult:
+    """Check if a family history entry matching the condition code is present."""
+    fmh_resources = _get_resources(ips_bundle, "FamilyMemberHistory")
+
+    for fmh in fmh_resources:
+        status = fmh.get("status", "")
+        if status in ("entered-in-error",):
+            continue
+
+        for condition in fmh.get("condition", []):
+            if _has_code(condition, "code", system, code):
+                return ExtractionResult(
+                    found=True,
+                    value=True,
+                    fhir_reference=f"FamilyMemberHistory/{fmh.get('id', 'unknown')}",
+                    resource_type="FamilyMemberHistory",
+                )
+
+    return ExtractionResult(found=False, value=False)
+
+
+@mlflow.trace(name="ips_extract_diagnostic_report")
+def extract_diagnostic_report(
+    ips_bundle: dict, system: str, code: str
+) -> ExtractionResult:
+    """Check if a diagnostic report matching the code is present."""
+    reports = _get_resources(ips_bundle, "DiagnosticReport")
+
+    for report in reports:
+        if not _has_code(report, "code", system, code):
+            continue
+
+        status = report.get("status", "")
+        if status in ("entered-in-error", "cancelled"):
+            continue
+
+        return ExtractionResult(
+            found=True,
+            value=True,
+            date=report.get("effectiveDateTime") or (
+                report.get("effectivePeriod", {}).get("start")
+            ),
+            fhir_reference=f"DiagnosticReport/{report.get('id', 'unknown')}",
+            resource_type="DiagnosticReport",
+        )
+
+    return ExtractionResult(found=False, value=False)
+
+
+def extract_patient_age(
+    ips_bundle: dict, reference_date: date
+) -> ExtractionResult:
+    """Compute patient age from birthDate relative to a reference date."""
+    patients = _get_resources(ips_bundle, "Patient")
+    if not patients:
+        return ExtractionResult(found=False)
+
+    patient = patients[0]
+    birth_date_str = patient.get("birthDate")
+    if not birth_date_str:
+        return ExtractionResult(found=False)
+
+    try:
+        birth_date = date.fromisoformat(birth_date_str)
+    except ValueError:
+        return ExtractionResult(found=False)
+
+    age = reference_date.year - birth_date.year
+    if (reference_date.month, reference_date.day) < (birth_date.month, birth_date.day):
+        age -= 1
+
+    return ExtractionResult(
+        found=True,
+        value=age,
+        unit="years",
+        fhir_reference=f"Patient/{patient.get('id', 'unknown')}",
+        resource_type="Patient",
+    )

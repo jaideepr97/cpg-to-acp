@@ -68,10 +68,10 @@ class ArtifactStore:
 
         url = self._get_client().generate_presigned_url(
             "put_object",
-            Params={"Bucket": self.bucket, "Key": key, "ContentType": content_type},
+            Params={"Bucket": self.bucket, "Key": key},
             ExpiresIn=300,
         )
-        resp = _requests.put(url, data=body, headers={"Content-Type": content_type}, timeout=30)
+        resp = _requests.put(url, data=body, timeout=30)
         resp.raise_for_status()
 
     def put(self, key: str, data: dict | list) -> str:

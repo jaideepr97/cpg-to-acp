@@ -1,0 +1,503 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "patient-graph-01",
+        "name": [{"family": "Sullivan", "given": ["Margaret"]}],
+        "gender": "female",
+        "birthDate": "1954-02-18"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "encounter-2026-01",
+        "status": "finished",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "AMB",
+          "display": "ambulatory"
+        },
+        "type": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "185349003",
+                "display": "Office visit"
+              }
+            ]
+          }
+        ],
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "period": {"start": "2026-01-15"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "encounter-2026-04",
+        "status": "finished",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "AMB",
+          "display": "ambulatory"
+        },
+        "type": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "185349003",
+                "display": "Office visit"
+              }
+            ]
+          }
+        ],
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "period": {"start": "2026-04-10"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "cond-htn-g1",
+        "clinicalStatus": {
+          "coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active"}]
+        },
+        "code": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "59621000", "display": "Essential hypertension"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "cond-dm2-g1",
+        "clinicalStatus": {
+          "coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active"}]
+        },
+        "code": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "44054006", "display": "Type 2 diabetes mellitus"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "cond-ckd-g1",
+        "clinicalStatus": {
+          "coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active"}]
+        },
+        "code": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "431855005", "display": "Chronic kidney disease stage 3"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "cond-lipid-g1",
+        "clinicalStatus": {
+          "coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active"}]
+        },
+        "code": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "55822004", "display": "Hyperlipidemia"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-metformin-g1",
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "861004", "display": "Metformin 1000 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "authoredOn": "2024-01-15",
+        "reasonReference": [{"reference": "Condition/cond-dm2-g1"}]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-lisinopril-g1",
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "314076", "display": "Lisinopril 20 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "authoredOn": "2024-03-01",
+        "reasonReference": [
+          {"reference": "Condition/cond-htn-g1"},
+          {"reference": "Condition/cond-ckd-g1"}
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-amlodipine-g1",
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "329528", "display": "Amlodipine 5 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "authoredOn": "2025-06-01",
+        "reasonReference": [{"reference": "Condition/cond-htn-g1"}]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-atorvastatin-g1",
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "259255", "display": "Atorvastatin 40 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "authoredOn": "2024-01-15",
+        "reasonReference": [{"reference": "Condition/cond-lipid-g1"}]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-glipizide-g1",
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "310490", "display": "Glipizide 5 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "authoredOn": "2025-01-10",
+        "reasonReference": [{"reference": "Condition/cond-dm2-g1"}]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-aspirin-g1",
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "243670", "display": "Aspirin 81 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "authoredOn": "2024-01-15"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-bp-g1-jan",
+        "status": "final",
+        "category": [
+          {
+            "coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "vital-signs", "display": "Vital Signs"}]
+          }
+        ],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "85354-9", "display": "Blood pressure panel"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "encounter": {"reference": "Encounter/encounter-2026-01"},
+        "effectiveDateTime": "2026-01-15T10:00:00Z",
+        "component": [
+          {
+            "code": {
+              "coding": [{"system": "http://loinc.org", "code": "8480-6", "display": "Systolic blood pressure"}]
+            },
+            "valueQuantity": {"value": 152, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          },
+          {
+            "code": {
+              "coding": [{"system": "http://loinc.org", "code": "8462-4", "display": "Diastolic blood pressure"}]
+            },
+            "valueQuantity": {"value": 94, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-hba1c-g1-jan",
+        "status": "final",
+        "category": [
+          {
+            "coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory", "display": "Laboratory"}]
+          }
+        ],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "4548-4", "display": "Hemoglobin A1c"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "encounter": {"reference": "Encounter/encounter-2026-01"},
+        "effectiveDateTime": "2026-01-15",
+        "valueQuantity": {"value": 8.2, "unit": "%", "system": "http://unitsofmeasure.org", "code": "%"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-creat-g1-jan",
+        "status": "final",
+        "category": [
+          {
+            "coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory", "display": "Laboratory"}]
+          }
+        ],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "2160-0", "display": "Creatinine"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "encounter": {"reference": "Encounter/encounter-2026-01"},
+        "effectiveDateTime": "2026-01-15",
+        "valueQuantity": {"value": 1.6, "unit": "mg/dL", "system": "http://unitsofmeasure.org", "code": "mg/dL"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-egfr-g1-jan",
+        "status": "final",
+        "category": [
+          {
+            "coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory", "display": "Laboratory"}]
+          }
+        ],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "33914-3", "display": "Estimated glomerular filtration rate"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "encounter": {"reference": "Encounter/encounter-2026-01"},
+        "effectiveDateTime": "2026-01-15",
+        "valueQuantity": {"value": 42, "unit": "mL/min/1.73m2", "system": "http://unitsofmeasure.org", "code": "mL/min/{1.73_m2}"},
+        "derivedFrom": [{"reference": "Observation/obs-creat-g1-jan"}]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-k-g1-jan",
+        "status": "final",
+        "category": [
+          {
+            "coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory", "display": "Laboratory"}]
+          }
+        ],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "2823-3", "display": "Potassium"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "encounter": {"reference": "Encounter/encounter-2026-01"},
+        "effectiveDateTime": "2026-01-15",
+        "valueQuantity": {"value": 4.5, "unit": "mEq/L", "system": "http://unitsofmeasure.org", "code": "meq/L"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-ldl-g1-jan",
+        "status": "final",
+        "category": [
+          {
+            "coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory", "display": "Laboratory"}]
+          }
+        ],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "2089-1", "display": "LDL Cholesterol"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "encounter": {"reference": "Encounter/encounter-2026-01"},
+        "effectiveDateTime": "2026-01-15",
+        "valueQuantity": {"value": 128, "unit": "mg/dL", "system": "http://unitsofmeasure.org", "code": "mg/dL"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-bp-g1-apr",
+        "status": "final",
+        "category": [
+          {
+            "coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "vital-signs", "display": "Vital Signs"}]
+          }
+        ],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "85354-9", "display": "Blood pressure panel"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "encounter": {"reference": "Encounter/encounter-2026-04"},
+        "effectiveDateTime": "2026-04-10T09:30:00Z",
+        "component": [
+          {
+            "code": {
+              "coding": [{"system": "http://loinc.org", "code": "8480-6", "display": "Systolic blood pressure"}]
+            },
+            "valueQuantity": {"value": 145, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          },
+          {
+            "code": {
+              "coding": [{"system": "http://loinc.org", "code": "8462-4", "display": "Diastolic blood pressure"}]
+            },
+            "valueQuantity": {"value": 90, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-hba1c-g1-apr",
+        "status": "final",
+        "category": [
+          {
+            "coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory", "display": "Laboratory"}]
+          }
+        ],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "4548-4", "display": "Hemoglobin A1c"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "encounter": {"reference": "Encounter/encounter-2026-04"},
+        "effectiveDateTime": "2026-04-10",
+        "valueQuantity": {"value": 7.6, "unit": "%", "system": "http://unitsofmeasure.org", "code": "%"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-creat-g1-apr",
+        "status": "final",
+        "category": [
+          {
+            "coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory", "display": "Laboratory"}]
+          }
+        ],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "2160-0", "display": "Creatinine"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "encounter": {"reference": "Encounter/encounter-2026-04"},
+        "effectiveDateTime": "2026-04-10",
+        "valueQuantity": {"value": 1.7, "unit": "mg/dL", "system": "http://unitsofmeasure.org", "code": "mg/dL"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-egfr-g1-apr",
+        "status": "final",
+        "category": [
+          {
+            "coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory", "display": "Laboratory"}]
+          }
+        ],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "33914-3", "display": "Estimated glomerular filtration rate"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "encounter": {"reference": "Encounter/encounter-2026-04"},
+        "effectiveDateTime": "2026-04-10",
+        "valueQuantity": {"value": 39, "unit": "mL/min/1.73m2", "system": "http://unitsofmeasure.org", "code": "mL/min/{1.73_m2}"},
+        "derivedFrom": [{"reference": "Observation/obs-creat-g1-apr"}]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-k-g1-apr",
+        "status": "final",
+        "category": [
+          {
+            "coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory", "display": "Laboratory"}]
+          }
+        ],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "2823-3", "display": "Potassium"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "encounter": {"reference": "Encounter/encounter-2026-04"},
+        "effectiveDateTime": "2026-04-10",
+        "valueQuantity": {"value": 4.8, "unit": "mEq/L", "system": "http://unitsofmeasure.org", "code": "meq/L"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "DiagnosticReport",
+        "id": "dr-bmp-g1-jan",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "51990-0", "display": "Basic metabolic panel"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "encounter": {"reference": "Encounter/encounter-2026-01"},
+        "effectiveDateTime": "2026-01-15",
+        "result": [
+          {"reference": "Observation/obs-creat-g1-jan"},
+          {"reference": "Observation/obs-k-g1-jan"},
+          {"reference": "Observation/obs-egfr-g1-jan"}
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "DiagnosticReport",
+        "id": "dr-bmp-g1-apr",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "51990-0", "display": "Basic metabolic panel"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "encounter": {"reference": "Encounter/encounter-2026-04"},
+        "effectiveDateTime": "2026-04-10",
+        "result": [
+          {"reference": "Observation/obs-creat-g1-apr"},
+          {"reference": "Observation/obs-k-g1-apr"},
+          {"reference": "Observation/obs-egfr-g1-apr"}
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Procedure",
+        "id": "proc-eye-exam-g1",
+        "status": "completed",
+        "code": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "36228007", "display": "Ophthalmic examination"}]
+        },
+        "subject": {"reference": "Patient/patient-graph-01"},
+        "performedDateTime": "2026-02-20",
+        "reasonReference": [{"reference": "Condition/cond-dm2-g1"}]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "AllergyIntolerance",
+        "id": "allergy-acei-g1",
+        "clinicalStatus": {
+          "coding": [{"system": "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical", "code": "active"}]
+        },
+        "criticality": "high",
+        "code": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "293963004", "display": "ACE inhibitor allergy"}]
+        },
+        "patient": {"reference": "Patient/patient-graph-01"}
+      }
+    }
+  ]
+}

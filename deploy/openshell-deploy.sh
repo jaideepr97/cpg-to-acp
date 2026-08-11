@@ -67,6 +67,9 @@ create_sandbox() {
         "app.kubernetes.io/instance=${k8s_instance_label}" \
         --overwrite 2>/dev/null
 
+    echo "  Exposing HTTP service..."
+    openshell service expose "$name" 8080 http 2>/dev/null || true
+
     echo "  Done: $name"
 }
 

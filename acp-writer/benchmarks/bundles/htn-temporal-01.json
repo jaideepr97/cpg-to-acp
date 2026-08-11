@@ -1,0 +1,217 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "patient-htn-01",
+        "name": [{"family": "Walker", "given": ["Thomas"]}],
+        "gender": "male",
+        "birthDate": "1971-03-15"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "condition-htn-01",
+        "clinicalStatus": {
+          "coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active"}]
+        },
+        "code": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "59621000", "display": "Essential hypertension"}]
+        },
+        "subject": {"reference": "Patient/patient-htn-01"},
+        "onsetDateTime": "2025-06-01"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-amlodipine-01",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "329528", "display": "Amlodipine 5 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-htn-01"},
+        "authoredOn": "2026-01-15"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "bp-2025-12-15",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "85354-9", "display": "Blood pressure panel"}]
+        },
+        "subject": {"reference": "Patient/patient-htn-01"},
+        "effectiveDateTime": "2025-12-15T10:30:00Z",
+        "component": [
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8480-6", "display": "Systolic blood pressure"}]},
+            "valueQuantity": {"value": 148, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          },
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8462-4", "display": "Diastolic blood pressure"}]},
+            "valueQuantity": {"value": 94, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "bp-2026-01-10",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "85354-9", "display": "Blood pressure panel"}]
+        },
+        "subject": {"reference": "Patient/patient-htn-01"},
+        "effectiveDateTime": "2026-01-10T09:15:00Z",
+        "component": [
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8480-6", "display": "Systolic blood pressure"}]},
+            "valueQuantity": {"value": 152, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          },
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8462-4", "display": "Diastolic blood pressure"}]},
+            "valueQuantity": {"value": 96, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "bp-2026-02-05",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "85354-9", "display": "Blood pressure panel"}]
+        },
+        "subject": {"reference": "Patient/patient-htn-01"},
+        "effectiveDateTime": "2026-02-05T14:00:00Z",
+        "component": [
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8480-6", "display": "Systolic blood pressure"}]},
+            "valueQuantity": {"value": 136, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          },
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8462-4", "display": "Diastolic blood pressure"}]},
+            "valueQuantity": {"value": 84, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "bp-2026-03-14",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "85354-9", "display": "Blood pressure panel"}]
+        },
+        "subject": {"reference": "Patient/patient-htn-01"},
+        "effectiveDateTime": "2026-03-14T11:45:00Z",
+        "component": [
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8480-6", "display": "Systolic blood pressure"}]},
+            "valueQuantity": {"value": 145, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          },
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8462-4", "display": "Diastolic blood pressure"}]},
+            "valueQuantity": {"value": 92, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "bp-2026-04-02",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "85354-9", "display": "Blood pressure panel"}]
+        },
+        "subject": {"reference": "Patient/patient-htn-01"},
+        "effectiveDateTime": "2026-04-02T08:30:00Z",
+        "component": [
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8480-6", "display": "Systolic blood pressure"}]},
+            "valueQuantity": {"value": 150, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          },
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8462-4", "display": "Diastolic blood pressure"}]},
+            "valueQuantity": {"value": 95, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "bp-2026-04-28",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "85354-9", "display": "Blood pressure panel"}]
+        },
+        "subject": {"reference": "Patient/patient-htn-01"},
+        "effectiveDateTime": "2026-04-28T16:20:00Z",
+        "component": [
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8480-6", "display": "Systolic blood pressure"}]},
+            "valueQuantity": {"value": 142, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          },
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8462-4", "display": "Diastolic blood pressure"}]},
+            "valueQuantity": {"value": 90, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "bp-2026-05-20",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "85354-9", "display": "Blood pressure panel"}]
+        },
+        "subject": {"reference": "Patient/patient-htn-01"},
+        "effectiveDateTime": "2026-05-20T13:00:00Z",
+        "component": [
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8480-6", "display": "Systolic blood pressure"}]},
+            "valueQuantity": {"value": 147, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          },
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8462-4", "display": "Diastolic blood pressure"}]},
+            "valueQuantity": {"value": 93, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "bp-2026-05-30",
+        "status": "final",
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "85354-9", "display": "Blood pressure panel"}]
+        },
+        "subject": {"reference": "Patient/patient-htn-01"},
+        "effectiveDateTime": "2026-05-30T10:00:00Z",
+        "component": [
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8480-6", "display": "Systolic blood pressure"}]},
+            "valueQuantity": {"value": 144, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          },
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8462-4", "display": "Diastolic blood pressure"}]},
+            "valueQuantity": {"value": 91, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          }
+        ]
+      }
+    }
+  ]
+}

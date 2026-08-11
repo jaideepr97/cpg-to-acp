@@ -1,0 +1,482 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "patient-complex-01",
+        "name": [{"family": "Thompson", "given": ["Robert"]}],
+        "gender": "male",
+        "birthDate": "1958-11-30"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "cond-htn",
+        "clinicalStatus": {
+          "coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active"}]
+        },
+        "code": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "59621000", "display": "Essential hypertension"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "cond-dm2",
+        "clinicalStatus": {
+          "coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active"}]
+        },
+        "code": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "44054006", "display": "Type 2 diabetes mellitus"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "cond-ckd",
+        "clinicalStatus": {
+          "coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active"}]
+        },
+        "code": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "431855005", "display": "Chronic kidney disease stage 3"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "cond-lipid",
+        "clinicalStatus": {
+          "coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active"}]
+        },
+        "code": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "55822004", "display": "Hyperlipidemia"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "cond-obesity",
+        "clinicalStatus": {
+          "coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active"}]
+        },
+        "code": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "414916001", "display": "Obesity"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "cond-oa",
+        "clinicalStatus": {
+          "coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active"}]
+        },
+        "code": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "239873007", "display": "Osteoarthritis of knee"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "AllergyIntolerance",
+        "id": "allergy-pcn",
+        "clinicalStatus": {
+          "coding": [{"system": "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical", "code": "active"}]
+        },
+        "code": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "91936005", "display": "Penicillin allergy"}]
+        },
+        "criticality": "high",
+        "patient": {"reference": "Patient/patient-complex-01"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "AllergyIntolerance",
+        "id": "allergy-codeine",
+        "clinicalStatus": {
+          "coding": [{"system": "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical", "code": "active"}]
+        },
+        "code": {
+          "coding": [{"system": "http://snomed.info/sct", "code": "387494007", "display": "Codeine"}]
+        },
+        "criticality": "low",
+        "patient": {"reference": "Patient/patient-complex-01"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-metformin",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "861004", "display": "Metformin 1000 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "authoredOn": "2023-01-15"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-lisinopril",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "314076", "display": "Lisinopril 20 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "authoredOn": "2023-03-01"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-amlodipine",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "329526", "display": "Amlodipine 10 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "authoredOn": "2024-06-01"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-atorvastatin",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "259255", "display": "Atorvastatin 40 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "authoredOn": "2023-01-15"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-aspirin",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "243670", "display": "Aspirin 81 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "authoredOn": "2023-01-15"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-omeprazole",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "198053", "display": "Omeprazole 20 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "authoredOn": "2024-01-10"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-gabapentin",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "310429", "display": "Gabapentin 300 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "authoredOn": "2025-02-20"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-glipizide",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "310490", "display": "Glipizide 5 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "authoredOn": "2024-09-01"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-hctz",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "310798", "display": "Hydrochlorothiazide 25 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "authoredOn": "2024-06-01"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "medrx-apap",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "198440", "display": "Acetaminophen 500 MG"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "authoredOn": "2025-06-01"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "bp-complex-01",
+        "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "vital-signs", "display": "Vital Signs"}]}],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "85354-9", "display": "Blood pressure panel"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "effectiveDateTime": "2026-04-15",
+        "component": [
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8480-6", "display": "Systolic blood pressure"}]},
+            "valueQuantity": {"value": 148, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          },
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8462-4", "display": "Diastolic blood pressure"}]},
+            "valueQuantity": {"value": 92, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "bp-complex-02",
+        "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "vital-signs", "display": "Vital Signs"}]}],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "85354-9", "display": "Blood pressure panel"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "effectiveDateTime": "2026-05-20",
+        "component": [
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8480-6", "display": "Systolic blood pressure"}]},
+            "valueQuantity": {"value": 145, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          },
+          {
+            "code": {"coding": [{"system": "http://loinc.org", "code": "8462-4", "display": "Diastolic blood pressure"}]},
+            "valueQuantity": {"value": 90, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-hr-01",
+        "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "vital-signs", "display": "Vital Signs"}]}],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "8867-4", "display": "Heart rate"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "effectiveDateTime": "2026-05-20",
+        "valueQuantity": {"value": 78, "unit": "/min", "system": "http://unitsofmeasure.org", "code": "/min"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-temp-01",
+        "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "vital-signs", "display": "Vital Signs"}]}],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "8310-5", "display": "Body temperature"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "effectiveDateTime": "2026-05-20",
+        "valueQuantity": {"value": 36.8, "unit": "Cel", "system": "http://unitsofmeasure.org", "code": "Cel"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-rr-01",
+        "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "vital-signs", "display": "Vital Signs"}]}],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "9279-1", "display": "Respiratory rate"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "effectiveDateTime": "2026-05-20",
+        "valueQuantity": {"value": 16, "unit": "/min", "system": "http://unitsofmeasure.org", "code": "/min"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-spo2-01",
+        "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "vital-signs", "display": "Vital Signs"}]}],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "2708-6", "display": "Oxygen saturation in Arterial blood"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "effectiveDateTime": "2026-05-20",
+        "valueQuantity": {"value": 97, "unit": "%", "system": "http://unitsofmeasure.org", "code": "%"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-weight-01",
+        "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "vital-signs", "display": "Vital Signs"}]}],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "29463-7", "display": "Body weight"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "effectiveDateTime": "2026-05-20",
+        "valueQuantity": {"value": 98.4, "unit": "kg", "system": "http://unitsofmeasure.org", "code": "kg"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-height-01",
+        "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "vital-signs", "display": "Vital Signs"}]}],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "8302-2", "display": "Body height"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "effectiveDateTime": "2026-01-10",
+        "valueQuantity": {"value": 175, "unit": "cm", "system": "http://unitsofmeasure.org", "code": "cm"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-hba1c-01",
+        "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory", "display": "Laboratory"}]}],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "4548-4", "display": "Hemoglobin A1c/Hemoglobin.total in Blood"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "effectiveDateTime": "2026-04-01",
+        "valueQuantity": {"value": 7.8, "unit": "%", "system": "http://unitsofmeasure.org", "code": "%"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-hba1c-02",
+        "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory", "display": "Laboratory"}]}],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "4548-4", "display": "Hemoglobin A1c/Hemoglobin.total in Blood"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "effectiveDateTime": "2026-01-05",
+        "valueQuantity": {"value": 8.1, "unit": "%", "system": "http://unitsofmeasure.org", "code": "%"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-egfr-01",
+        "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory", "display": "Laboratory"}]}],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "33914-3", "display": "Glomerular filtration rate/1.73 sq M.predicted"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "effectiveDateTime": "2026-04-01",
+        "valueQuantity": {"value": 48, "unit": "mL/min/1.73m2", "system": "http://unitsofmeasure.org", "code": "mL/min/{1.73_m2}"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-creat-01",
+        "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory", "display": "Laboratory"}]}],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "2160-0", "display": "Creatinine [Mass/volume] in Serum or Plasma"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "effectiveDateTime": "2026-04-01",
+        "valueQuantity": {"value": 1.5, "unit": "mg/dL", "system": "http://unitsofmeasure.org", "code": "mg/dL"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-k-01",
+        "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory", "display": "Laboratory"}]}],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "2823-3", "display": "Potassium [Moles/volume] in Serum or Plasma"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "effectiveDateTime": "2026-04-01",
+        "valueQuantity": {"value": 4.2, "unit": "mEq/L", "system": "http://unitsofmeasure.org", "code": "meq/L"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-fbg-01",
+        "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory", "display": "Laboratory"}]}],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "1558-6", "display": "Fasting glucose [Mass/volume] in Serum or Plasma"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "effectiveDateTime": "2026-04-01",
+        "valueQuantity": {"value": 142, "unit": "mg/dL", "system": "http://unitsofmeasure.org", "code": "mg/dL"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-ldl-01",
+        "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory", "display": "Laboratory"}]}],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "2089-1", "display": "LDL Cholesterol"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "effectiveDateTime": "2026-03-15",
+        "valueQuantity": {"value": 118, "unit": "mg/dL", "system": "http://unitsofmeasure.org", "code": "mg/dL"}
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-bmp-01",
+        "status": "final",
+        "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "laboratory", "display": "Laboratory"}]}],
+        "code": {
+          "coding": [{"system": "http://loinc.org", "code": "51990-0", "display": "Basic metabolic panel - Blood"}]
+        },
+        "subject": {"reference": "Patient/patient-complex-01"},
+        "effectiveDateTime": "2023-03-10T08:00:00Z"
+      }
+    }
+  ]
+}

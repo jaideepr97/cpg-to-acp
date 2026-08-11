@@ -56,13 +56,19 @@ def _parse_dmn_metadata(dmn_xml: str) -> DecisionModelSummary:
     model_name = root.get("name", "unknown")
     model_id = model_name.lower().replace(" ", "-")
 
+    from acp_writer.api import _extract_codes, _extract_description
+
     inputs = []
     for input_data in root.findall(f"{{{DMN_NS}}}inputData"):
         var = input_data.find(f"{{{DMN_NS}}}variable")
         if var is not None:
+            codes = _extract_codes(input_data)
+            desc = _extract_description(input_data)
             inputs.append(DecisionVariable(
                 name=var.get("name", ""),
                 type=var.get("typeRef", "string"),
+                codes=codes or None,
+                description=desc,
             ))
 
     outputs = []

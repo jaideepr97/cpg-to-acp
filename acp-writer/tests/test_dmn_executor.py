@@ -78,6 +78,71 @@ class TestExtractInputValue:
         value, ref = _extract_input_value({"entry": []}, "Unknown Variable", "string", {})
         assert value is None
 
+    def test_extract_via_codes_observation(self):
+        bundle = _load_bundle("patient-bundle-medication.json")
+        codes = [f"{LOINC}|8480-6"]
+        value, ref = _extract_input_value(
+            bundle, "SBP Reading", "number", {}, codes=codes
+        )
+        assert value == 142
+
+    def test_extract_via_codes_condition(self):
+        bundle = _load_bundle("patient-bundle-medication.json")
+        codes = [f"{SNOMED}|44054006"]
+        value, ref = _extract_input_value(
+            bundle, "Diabetes Present", "boolean", {}, codes=codes
+        )
+        assert value is True
+
+    def test_codes_take_priority_over_map(self):
+        """When codes are provided, they are used even if the name matches the map."""
+        bundle = _load_bundle("patient-bundle-medication.json")
+        codes = [f"{LOINC}|8462-4"]
+        value, ref = _extract_input_value(
+            bundle, "Systolic BP", "number", {}, codes=codes
+        )
+        assert value == 92
+
+    def test_codes_none_falls_back_to_map(self):
+        bundle = _load_bundle("patient-bundle-medication.json")
+        value, ref = _extract_input_value(
+            bundle, "Systolic BP", "number", {}, codes=None
+        )
+        assert value == 142
+
+    def test_concept_resolver_hba1c(self):
+        """Concept resolver resolves 'HbA1c Value' without codes or map entry."""
+        bundle = _load_bundle("patient-bundle-medication.json")
+        # HbA1c is NOT in KNOWN_VARIABLE_MAP but IS in concept_resolver
+        value, ref = _extract_input_value(bundle, "HbA1c Value", "number", {})
+        # patient-bundle-medication doesn't have HbA1c, so value should be None
+        assert value is None
+
+    def test_concept_resolver_condition(self):
+        """Concept resolver resolves 'hypertension' to a condition check."""
+        bundle = _load_bundle("patient-bundle-medication.json")
+        value, ref = _extract_input_value(bundle, "Has Hypertension", "boolean", {})
+        assert value is True
+
+    def test_concept_resolver_drug_class(self):
+        """Concept resolver handles drug class queries."""
+        bundle = {
+            "entry": [{
+                "resource": {
+                    "resourceType": "MedicationRequest",
+                    "id": "mr1",
+                    "status": "active",
+                    "medicationCodeableConcept": {
+                        "coding": [{"system": SNOMED, "code": "314076", "display": "Lisinopril"}],
+                    },
+                },
+            }],
+        }
+        # Lisinopril is NOT coded with RxNorm here, so drug class won't match
+        # But this tests that the resolver path doesn't crash
+        value, ref = _extract_input_value(bundle, "Current ACE Inhibitor", "boolean", {})
+        assert value is not None  # Either True (found) or False (not found)
+
 
 class TestDMNExecutor:
     def test_no_models(self):

@@ -83,6 +83,49 @@ def _check_kogito() -> bool:
         return False
 
 
+import re as _re
+
+_CODE_TOKEN_RE = _re.compile(r"(https?://[^\s|]+)\|(\S+)")
+
+
+def _extract_codes(input_data_el: ET.Element) -> list[str]:
+    """Extract clinical codes from a DMN inputData element.
+
+    Looks for codes in two places (in order):
+    1. extensionElements with code annotations (future cpg-ingester output)
+    2. Structured code tokens in the description element text
+
+    Code format: "system-url|code" (e.g. "http://loinc.org|8480-6").
+    """
+    codes: list[str] = []
+
+    ext = input_data_el.find(f"{{{DMN_NS}}}extensionElements")
+    if ext is not None:
+        for child in ext:
+            system = child.get("system", "")
+            code = child.get("code", "")
+            if system and code:
+                codes.append(f"{system}|{code}")
+            elif child.text:
+                codes.extend(_CODE_TOKEN_RE.findall(child.text))
+
+    if not codes:
+        desc_el = input_data_el.find(f"{{{DMN_NS}}}description")
+        if desc_el is not None and desc_el.text:
+            for system, code in _CODE_TOKEN_RE.findall(desc_el.text):
+                codes.append(f"{system}|{code}")
+
+    return codes
+
+
+def _extract_description(input_data_el: ET.Element) -> str | None:
+    """Extract description text from a DMN inputData element."""
+    desc_el = input_data_el.find(f"{{{DMN_NS}}}description")
+    if desc_el is not None and desc_el.text:
+        return desc_el.text.strip()
+    return None
+
+
 def _parse_dmn_metadata(dmn_xml: str) -> DecisionModelSummary:
     """Extract model name, inputs, and outputs from DMN XML."""
     root = ET.fromstring(dmn_xml)
@@ -94,9 +137,13 @@ def _parse_dmn_metadata(dmn_xml: str) -> DecisionModelSummary:
     for input_data in root.findall(f"{{{DMN_NS}}}inputData"):
         var = input_data.find(f"{{{DMN_NS}}}variable")
         if var is not None:
+            codes = _extract_codes(input_data)
+            desc = _extract_description(input_data)
             inputs.append(DecisionVariable(
                 name=var.get("name", ""),
                 type=var.get("typeRef", "string"),
+                codes=codes or None,
+                description=desc,
             ))
 
     if not inputs:

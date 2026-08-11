@@ -9,7 +9,7 @@ Two-phase LangGraph pipeline:
 **Phase 1 — Clinical Reasoning:**
 1. **Condition Scanner** — Extract patient conditions, medications, allergies from IPS (deterministic)
 2. **Guideline Resolver** — Match conditions to registered CPGs and DMN models
-3. **DMN Executor** — Evaluate decision models with targeted IPS extraction
+3. **DMN Executor** — Evaluate decision models with layered patient data extraction (see [Clinical Data QA](../docs/clinical-data-qa.md))
 4. **Recommendation Retriever** — Search vector store for applicable recommendations
 5. **Plan Composer** — LLM maps decisions + recommendations → Planning Brief
 6. **Brief Reviewer** — Adversarial LLM review (clinical pharmacist persona, max 2 loops)
@@ -92,6 +92,31 @@ Every care plan bundle includes:
 - **AI-Provenance** with CPG derivation lineage
 - **Per-activity Provenance** linking to source recommendations
 - On approval: AIAST → CLINAST_AIRPT, clinician added as verifier
+
+## Clinical Data Extraction
+
+The DMN Executor extracts patient data from FHIR IPS bundles using a layered resolution strategy:
+
+1. **Prior DMN results** — chained decision outputs
+2. **DecisionVariable.codes** — terminology codes from DMN metadata (when cpg-ingester provides them)
+3. **Concept resolver** — deterministic mapping of 60+ observation terms, 20+ conditions, drug classes, and computed values (age, BMI) to FHIR codes
+4. **KNOWN_VARIABLE_MAP** — legacy 6-entry hardcoded fallback
+
+Temporal queries (time-windowed counts, consecutive readings, rate of change) are handled by named primitives in `tools/temporal_queries.py`.
+
+See [Clinical Data QA](../docs/clinical-data-qa.md) for the full architecture.
+
+### Benchmarking
+
+```bash
+# 50-question smoke suite
+python -m acp_writer.benchmark run --suite smoke --backend current --no-mlflow
+
+# 200-question standard suite
+python -m acp_writer.benchmark run --suite standard --backend current --no-mlflow
+```
+
+See `benchmarks/README.md` for details.
 
 ## Observability
 

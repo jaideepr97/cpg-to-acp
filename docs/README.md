@@ -8,5 +8,7 @@ User-facing documentation for the CPG-to-Actionable Care Plans system.
 | [Tool Governance with MCP Gateway](mcp-gateway-tool-governance.md) | How MCP Gateway governs AI agent tool access with aggregation, prefixing, and virtual servers |
 | [API Gateway](api-gateway.md) | How the API gateway unifies pod-split services behind a single URL with path-based routing |
 | [Workflow Orchestration with SonataFlow](sonataflow-orchestration.md) | How SonataFlow orchestrates the pipelines, async callback patterns, and MinIO-based state transfer |
+| [Adversarial Review Pattern](adversarial-review-pattern.md) | How agents check agents — the adversarial review architecture across both pipelines |
+| [Clinical Data Question Answering](clinical-data-qa.md) | How acp-writer extracts patient data from FHIR IPS bundles — layered resolution, temporal primitives, benchmarking |
 
 For internal development documentation (design docs, spikes, project plan), see [`dev_docs/`](../dev_docs/).

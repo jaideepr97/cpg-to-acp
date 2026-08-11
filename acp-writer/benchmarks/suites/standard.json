@@ -1,0 +1,3898 @@
+[
+  {
+    "id": "std-lookup-001",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's most recent systolic blood pressure?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|8480-6"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 144
+    },
+    "expected_provenance": [
+      "Observation/bp-2026-05-30"
+    ]
+  },
+  {
+    "id": "std-lookup-002",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's most recent diastolic blood pressure?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|8462-4"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 91
+    },
+    "expected_provenance": [
+      "Observation/bp-2026-05-30"
+    ]
+  },
+  {
+    "id": "std-lookup-003",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's heart rate?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|8867-4"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 78
+    },
+    "expected_provenance": [
+      "Observation/obs-hr-01"
+    ]
+  },
+  {
+    "id": "std-lookup-004",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's body temperature?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|8310-5"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 36.8
+    },
+    "expected_provenance": [
+      "Observation/obs-temp-01"
+    ]
+  },
+  {
+    "id": "std-lookup-005",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's body weight?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|29463-7"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 98.4
+    },
+    "expected_provenance": [
+      "Observation/obs-weight-01"
+    ]
+  },
+  {
+    "id": "std-lookup-006",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's height?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|8302-2"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 175
+    },
+    "expected_provenance": [
+      "Observation/obs-height-01"
+    ]
+  },
+  {
+    "id": "std-lookup-007",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's most recent HbA1c?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|4548-4"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 7.8
+    },
+    "expected_provenance": [
+      "Observation/obs-hba1c-01"
+    ]
+  },
+  {
+    "id": "std-lookup-008",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's most recent eGFR?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|33914-3"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 40
+    },
+    "expected_provenance": [
+      "Observation/egfr-2026-05-28"
+    ]
+  },
+  {
+    "id": "std-lookup-009",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's most recent serum creatinine?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|2160-0"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 1.6
+    },
+    "expected_provenance": [
+      "Observation/creat-2026-05-28"
+    ]
+  },
+  {
+    "id": "std-lookup-010",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's serum potassium?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|2823-3"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 4.2
+    },
+    "expected_provenance": [
+      "Observation/obs-k-01"
+    ]
+  },
+  {
+    "id": "std-lookup-011",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's fasting blood glucose?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|1558-6"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 142
+    },
+    "expected_provenance": [
+      "Observation/obs-fbg-01"
+    ]
+  },
+  {
+    "id": "std-lookup-012",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's LDL cholesterol?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|2089-1"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 118
+    },
+    "expected_provenance": [
+      "Observation/obs-ldl-01"
+    ]
+  },
+  {
+    "id": "std-lookup-013",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's most recent BNP level?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|30934-4"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 380
+    },
+    "expected_provenance": [
+      "Observation/obs-bnp-g2-may"
+    ]
+  },
+  {
+    "id": "std-lookup-014",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's left ventricular ejection fraction?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|10230-1"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 35
+    },
+    "expected_provenance": [
+      "Observation/obs-ef-g2-feb"
+    ]
+  },
+  {
+    "id": "std-lookup-015",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's oxygen saturation?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|2708-6"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 97
+    },
+    "expected_provenance": [
+      "Observation/obs-spo2-01"
+    ]
+  },
+  {
+    "id": "std-lookup-016",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's most recent urine albumin-to-creatinine ratio?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|9318-7"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 58
+    },
+    "expected_provenance": [
+      "Observation/uacr-2026-05-28"
+    ]
+  },
+  {
+    "id": "std-lookup-017",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's most recent systolic blood pressure?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|8480-6"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 145
+    },
+    "expected_provenance": [
+      "Observation/obs-bp-g1-apr"
+    ]
+  },
+  {
+    "id": "std-lookup-018",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's most recent diastolic blood pressure?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|8462-4"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 90
+    },
+    "expected_provenance": [
+      "Observation/obs-bp-g1-apr"
+    ]
+  },
+  {
+    "id": "std-lookup-019",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's most recent heart rate?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|8867-4"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 72
+    },
+    "expected_provenance": [
+      "Observation/obs-hr-g2-may"
+    ]
+  },
+  {
+    "id": "std-lookup-020",
+    "category": "lookup",
+    "level": 1,
+    "question": "What is the patient's respiratory rate?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|9279-1"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 16
+    },
+    "expected_provenance": [
+      "Observation/obs-rr-01"
+    ]
+  },
+  {
+    "id": "std-boolean-001",
+    "category": "boolean",
+    "level": 1,
+    "question": "Does the patient have an active hypertension diagnosis?",
+    "structured_intent": {
+      "function": "has_condition",
+      "params": {
+        "code": "http://snomed.info/sct|59621000"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "Condition/condition-htn-01"
+    ]
+  },
+  {
+    "id": "std-boolean-002",
+    "category": "boolean",
+    "level": 1,
+    "question": "Does the patient have type 2 diabetes mellitus?",
+    "structured_intent": {
+      "function": "has_condition",
+      "params": {
+        "code": "http://snomed.info/sct|44054006"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "Condition/condition-t2dm-01"
+    ]
+  },
+  {
+    "id": "std-boolean-003",
+    "category": "boolean",
+    "level": 1,
+    "question": "Does the patient have chronic kidney disease?",
+    "structured_intent": {
+      "function": "has_condition",
+      "params": {
+        "code": "http://snomed.info/sct|431855005"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "Condition/cond-ckd"
+    ]
+  },
+  {
+    "id": "std-boolean-004",
+    "category": "boolean",
+    "level": 1,
+    "question": "Does the patient have a penicillin allergy?",
+    "structured_intent": {
+      "function": "has_allergy",
+      "params": {
+        "code": "http://snomed.info/sct|91936005"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "AllergyIntolerance/allergy-pcn"
+    ]
+  },
+  {
+    "id": "std-boolean-005",
+    "category": "boolean",
+    "level": 1,
+    "question": "Does the patient have a codeine allergy?",
+    "structured_intent": {
+      "function": "has_allergy",
+      "params": {
+        "code": "http://snomed.info/sct|387494007"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "AllergyIntolerance/allergy-codeine"
+    ]
+  },
+  {
+    "id": "std-boolean-006",
+    "category": "boolean",
+    "level": 1,
+    "question": "Is the patient currently prescribed metformin?",
+    "structured_intent": {
+      "function": "has_medication",
+      "params": {
+        "code": "http://www.nlm.nih.gov/research/umls/rxnorm|861004"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-metformin-01"
+    ]
+  },
+  {
+    "id": "std-boolean-007",
+    "category": "boolean",
+    "level": 1,
+    "question": "Is the patient currently prescribed amlodipine?",
+    "structured_intent": {
+      "function": "has_medication",
+      "params": {
+        "code": "http://www.nlm.nih.gov/research/umls/rxnorm|329528"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-amlodipine-01"
+    ]
+  },
+  {
+    "id": "std-boolean-008",
+    "category": "boolean",
+    "level": 1,
+    "question": "Does the patient have heart failure with reduced ejection fraction?",
+    "structured_intent": {
+      "function": "has_condition",
+      "params": {
+        "code": "http://snomed.info/sct|441530006"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "Condition/cond-hfref-g2"
+    ]
+  },
+  {
+    "id": "std-boolean-009",
+    "category": "boolean",
+    "level": 1,
+    "question": "Does the patient have atrial fibrillation?",
+    "structured_intent": {
+      "function": "has_condition",
+      "params": {
+        "code": "http://snomed.info/sct|49436004"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "Condition/cond-afib-g2"
+    ]
+  },
+  {
+    "id": "std-boolean-010",
+    "category": "boolean",
+    "level": 1,
+    "question": "Does the patient have chronic obstructive pulmonary disease?",
+    "structured_intent": {
+      "function": "has_condition",
+      "params": {
+        "code": "http://snomed.info/sct|13645005"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "Condition/cond-copd-g2"
+    ]
+  },
+  {
+    "id": "std-boolean-011",
+    "category": "boolean",
+    "level": 1,
+    "question": "Does the patient have an active heart failure diagnosis?",
+    "structured_intent": {
+      "function": "has_condition",
+      "params": {
+        "code": "http://snomed.info/sct|84114007"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-boolean-012",
+    "category": "boolean",
+    "level": 1,
+    "question": "Is the patient currently on warfarin?",
+    "structured_intent": {
+      "function": "has_medication",
+      "params": {
+        "code": "http://www.nlm.nih.gov/research/umls/rxnorm|11289"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-boolean-013",
+    "category": "boolean",
+    "level": 1,
+    "question": "Does the patient have a sulfonamide allergy?",
+    "structured_intent": {
+      "function": "has_allergy",
+      "params": {
+        "code": "http://snomed.info/sct|91939002"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "AllergyIntolerance/allergy-sulfa-g2"
+    ]
+  },
+  {
+    "id": "std-boolean-014",
+    "category": "boolean",
+    "level": 1,
+    "question": "Does the patient have an ACE inhibitor allergy?",
+    "structured_intent": {
+      "function": "has_allergy",
+      "params": {
+        "code": "http://snomed.info/sct|293963004"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "AllergyIntolerance/allergy-acei-g1"
+    ]
+  },
+  {
+    "id": "std-boolean-015",
+    "category": "boolean",
+    "level": 1,
+    "question": "Is the patient currently on insulin?",
+    "structured_intent": {
+      "function": "has_medication",
+      "params": {
+        "code": "http://www.nlm.nih.gov/research/umls/rxnorm|311036"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-bridging-001",
+    "category": "bridging",
+    "level": 2,
+    "question": "HbA1c Value",
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 7.6
+    },
+    "expected_provenance": [
+      "Observation/obs-hba1c-g1-apr"
+    ]
+  },
+  {
+    "id": "std-bridging-002",
+    "category": "bridging",
+    "level": 2,
+    "question": "Patient Age",
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 72
+    }
+  },
+  {
+    "id": "std-bridging-003",
+    "category": "bridging",
+    "level": 2,
+    "question": "Blood Sugar Level",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 142
+    },
+    "expected_provenance": [
+      "Observation/obs-fbg-01"
+    ]
+  },
+  {
+    "id": "std-bridging-004",
+    "category": "bridging",
+    "level": 2,
+    "question": "Heart Rate",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 72
+    },
+    "expected_provenance": [
+      "Observation/obs-hr-g2-may"
+    ]
+  },
+  {
+    "id": "std-bridging-005",
+    "category": "bridging",
+    "level": 2,
+    "question": "What is the patient's ejection fraction?",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 35
+    },
+    "expected_provenance": [
+      "Observation/obs-ef-g2-feb"
+    ]
+  },
+  {
+    "id": "std-bridging-006",
+    "category": "bridging",
+    "level": 2,
+    "question": "Smoking Status",
+    "bundle": "bundles/edge-coded-values.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": "449868002"
+    },
+    "expected_provenance": [
+      "Observation/obs-smoking-01"
+    ]
+  },
+  {
+    "id": "std-bridging-007",
+    "category": "bridging",
+    "level": 2,
+    "question": "Does the patient have COPD?",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "Condition/cond-copd-g2"
+    ]
+  },
+  {
+    "id": "std-bridging-008",
+    "category": "bridging",
+    "level": 2,
+    "question": "Is the patient on a beta-blocker?",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-metoprolol-g2"
+    ]
+  },
+  {
+    "id": "std-bridging-009",
+    "category": "bridging",
+    "level": 2,
+    "question": "Kidney Function",
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 40
+    },
+    "expected_provenance": [
+      "Observation/egfr-2026-05-28"
+    ]
+  },
+  {
+    "id": "std-bridging-010",
+    "category": "bridging",
+    "level": 2,
+    "question": "Systolic BP",
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 145
+    },
+    "expected_provenance": [
+      "Observation/obs-bp-g1-apr"
+    ]
+  },
+  {
+    "id": "std-bridging-011",
+    "category": "bridging",
+    "level": 2,
+    "question": "What is the patient's weight?",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 88
+    },
+    "expected_provenance": [
+      "Observation/obs-weight-g2-may"
+    ]
+  },
+  {
+    "id": "std-bridging-012",
+    "category": "bridging",
+    "level": 2,
+    "question": "LDL Cholesterol",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 118
+    },
+    "expected_provenance": [
+      "Observation/obs-ldl-01"
+    ]
+  },
+  {
+    "id": "std-bridging-013",
+    "category": "bridging",
+    "level": 2,
+    "question": "Diastolic BP",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 80
+    },
+    "expected_provenance": [
+      "Observation/obs-bp-g2-may"
+    ]
+  },
+  {
+    "id": "std-bridging-014",
+    "category": "bridging",
+    "level": 2,
+    "question": "What is the patient's potassium level?",
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 4.8
+    },
+    "expected_provenance": [
+      "Observation/obs-k-g1-apr"
+    ]
+  },
+  {
+    "id": "std-bridging-015",
+    "category": "bridging",
+    "level": 2,
+    "question": "Creatinine Level",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 1.4
+    },
+    "expected_provenance": [
+      "Observation/obs-creat-g2-may"
+    ]
+  },
+  {
+    "id": "std-drugclass-001",
+    "category": "drug_class",
+    "level": 3,
+    "question": "Is the patient currently on any ACE inhibitor?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-lisinopril"
+    ]
+  },
+  {
+    "id": "std-drugclass-002",
+    "category": "drug_class",
+    "level": 3,
+    "question": "Is the patient currently on any statin medication?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-atorvastatin"
+    ]
+  },
+  {
+    "id": "std-drugclass-003",
+    "category": "drug_class",
+    "level": 3,
+    "question": "Is the patient currently on any calcium channel blocker?",
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-amlodipine-01"
+    ]
+  },
+  {
+    "id": "std-drugclass-004",
+    "category": "drug_class",
+    "level": 3,
+    "question": "Is the patient currently on any beta-blocker?",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-metoprolol-g2"
+    ]
+  },
+  {
+    "id": "std-drugclass-005",
+    "category": "drug_class",
+    "level": 3,
+    "question": "Is the patient currently on any anticoagulant?",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-apixaban-g2"
+    ]
+  },
+  {
+    "id": "std-drugclass-006",
+    "category": "drug_class",
+    "level": 3,
+    "question": "Is the patient currently on any diuretic?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-hctz"
+    ]
+  },
+  {
+    "id": "std-drugclass-007",
+    "category": "drug_class",
+    "level": 3,
+    "question": "Is the patient currently on any beta-blocker?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-drugclass-008",
+    "category": "drug_class",
+    "level": 3,
+    "question": "Is the patient currently on any anticoagulant?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-drugclass-009",
+    "category": "drug_class",
+    "level": 3,
+    "question": "Is the patient currently on any sulfonylurea?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-glipizide"
+    ]
+  },
+  {
+    "id": "std-drugclass-010",
+    "category": "drug_class",
+    "level": 3,
+    "question": "Is the patient currently on any insulin?",
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-derived-001",
+    "category": "derived",
+    "level": 3,
+    "question": "What is the patient's BMI?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 32.1
+    },
+    "expected_provenance": [
+      "Observation/obs-weight-01",
+      "Observation/obs-height-01"
+    ]
+  },
+  {
+    "id": "std-derived-002",
+    "category": "derived",
+    "level": 3,
+    "question": "What is the patient's age?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 67
+    }
+  },
+  {
+    "id": "std-derived-003",
+    "category": "derived",
+    "level": 3,
+    "question": "What is the patient's age?",
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 55
+    }
+  },
+  {
+    "id": "std-derived-004",
+    "category": "derived",
+    "level": 3,
+    "question": "What is the patient's urine albumin-to-creatinine ratio category (A1/A2/A3)?",
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": "A2"
+    },
+    "expected_provenance": [
+      "Observation/uacr-2026-05-28"
+    ]
+  },
+  {
+    "id": "std-derived-005",
+    "category": "derived",
+    "level": 3,
+    "question": "What is the patient's age?",
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 72
+    }
+  },
+  {
+    "id": "std-derived-006",
+    "category": "derived",
+    "level": 3,
+    "question": "What is the patient's age?",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 64
+    }
+  },
+  {
+    "id": "std-derived-007",
+    "category": "derived",
+    "level": 3,
+    "question": "What is the patient's age?",
+    "bundle": "bundles/edge-missing-dates.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 44
+    }
+  },
+  {
+    "id": "std-derived-008",
+    "category": "derived",
+    "level": 3,
+    "question": "What is the patient's age?",
+    "bundle": "bundles/edge-coded-values.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 60
+    }
+  },
+  {
+    "id": "std-derived-009",
+    "category": "derived",
+    "level": 3,
+    "question": "Based on the most recent eGFR, what is the patient's CKD stage (G1/G2/G3a/G3b/G4/G5)?",
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": "G3b"
+    },
+    "expected_provenance": [
+      "Observation/egfr-2026-05-28"
+    ]
+  },
+  {
+    "id": "std-derived-010",
+    "category": "derived",
+    "level": 3,
+    "question": "How many active medications is the patient currently prescribed?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 10
+    }
+  },
+  {
+    "id": "std-temporal-001",
+    "category": "temporal",
+    "level": 4,
+    "question": "How many systolic BP readings >= 140 mmHg in the 3 months before the reference date?",
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|8480-6",
+        "duration": "P3M",
+        "threshold": 140,
+        "comparator": "ge"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 5
+    },
+    "expected_provenance": [
+      "Observation/bp-2026-03-14",
+      "Observation/bp-2026-04-02",
+      "Observation/bp-2026-04-28",
+      "Observation/bp-2026-05-20",
+      "Observation/bp-2026-05-30"
+    ]
+  },
+  {
+    "id": "std-temporal-002",
+    "category": "temporal",
+    "level": 4,
+    "question": "How many consecutive systolic BP readings above 140 from the most recent backward?",
+    "structured_intent": {
+      "function": "consecutive_above",
+      "params": {
+        "code": "http://loinc.org|8480-6",
+        "threshold": 140
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 5
+    }
+  },
+  {
+    "id": "std-temporal-003",
+    "category": "temporal",
+    "level": 4,
+    "question": "What is the eGFR rate of change over the past year (mL/min/1.73m2 per year)?",
+    "structured_intent": {
+      "function": "rate_of_change",
+      "params": {
+        "code": "http://loinc.org|33914-3",
+        "duration": "P1Y"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": -8.0
+    }
+  },
+  {
+    "id": "std-temporal-004",
+    "category": "temporal",
+    "level": 4,
+    "question": "How many blood pressure readings are recorded in the past 6 months?",
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|85354-9",
+        "duration": "P6M"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 8
+    }
+  },
+  {
+    "id": "std-temporal-005",
+    "category": "temporal",
+    "level": 4,
+    "question": "How many eGFR measurements are in the past year?",
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|33914-3",
+        "duration": "P1Y"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 5
+    }
+  },
+  {
+    "id": "std-temporal-006",
+    "category": "temporal",
+    "level": 4,
+    "question": "Is the patient's most recent eGFR lower than the one before it?",
+    "structured_intent": {
+      "function": "trend_declining",
+      "params": {
+        "code": "http://loinc.org|33914-3"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-temporal-007",
+    "category": "temporal",
+    "level": 4,
+    "question": "How many systolic BP readings >= 140 mmHg in the past 12 months?",
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|8480-6",
+        "duration": "P12M",
+        "threshold": 140,
+        "comparator": "ge"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 7
+    }
+  },
+  {
+    "id": "std-temporal-008",
+    "category": "temporal",
+    "level": 4,
+    "question": "How many diastolic BP readings >= 90 mmHg in the past 6 months?",
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|8462-4",
+        "duration": "P6M",
+        "threshold": 90,
+        "comparator": "ge"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 7
+    },
+    "expected_provenance": [
+      "Observation/bp-2025-12-15",
+      "Observation/bp-2026-01-10",
+      "Observation/bp-2026-03-14",
+      "Observation/bp-2026-04-02",
+      "Observation/bp-2026-04-28",
+      "Observation/bp-2026-05-20",
+      "Observation/bp-2026-05-30"
+    ]
+  },
+  {
+    "id": "std-temporal-009",
+    "category": "temporal",
+    "level": 4,
+    "question": "How many UACR measurements are in the past year?",
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|9318-7",
+        "duration": "P1Y"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 2
+    },
+    "expected_provenance": [
+      "Observation/uacr-2025-07-20",
+      "Observation/uacr-2026-05-28"
+    ]
+  },
+  {
+    "id": "std-temporal-010",
+    "category": "temporal",
+    "level": 4,
+    "question": "How many creatinine measurements are in the past year?",
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|2160-0",
+        "duration": "P1Y"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 2
+    },
+    "expected_provenance": [
+      "Observation/creat-2025-07-20",
+      "Observation/creat-2026-05-28"
+    ]
+  },
+  {
+    "id": "std-temporal-011",
+    "category": "temporal",
+    "level": 4,
+    "question": "Is the patient's most recent UACR higher than the one before it?",
+    "structured_intent": {
+      "function": "trend_increasing",
+      "params": {
+        "code": "http://loinc.org|9318-7"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-temporal-012",
+    "category": "temporal",
+    "level": 4,
+    "question": "Is the patient's most recent creatinine higher than the one before it?",
+    "structured_intent": {
+      "function": "trend_increasing",
+      "params": {
+        "code": "http://loinc.org|2160-0"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-temporal-013",
+    "category": "temporal",
+    "level": 4,
+    "question": "How many systolic BP readings below 140 mmHg in the past 6 months?",
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|8480-6",
+        "duration": "P6M",
+        "threshold": 140,
+        "comparator": "lt"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 1
+    },
+    "expected_provenance": [
+      "Observation/bp-2026-02-05"
+    ]
+  },
+  {
+    "id": "std-temporal-014",
+    "category": "temporal",
+    "level": 4,
+    "question": "How many eGFR readings below 45 mL/min/1.73m2 in the past year?",
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|33914-3",
+        "duration": "P1Y",
+        "threshold": 45,
+        "comparator": "lt"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 3
+    },
+    "expected_provenance": [
+      "Observation/egfr-2026-01-12",
+      "Observation/egfr-2026-04-18",
+      "Observation/egfr-2026-05-28"
+    ]
+  },
+  {
+    "id": "std-temporal-015",
+    "category": "temporal",
+    "level": 4,
+    "question": "How many consecutive eGFR readings below 45 from the most recent backward?",
+    "structured_intent": {
+      "function": "consecutive_below",
+      "params": {
+        "code": "http://loinc.org|33914-3",
+        "threshold": 45
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 3
+    }
+  },
+  {
+    "id": "std-temporal-016",
+    "category": "temporal",
+    "level": 4,
+    "question": "Is the patient's most recent systolic BP lower than the one before it?",
+    "structured_intent": {
+      "function": "trend_declining",
+      "params": {
+        "code": "http://loinc.org|8480-6"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-temporal-017",
+    "category": "temporal",
+    "level": 4,
+    "question": "How many systolic BP readings >= 150 mmHg in the past 6 months?",
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|8480-6",
+        "duration": "P6M",
+        "threshold": 150,
+        "comparator": "ge"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 2
+    },
+    "expected_provenance": [
+      "Observation/bp-2026-01-10",
+      "Observation/bp-2026-04-02"
+    ]
+  },
+  {
+    "id": "std-temporal-018",
+    "category": "temporal",
+    "level": 4,
+    "question": "How many BNP measurements are recorded in the past 6 months?",
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|30934-4",
+        "duration": "P6M"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 2
+    },
+    "expected_provenance": [
+      "Observation/obs-bnp-g2-feb",
+      "Observation/obs-bnp-g2-may"
+    ]
+  },
+  {
+    "id": "std-temporal-019",
+    "category": "temporal",
+    "level": 4,
+    "question": "Is the patient's most recent BNP lower than the one before it?",
+    "structured_intent": {
+      "function": "trend_declining",
+      "params": {
+        "code": "http://loinc.org|30934-4"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-temporal-020",
+    "category": "temporal",
+    "level": 4,
+    "question": "How many heart rate measurements are recorded in the past 6 months?",
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|8867-4",
+        "duration": "P6M"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 2
+    },
+    "expected_provenance": [
+      "Observation/obs-hr-g2-feb",
+      "Observation/obs-hr-g2-may"
+    ]
+  },
+  {
+    "id": "std-cross-001",
+    "category": "cross_resource_temporal",
+    "level": 4,
+    "question": "Was a basic metabolic panel obtained within 2 weeks of starting lisinopril?",
+    "structured_intent": {
+      "function": "cross_resource_temporal",
+      "params": {
+        "anchor_resource": "MedicationRequest",
+        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|314076",
+        "target_code": "http://loinc.org|51990-0",
+        "window": "P14D"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-cross-002",
+    "category": "cross_resource_temporal",
+    "level": 4,
+    "question": "Was an HbA1c obtained within 3 months of starting metformin?",
+    "structured_intent": {
+      "function": "cross_resource_temporal",
+      "params": {
+        "anchor_resource": "MedicationRequest",
+        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|861004",
+        "target_code": "http://loinc.org|4548-4",
+        "window": "P3M"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-cross-003",
+    "category": "cross_resource_temporal",
+    "level": 4,
+    "question": "Was an eGFR obtained within 1 month of starting lisinopril?",
+    "structured_intent": {
+      "function": "cross_resource_temporal",
+      "params": {
+        "anchor_resource": "MedicationRequest",
+        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|314076",
+        "target_code": "http://loinc.org|33914-3",
+        "window": "P1M"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-cross-004",
+    "category": "cross_resource_temporal",
+    "level": 4,
+    "question": "Was a potassium level obtained within 2 weeks of starting lisinopril?",
+    "structured_intent": {
+      "function": "cross_resource_temporal",
+      "params": {
+        "anchor_resource": "MedicationRequest",
+        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|314076",
+        "target_code": "http://loinc.org|2823-3",
+        "window": "P14D"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-cross-005",
+    "category": "cross_resource_temporal",
+    "level": 4,
+    "question": "Was a creatinine level obtained within 1 month of starting metformin?",
+    "structured_intent": {
+      "function": "cross_resource_temporal",
+      "params": {
+        "anchor_resource": "MedicationRequest",
+        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|861004",
+        "target_code": "http://loinc.org|2160-0",
+        "window": "P1M"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-cross-006",
+    "category": "cross_resource_temporal",
+    "level": 4,
+    "question": "Was an eGFR obtained within 2 weeks of starting lisinopril?",
+    "structured_intent": {
+      "function": "cross_resource_temporal",
+      "params": {
+        "anchor_resource": "MedicationRequest",
+        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|314076",
+        "target_code": "http://loinc.org|33914-3",
+        "window": "P14D"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-cross-007",
+    "category": "cross_resource_temporal",
+    "level": 4,
+    "question": "Was a BNP obtained within 1 month of starting metoprolol?",
+    "structured_intent": {
+      "function": "cross_resource_temporal",
+      "params": {
+        "anchor_resource": "MedicationRequest",
+        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|866924",
+        "target_code": "http://loinc.org|30934-4",
+        "window": "P1M"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-cross-008",
+    "category": "cross_resource_temporal",
+    "level": 4,
+    "question": "Was an HbA1c obtained within 1 month of starting glipizide?",
+    "structured_intent": {
+      "function": "cross_resource_temporal",
+      "params": {
+        "anchor_resource": "MedicationRequest",
+        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|310490",
+        "target_code": "http://loinc.org|4548-4",
+        "window": "P1M"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-cross-009",
+    "category": "cross_resource_temporal",
+    "level": 4,
+    "question": "Was an ejection fraction obtained within 1 month of starting furosemide?",
+    "structured_intent": {
+      "function": "cross_resource_temporal",
+      "params": {
+        "anchor_resource": "MedicationRequest",
+        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|310429",
+        "target_code": "http://loinc.org|10230-1",
+        "window": "P1M"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-cross-010",
+    "category": "cross_resource_temporal",
+    "level": 4,
+    "question": "Was a creatinine level obtained within 2 weeks of starting lisinopril?",
+    "structured_intent": {
+      "function": "cross_resource_temporal",
+      "params": {
+        "anchor_resource": "MedicationRequest",
+        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|314076",
+        "target_code": "http://loinc.org|2160-0",
+        "window": "P14D"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-cross-011",
+    "category": "cross_resource_temporal",
+    "level": 4,
+    "question": "Was a systolic BP obtained within 1 month of starting amlodipine?",
+    "structured_intent": {
+      "function": "cross_resource_temporal",
+      "params": {
+        "anchor_resource": "MedicationRequest",
+        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|329528",
+        "target_code": "http://loinc.org|8480-6",
+        "window": "P1M"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-cross-012",
+    "category": "cross_resource_temporal",
+    "level": 4,
+    "question": "Was an LDL obtained within 3 months of starting atorvastatin?",
+    "structured_intent": {
+      "function": "cross_resource_temporal",
+      "params": {
+        "anchor_resource": "MedicationRequest",
+        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|259255",
+        "target_code": "http://loinc.org|2089-1",
+        "window": "P3M"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-cross-013",
+    "category": "cross_resource_temporal",
+    "level": 4,
+    "question": "Was a systolic BP obtained within 1 week of starting amlodipine?",
+    "structured_intent": {
+      "function": "cross_resource_temporal",
+      "params": {
+        "anchor_resource": "MedicationRequest",
+        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|329528",
+        "target_code": "http://loinc.org|8480-6",
+        "window": "P7D"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-cross-014",
+    "category": "cross_resource_temporal",
+    "level": 4,
+    "question": "Was a potassium level obtained within 1 month of starting lisinopril?",
+    "structured_intent": {
+      "function": "cross_resource_temporal",
+      "params": {
+        "anchor_resource": "MedicationRequest",
+        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|314076",
+        "target_code": "http://loinc.org|2823-3",
+        "window": "P1M"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-cross-015",
+    "category": "cross_resource_temporal",
+    "level": 4,
+    "question": "Was an HbA1c obtained within 3 months of starting metformin?",
+    "structured_intent": {
+      "function": "cross_resource_temporal",
+      "params": {
+        "anchor_resource": "MedicationRequest",
+        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|861004",
+        "target_code": "http://loinc.org|4548-4",
+        "window": "P3M"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-insuff-001",
+    "category": "insufficient_data",
+    "level": 1,
+    "question": "What is the patient's TSH level?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|3016-3"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-insuff-002",
+    "category": "insufficient_data",
+    "level": 1,
+    "question": "What is the patient's ejection fraction?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|10230-1"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-insuff-003",
+    "category": "insufficient_data",
+    "level": 1,
+    "question": "What is the patient's INR?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|6301-6"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-insuff-004",
+    "category": "insufficient_data",
+    "level": 1,
+    "question": "What is the patient's BNP level?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|30934-4"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-insuff-005",
+    "category": "insufficient_data",
+    "level": 1,
+    "question": "What is the patient's serum sodium level?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|2951-2"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-insuff-006",
+    "category": "insufficient_data",
+    "level": 1,
+    "question": "What is the patient's troponin level?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|6598-7"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-insuff-007",
+    "category": "insufficient_data",
+    "level": 1,
+    "question": "What is the patient's ALT level?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|1742-6"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-insuff-008",
+    "category": "insufficient_data",
+    "level": 1,
+    "question": "What is the patient's hemoglobin level?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|718-7"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-insuff-009",
+    "category": "insufficient_data",
+    "level": 1,
+    "question": "What is the patient's triglyceride level?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|2571-8"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-insuff-010",
+    "category": "insufficient_data",
+    "level": 2,
+    "question": "Does the patient have a family history of cardiovascular disease?",
+    "structured_intent": {
+      "function": "has_family_history",
+      "params": {
+        "code": "http://snomed.info/sct|266894000"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-insuff-011",
+    "category": "insufficient_data",
+    "level": 2,
+    "question": "Does the patient have a history of cardiac catheterization?",
+    "structured_intent": {
+      "function": "has_procedure",
+      "params": {
+        "code": "http://snomed.info/sct|41976001"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-insuff-012",
+    "category": "insufficient_data",
+    "level": 2,
+    "question": "Does the patient have a history of coronary artery bypass surgery?",
+    "structured_intent": {
+      "function": "has_procedure",
+      "params": {
+        "code": "http://snomed.info/sct|232717009"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-insuff-013",
+    "category": "insufficient_data",
+    "level": 2,
+    "question": "Has the patient had an echocardiogram?",
+    "structured_intent": {
+      "function": "has_procedure",
+      "params": {
+        "code": "http://snomed.info/sct|40701008"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-insuff-014",
+    "category": "insufficient_data",
+    "level": 1,
+    "question": "What is the patient's procalcitonin level?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|75241-0"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-insuff-015",
+    "category": "insufficient_data",
+    "level": 1,
+    "question": "What is the patient's D-dimer level?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|48065-7"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-medcond-001",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for diabetes?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|44054006"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": ["Metformin 1000 MG", "Glipizide 5 MG"]
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-metformin-g1",
+      "MedicationRequest/medrx-glipizide-g1"
+    ]
+  },
+  {
+    "id": "std-medcond-002",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for hypertension?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|59621000"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": ["Lisinopril 20 MG", "Amlodipine 5 MG"]
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-lisinopril-g1",
+      "MedicationRequest/medrx-amlodipine-g1"
+    ]
+  },
+  {
+    "id": "std-medcond-003",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for chronic kidney disease?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|431855005"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": ["Lisinopril 20 MG"]
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-lisinopril-g1"
+    ]
+  },
+  {
+    "id": "std-medcond-004",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for hyperlipidemia?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|55822004"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": ["Atorvastatin 40 MG"]
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-atorvastatin-g1"
+    ]
+  },
+  {
+    "id": "std-medcond-005",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for heart failure?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|441530006"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": ["Metoprolol succinate 50 MG", "Furosemide 40 MG", "Lisinopril 10 MG"]
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-metoprolol-g2",
+      "MedicationRequest/medrx-furosemide-g2",
+      "MedicationRequest/medrx-lisinopril-g2"
+    ]
+  },
+  {
+    "id": "std-medcond-006",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for atrial fibrillation?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|49436004"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": ["Metoprolol succinate 50 MG", "Apixaban 5 MG"]
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-metoprolol-g2",
+      "MedicationRequest/medrx-apixaban-g2"
+    ]
+  },
+  {
+    "id": "std-medcond-007",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for COPD?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|13645005"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": ["Tiotropium 18 MCG"]
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-tiotropium-g2"
+    ]
+  },
+  {
+    "id": "std-medcond-008",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for diabetes?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|44054006"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": ["Metformin hydrochloride 1000 MG"]
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-metformin-g2"
+    ]
+  },
+  {
+    "id": "std-medcond-009",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for asthma?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|195967001"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-medcond-010",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for hypertension?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|59621000"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-medcond-011",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for diabetes?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|44054006"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-medcond-012",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for hypertension?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|59621000"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-medcond-013",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for chronic kidney disease?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|431855005"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-medcond-014",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for heart failure?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|441530006"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-medcond-015",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for COPD?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|13645005"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-medcond-016",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for diabetes?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|44054006"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-medcond-017",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for hypertension?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|59621000"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-medcond-018",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for chronic kidney disease?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|431855005"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-medcond-019",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for hyperlipidemia?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|55822004"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-medcond-020",
+    "category": "medication_condition_linkage",
+    "level": 5,
+    "question": "What medications are prescribed for osteoarthritis?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|239873007"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-panel-001",
+    "category": "panel_grouped",
+    "level": 5,
+    "question": "What were the results of the January basic metabolic panel?",
+    "structured_intent": {
+      "function": "panel_results",
+      "params": {
+        "panel_code": "http://loinc.org|51990-0",
+        "date": "2026-01-15"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": [
+        {"name": "Creatinine", "value": 1.6, "unit": "mg/dL"},
+        {"name": "Potassium", "value": 4.5, "unit": "mEq/L"},
+        {"name": "Estimated glomerular filtration rate", "value": 42, "unit": "mL/min/1.73m2"}
+      ]
+    },
+    "expected_provenance": [
+      "DiagnosticReport/dr-bmp-g1-jan",
+      "Observation/obs-creat-g1-jan",
+      "Observation/obs-k-g1-jan",
+      "Observation/obs-egfr-g1-jan"
+    ]
+  },
+  {
+    "id": "std-panel-002",
+    "category": "panel_grouped",
+    "level": 5,
+    "question": "What were the results of the April basic metabolic panel?",
+    "structured_intent": {
+      "function": "panel_results",
+      "params": {
+        "panel_code": "http://loinc.org|51990-0",
+        "date": "2026-04-10"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": [
+        {"name": "Creatinine", "value": 1.7, "unit": "mg/dL"},
+        {"name": "Potassium", "value": 4.8, "unit": "mEq/L"},
+        {"name": "Estimated glomerular filtration rate", "value": 39, "unit": "mL/min/1.73m2"}
+      ]
+    },
+    "expected_provenance": [
+      "DiagnosticReport/dr-bmp-g1-apr",
+      "Observation/obs-creat-g1-apr",
+      "Observation/obs-k-g1-apr",
+      "Observation/obs-egfr-g1-apr"
+    ]
+  },
+  {
+    "id": "std-panel-003",
+    "category": "panel_grouped",
+    "level": 5,
+    "question": "What were the results of the February cardiac laboratory panel?",
+    "structured_intent": {
+      "function": "panel_results",
+      "params": {
+        "panel_code": "http://loinc.org|11502-2",
+        "date": "2026-02-20"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": [
+        {"name": "Natriuretic peptide B [Mass/volume] in Serum or Plasma", "value": 450, "unit": "pg/mL"},
+        {"name": "Creatinine [Mass/volume] in Serum or Plasma", "value": 1.3, "unit": "mg/dL"},
+        {"name": "Potassium [Moles/volume] in Serum or Plasma", "value": 4.1, "unit": "mEq/L"}
+      ]
+    },
+    "expected_provenance": [
+      "DiagnosticReport/dr-cardiac-g2-feb",
+      "Observation/obs-bnp-g2-feb",
+      "Observation/obs-creat-g2-feb",
+      "Observation/obs-k-g2-feb"
+    ]
+  },
+  {
+    "id": "std-panel-004",
+    "category": "panel_grouped",
+    "level": 5,
+    "question": "What were the results of the most recent basic metabolic panel?",
+    "structured_intent": {
+      "function": "panel_results",
+      "params": {
+        "panel_code": "http://loinc.org|51990-0",
+        "date": "most_recent"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": [
+        {"name": "Creatinine", "value": 1.7, "unit": "mg/dL"},
+        {"name": "Potassium", "value": 4.8, "unit": "mEq/L"},
+        {"name": "Estimated glomerular filtration rate", "value": 39, "unit": "mL/min/1.73m2"}
+      ]
+    },
+    "expected_provenance": [
+      "DiagnosticReport/dr-bmp-g1-apr",
+      "Observation/obs-creat-g1-apr",
+      "Observation/obs-k-g1-apr",
+      "Observation/obs-egfr-g1-apr"
+    ]
+  },
+  {
+    "id": "std-panel-005",
+    "category": "panel_grouped",
+    "level": 5,
+    "question": "What were the results of the most recent laboratory panel?",
+    "structured_intent": {
+      "function": "panel_results",
+      "params": {
+        "panel_code": "http://loinc.org|11502-2",
+        "date": "most_recent"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": [
+        {"name": "Natriuretic peptide B [Mass/volume] in Serum or Plasma", "value": 450, "unit": "pg/mL"},
+        {"name": "Creatinine [Mass/volume] in Serum or Plasma", "value": 1.3, "unit": "mg/dL"},
+        {"name": "Potassium [Moles/volume] in Serum or Plasma", "value": 4.1, "unit": "mEq/L"}
+      ]
+    },
+    "expected_provenance": [
+      "DiagnosticReport/dr-cardiac-g2-feb"
+    ]
+  },
+  {
+    "id": "std-panel-006",
+    "category": "panel_grouped",
+    "level": 5,
+    "question": "What were the results of the most recent basic metabolic panel?",
+    "structured_intent": {
+      "function": "panel_results",
+      "params": {
+        "panel_code": "http://loinc.org|51990-0",
+        "date": "most_recent"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-panel-007",
+    "category": "panel_grouped",
+    "level": 5,
+    "question": "What were the results of the most recent basic metabolic panel?",
+    "structured_intent": {
+      "function": "panel_results",
+      "params": {
+        "panel_code": "http://loinc.org|51990-0",
+        "date": "most_recent"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-panel-008",
+    "category": "panel_grouped",
+    "level": 5,
+    "question": "What were the results of the most recent basic metabolic panel?",
+    "structured_intent": {
+      "function": "panel_results",
+      "params": {
+        "panel_code": "http://loinc.org|51990-0",
+        "date": "most_recent"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-panel-009",
+    "category": "panel_grouped",
+    "level": 5,
+    "question": "What were the results of the most recent lipid panel?",
+    "structured_intent": {
+      "function": "panel_results",
+      "params": {
+        "panel_code": "http://loinc.org|57698-3",
+        "date": "most_recent"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-panel-010",
+    "category": "panel_grouped",
+    "level": 5,
+    "question": "What were the results of the most recent complete blood count?",
+    "structured_intent": {
+      "function": "panel_results",
+      "params": {
+        "panel_code": "http://loinc.org|58410-2",
+        "date": "most_recent"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-panel-011",
+    "category": "panel_grouped",
+    "level": 5,
+    "question": "What were the results of the most recent thyroid panel?",
+    "structured_intent": {
+      "function": "panel_results",
+      "params": {
+        "panel_code": "http://loinc.org|55789-0",
+        "date": "most_recent"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-panel-012",
+    "category": "panel_grouped",
+    "level": 5,
+    "question": "What were the results of the most recent comprehensive metabolic panel?",
+    "structured_intent": {
+      "function": "panel_results",
+      "params": {
+        "panel_code": "http://loinc.org|24323-8",
+        "date": "most_recent"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-panel-013",
+    "category": "panel_grouped",
+    "level": 5,
+    "question": "What were the results of the most recent liver function panel?",
+    "structured_intent": {
+      "function": "panel_results",
+      "params": {
+        "panel_code": "http://loinc.org|24325-3",
+        "date": "most_recent"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-panel-014",
+    "category": "panel_grouped",
+    "level": 5,
+    "question": "What were the results of the most recent cardiac laboratory panel?",
+    "structured_intent": {
+      "function": "panel_results",
+      "params": {
+        "panel_code": "http://loinc.org|11502-2",
+        "date": "most_recent"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-panel-015",
+    "category": "panel_grouped",
+    "level": 5,
+    "question": "What were the results of the most recent renal function panel?",
+    "structured_intent": {
+      "function": "panel_results",
+      "params": {
+        "panel_code": "http://loinc.org|24362-6",
+        "date": "most_recent"
+      }
+    },
+    "bundle": "bundles/edge-coded-values.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-encounter-001",
+    "category": "encounter_scoped",
+    "level": 5,
+    "question": "What was measured during the patient's most recent visit?",
+    "structured_intent": {
+      "function": "observations_in_encounter",
+      "params": {
+        "encounter_id": "most_recent"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": [
+        {"name": "Systolic blood pressure", "value": 145, "unit": "mmHg"},
+        {"name": "Diastolic blood pressure", "value": 90, "unit": "mmHg"},
+        {"name": "Hemoglobin A1c", "value": 7.6, "unit": "%"},
+        {"name": "Creatinine", "value": 1.7, "unit": "mg/dL"},
+        {"name": "Estimated glomerular filtration rate", "value": 39, "unit": "mL/min/1.73m2"},
+        {"name": "Potassium", "value": 4.8, "unit": "mEq/L"}
+      ]
+    },
+    "expected_provenance": [
+      "Encounter/encounter-2026-04",
+      "Observation/obs-bp-g1-apr",
+      "Observation/obs-hba1c-g1-apr",
+      "Observation/obs-creat-g1-apr",
+      "Observation/obs-egfr-g1-apr",
+      "Observation/obs-k-g1-apr"
+    ]
+  },
+  {
+    "id": "std-encounter-002",
+    "category": "encounter_scoped",
+    "level": 5,
+    "question": "What was measured during the patient's most recent visit?",
+    "structured_intent": {
+      "function": "observations_in_encounter",
+      "params": {
+        "encounter_id": "most_recent"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": [
+        {"name": "Systolic blood pressure", "value": 132, "unit": "mmHg"},
+        {"name": "Diastolic blood pressure", "value": 80, "unit": "mmHg"},
+        {"name": "Heart rate", "value": 72, "unit": "/min"},
+        {"name": "Natriuretic peptide B", "value": 380, "unit": "pg/mL"},
+        {"name": "Creatinine", "value": 1.4, "unit": "mg/dL"},
+        {"name": "Potassium", "value": 4.6, "unit": "mEq/L"},
+        {"name": "Oxygen saturation", "value": 94, "unit": "%"},
+        {"name": "Body weight", "value": 88, "unit": "kg"}
+      ]
+    },
+    "expected_provenance": [
+      "Encounter/encounter-2026-05",
+      "Observation/obs-bp-g2-may",
+      "Observation/obs-hr-g2-may",
+      "Observation/obs-bnp-g2-may",
+      "Observation/obs-creat-g2-may",
+      "Observation/obs-k-g2-may",
+      "Observation/obs-spo2-g2-may",
+      "Observation/obs-weight-g2-may"
+    ]
+  },
+  {
+    "id": "std-encounter-003",
+    "category": "encounter_scoped",
+    "level": 5,
+    "question": "What was measured during the January 2026 visit?",
+    "structured_intent": {
+      "function": "observations_in_encounter",
+      "params": {
+        "encounter_id": "encounter-2026-01"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": [
+        {"name": "Systolic blood pressure", "value": 152, "unit": "mmHg"},
+        {"name": "Diastolic blood pressure", "value": 94, "unit": "mmHg"},
+        {"name": "Hemoglobin A1c", "value": 8.2, "unit": "%"},
+        {"name": "Creatinine", "value": 1.6, "unit": "mg/dL"},
+        {"name": "Estimated glomerular filtration rate", "value": 42, "unit": "mL/min/1.73m2"},
+        {"name": "Potassium", "value": 4.5, "unit": "mEq/L"},
+        {"name": "LDL Cholesterol", "value": 128, "unit": "mg/dL"}
+      ]
+    },
+    "expected_provenance": [
+      "Encounter/encounter-2026-01",
+      "Observation/obs-bp-g1-jan",
+      "Observation/obs-hba1c-g1-jan",
+      "Observation/obs-creat-g1-jan",
+      "Observation/obs-egfr-g1-jan",
+      "Observation/obs-k-g1-jan",
+      "Observation/obs-ldl-g1-jan"
+    ]
+  },
+  {
+    "id": "std-encounter-004",
+    "category": "encounter_scoped",
+    "level": 5,
+    "question": "What was measured during the February 2026 visit?",
+    "structured_intent": {
+      "function": "observations_in_encounter",
+      "params": {
+        "encounter_id": "encounter-2026-02"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": [
+        {"name": "Systolic blood pressure", "value": 128, "unit": "mmHg"},
+        {"name": "Diastolic blood pressure", "value": 78, "unit": "mmHg"},
+        {"name": "Heart rate", "value": 68, "unit": "/min"},
+        {"name": "Natriuretic peptide B", "value": 450, "unit": "pg/mL"},
+        {"name": "Hemoglobin A1c", "value": 7.2, "unit": "%"},
+        {"name": "Creatinine", "value": 1.3, "unit": "mg/dL"},
+        {"name": "Potassium", "value": 4.1, "unit": "mEq/L"},
+        {"name": "Left ventricular ejection fraction", "value": 35, "unit": "%"}
+      ]
+    },
+    "expected_provenance": [
+      "Encounter/encounter-2026-02",
+      "Observation/obs-bp-g2-feb",
+      "Observation/obs-hr-g2-feb",
+      "Observation/obs-bnp-g2-feb",
+      "Observation/obs-hba1c-g2-feb",
+      "Observation/obs-creat-g2-feb",
+      "Observation/obs-k-g2-feb",
+      "Observation/obs-ef-g2-feb"
+    ]
+  },
+  {
+    "id": "std-encounter-005",
+    "category": "encounter_scoped",
+    "level": 5,
+    "question": "What was measured during the April 2026 visit?",
+    "structured_intent": {
+      "function": "observations_in_encounter",
+      "params": {
+        "encounter_id": "encounter-2026-04"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": [
+        {"name": "Systolic blood pressure", "value": 145, "unit": "mmHg"},
+        {"name": "Diastolic blood pressure", "value": 90, "unit": "mmHg"},
+        {"name": "Hemoglobin A1c", "value": 7.6, "unit": "%"},
+        {"name": "Creatinine", "value": 1.7, "unit": "mg/dL"},
+        {"name": "Estimated glomerular filtration rate", "value": 39, "unit": "mL/min/1.73m2"},
+        {"name": "Potassium", "value": 4.8, "unit": "mEq/L"}
+      ]
+    },
+    "expected_provenance": [
+      "Encounter/encounter-2026-04",
+      "Observation/obs-bp-g1-apr",
+      "Observation/obs-hba1c-g1-apr",
+      "Observation/obs-creat-g1-apr",
+      "Observation/obs-egfr-g1-apr",
+      "Observation/obs-k-g1-apr"
+    ]
+  },
+  {
+    "id": "std-encounter-006",
+    "category": "encounter_scoped",
+    "level": 5,
+    "question": "What was measured during the May 2026 visit?",
+    "structured_intent": {
+      "function": "observations_in_encounter",
+      "params": {
+        "encounter_id": "encounter-2026-05"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": [
+        {"name": "Systolic blood pressure", "value": 132, "unit": "mmHg"},
+        {"name": "Diastolic blood pressure", "value": 80, "unit": "mmHg"},
+        {"name": "Heart rate", "value": 72, "unit": "/min"},
+        {"name": "Natriuretic peptide B", "value": 380, "unit": "pg/mL"},
+        {"name": "Creatinine", "value": 1.4, "unit": "mg/dL"},
+        {"name": "Potassium", "value": 4.6, "unit": "mEq/L"},
+        {"name": "Oxygen saturation", "value": 94, "unit": "%"},
+        {"name": "Body weight", "value": 88, "unit": "kg"}
+      ]
+    },
+    "expected_provenance": [
+      "Encounter/encounter-2026-05",
+      "Observation/obs-bp-g2-may",
+      "Observation/obs-hr-g2-may",
+      "Observation/obs-bnp-g2-may",
+      "Observation/obs-creat-g2-may",
+      "Observation/obs-k-g2-may",
+      "Observation/obs-spo2-g2-may",
+      "Observation/obs-weight-g2-may"
+    ]
+  },
+  {
+    "id": "std-encounter-007",
+    "category": "encounter_scoped",
+    "level": 5,
+    "question": "What was measured during the patient's most recent visit?",
+    "structured_intent": {
+      "function": "observations_in_encounter",
+      "params": {
+        "encounter_id": "most_recent"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-encounter-008",
+    "category": "encounter_scoped",
+    "level": 5,
+    "question": "What was measured during the patient's most recent visit?",
+    "structured_intent": {
+      "function": "observations_in_encounter",
+      "params": {
+        "encounter_id": "most_recent"
+      }
+    },
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-encounter-009",
+    "category": "encounter_scoped",
+    "level": 5,
+    "question": "What was measured during the patient's most recent visit?",
+    "structured_intent": {
+      "function": "observations_in_encounter",
+      "params": {
+        "encounter_id": "most_recent"
+      }
+    },
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-encounter-010",
+    "category": "encounter_scoped",
+    "level": 5,
+    "question": "What was measured during the patient's most recent visit?",
+    "structured_intent": {
+      "function": "observations_in_encounter",
+      "params": {
+        "encounter_id": "most_recent"
+      }
+    },
+    "bundle": "bundles/edge-missing-dates.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-encounter-011",
+    "category": "encounter_scoped",
+    "level": 5,
+    "question": "What was measured during the patient's most recent visit?",
+    "structured_intent": {
+      "function": "observations_in_encounter",
+      "params": {
+        "encounter_id": "most_recent"
+      }
+    },
+    "bundle": "bundles/edge-coded-values.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-encounter-012",
+    "category": "encounter_scoped",
+    "level": 5,
+    "question": "What was measured during the January 2026 visit?",
+    "structured_intent": {
+      "function": "observations_in_encounter",
+      "params": {
+        "encounter_id": "encounter-2026-01"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-encounter-013",
+    "category": "encounter_scoped",
+    "level": 5,
+    "question": "How many observations were recorded at the patient's February visit?",
+    "structured_intent": {
+      "function": "observations_in_encounter",
+      "params": {
+        "encounter_id": "encounter-2026-02",
+        "aggregate": "count"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 7
+    }
+  },
+  {
+    "id": "std-encounter-014",
+    "category": "encounter_scoped",
+    "level": 5,
+    "question": "How many observations were recorded at the patient's most recent visit?",
+    "structured_intent": {
+      "function": "observations_in_encounter",
+      "params": {
+        "encounter_id": "most_recent",
+        "aggregate": "count"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 5
+    }
+  },
+  {
+    "id": "std-encounter-015",
+    "category": "encounter_scoped",
+    "level": 5,
+    "question": "How many visits does the patient have recorded?",
+    "structured_intent": {
+      "function": "encounter_count",
+      "params": {}
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 2
+    },
+    "expected_provenance": [
+      "Encounter/encounter-2026-01",
+      "Encounter/encounter-2026-04"
+    ]
+  },
+  {
+    "id": "std-multihop-001",
+    "category": "multi_hop",
+    "level": 5,
+    "question": "How many medications is the patient taking for heart failure?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|441530006",
+        "aggregate": "count"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 3
+    }
+  },
+  {
+    "id": "std-multihop-002",
+    "category": "multi_hop",
+    "level": 5,
+    "question": "Is the patient on any medication that treats both heart failure and atrial fibrillation?",
+    "structured_intent": {
+      "function": "shared_medication_for_conditions",
+      "params": {
+        "condition_codes": [
+          "http://snomed.info/sct|441530006",
+          "http://snomed.info/sct|49436004"
+        ]
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-metoprolol-g2"
+    ]
+  },
+  {
+    "id": "std-multihop-003",
+    "category": "multi_hop",
+    "level": 5,
+    "question": "How many conditions does lisinopril treat for this patient?",
+    "structured_intent": {
+      "function": "conditions_for_medication",
+      "params": {
+        "medication_code": "http://www.nlm.nih.gov/research/umls/rxnorm|314076",
+        "aggregate": "count"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 2
+    },
+    "expected_provenance": [
+      "Condition/cond-htn-g1",
+      "Condition/cond-ckd-g1"
+    ]
+  },
+  {
+    "id": "std-multihop-004",
+    "category": "multi_hop",
+    "level": 5,
+    "question": "How many medications treat more than one condition for this patient?",
+    "structured_intent": {
+      "function": "medications_with_multiple_indications",
+      "params": {}
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 1
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-lisinopril-g1"
+    ]
+  },
+  {
+    "id": "std-multihop-005",
+    "category": "multi_hop",
+    "level": 5,
+    "question": "How many medications treat more than one condition for this patient?",
+    "structured_intent": {
+      "function": "medications_with_multiple_indications",
+      "params": {}
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 1
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-metoprolol-g2"
+    ]
+  },
+  {
+    "id": "std-multihop-006",
+    "category": "multi_hop",
+    "level": 5,
+    "question": "Are all of the patient's medications linked to a specific condition?",
+    "structured_intent": {
+      "function": "all_medications_linked",
+      "params": {}
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-aspirin-g1"
+    ]
+  },
+  {
+    "id": "std-multihop-007",
+    "category": "multi_hop",
+    "level": 5,
+    "question": "How many medications is the patient taking for diabetes?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|44054006",
+        "aggregate": "count"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 2
+    }
+  },
+  {
+    "id": "std-multihop-008",
+    "category": "multi_hop",
+    "level": 5,
+    "question": "How many medications is the patient taking for atrial fibrillation?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|49436004",
+        "aggregate": "count"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 2
+    }
+  },
+  {
+    "id": "std-multihop-009",
+    "category": "multi_hop",
+    "level": 5,
+    "question": "Does the patient have any medication that is not linked to any condition?",
+    "structured_intent": {
+      "function": "unlinked_medications",
+      "params": {}
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-aspirin-g1"
+    ]
+  },
+  {
+    "id": "std-multihop-010",
+    "category": "multi_hop",
+    "level": 5,
+    "question": "How many distinct conditions are treated by at least one medication?",
+    "structured_intent": {
+      "function": "count_conditions_treated",
+      "params": {}
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 4
+    }
+  },
+  {
+    "id": "std-multihop-011",
+    "category": "multi_hop",
+    "level": 5,
+    "question": "How many distinct conditions are treated by at least one medication?",
+    "structured_intent": {
+      "function": "count_conditions_treated",
+      "params": {}
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 4
+    }
+  },
+  {
+    "id": "std-multihop-012",
+    "category": "multi_hop",
+    "level": 5,
+    "question": "Does the patient have an allergy that conflicts with a prescribed medication class?",
+    "structured_intent": {
+      "function": "allergy_medication_conflict",
+      "params": {}
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "AllergyIntolerance/allergy-acei-g1",
+      "MedicationRequest/medrx-lisinopril-g1"
+    ]
+  },
+  {
+    "id": "std-multihop-013",
+    "category": "multi_hop",
+    "level": 5,
+    "question": "How many medications is the patient taking for CKD?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|431855005",
+        "aggregate": "count"
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 1
+    }
+  },
+  {
+    "id": "std-multihop-014",
+    "category": "multi_hop",
+    "level": 5,
+    "question": "Is the patient on any medication that treats both hypertension and chronic kidney disease?",
+    "structured_intent": {
+      "function": "shared_medication_for_conditions",
+      "params": {
+        "condition_codes": [
+          "http://snomed.info/sct|59621000",
+          "http://snomed.info/sct|431855005"
+        ]
+      }
+    },
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "MedicationRequest/medrx-lisinopril-g1"
+    ]
+  },
+  {
+    "id": "std-multihop-015",
+    "category": "multi_hop",
+    "level": 5,
+    "question": "How many conditions does metoprolol treat for this patient?",
+    "structured_intent": {
+      "function": "conditions_for_medication",
+      "params": {
+        "medication_code": "http://www.nlm.nih.gov/research/umls/rxnorm|866924",
+        "aggregate": "count"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 2
+    },
+    "expected_provenance": [
+      "Condition/cond-hfref-g2",
+      "Condition/cond-afib-g2"
+    ]
+  },
+  {
+    "id": "std-edge-001",
+    "category": "edge_cases",
+    "level": 3,
+    "question": "What is the patient's most recent systolic blood pressure?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|8480-6"
+      }
+    },
+    "bundle": "bundles/edge-missing-dates.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 142
+    },
+    "expected_provenance": [
+      "Observation/bp-dated-02"
+    ]
+  },
+  {
+    "id": "std-edge-002",
+    "category": "edge_cases",
+    "level": 3,
+    "question": "What is the patient's most recent diastolic blood pressure?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|8462-4"
+      }
+    },
+    "bundle": "bundles/edge-missing-dates.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 90
+    },
+    "expected_provenance": [
+      "Observation/bp-dated-02"
+    ]
+  },
+  {
+    "id": "std-edge-003",
+    "category": "edge_cases",
+    "level": 3,
+    "question": "What is the patient's smoking status?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|72166-2"
+      }
+    },
+    "bundle": "bundles/edge-coded-values.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": "449868002"
+    },
+    "expected_provenance": [
+      "Observation/obs-smoking-01"
+    ]
+  },
+  {
+    "id": "std-edge-004",
+    "category": "edge_cases",
+    "level": 3,
+    "question": "What is the patient's blood type?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|882-1"
+      }
+    },
+    "bundle": "bundles/edge-coded-values.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": "112144000"
+    },
+    "expected_provenance": [
+      "Observation/obs-blood-type-01"
+    ]
+  },
+  {
+    "id": "std-edge-005",
+    "category": "edge_cases",
+    "level": 3,
+    "question": "What is the patient's urine specific gravity?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|5811-5"
+      }
+    },
+    "bundle": "bundles/edge-coded-values.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": "Trace"
+    },
+    "expected_provenance": [
+      "Observation/obs-urine-01"
+    ]
+  },
+  {
+    "id": "std-edge-006",
+    "category": "edge_cases",
+    "level": 3,
+    "question": "What is the patient's smoking status?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|72166-2"
+      }
+    },
+    "bundle": "bundles/edge-missing-dates.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": "449868002"
+    },
+    "expected_provenance": [
+      "Observation/obs-coded-01"
+    ]
+  },
+  {
+    "id": "std-edge-007",
+    "category": "edge_cases",
+    "level": 3,
+    "question": "How many blood pressure readings are recorded in the past 6 months?",
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|85354-9",
+        "duration": "P6M"
+      }
+    },
+    "bundle": "bundles/edge-missing-dates.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 3
+    },
+    "expected_provenance": [
+      "Observation/bp-dated-01",
+      "Observation/bp-dated-02",
+      "Observation/bp-period-only"
+    ]
+  },
+  {
+    "id": "std-edge-008",
+    "category": "edge_cases",
+    "level": 3,
+    "question": "What is the patient's most recent systolic blood pressure?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|8480-6"
+      }
+    },
+    "bundle": "bundles/edge-coded-values.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 135
+    },
+    "expected_provenance": [
+      "Observation/bp-coded-01"
+    ]
+  },
+  {
+    "id": "std-edge-009",
+    "category": "edge_cases",
+    "level": 3,
+    "question": "What is the patient's most recent diastolic blood pressure?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|8462-4"
+      }
+    },
+    "bundle": "bundles/edge-coded-values.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 85
+    },
+    "expected_provenance": [
+      "Observation/bp-coded-01"
+    ]
+  },
+  {
+    "id": "std-edge-010",
+    "category": "edge_cases",
+    "level": 3,
+    "question": "Does the patient have an active hypertension diagnosis?",
+    "structured_intent": {
+      "function": "has_condition",
+      "params": {
+        "code": "http://snomed.info/sct|59621000"
+      }
+    },
+    "bundle": "bundles/edge-missing-dates.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "Condition/condition-htn-edge"
+    ]
+  },
+  {
+    "id": "std-edge-011",
+    "category": "edge_cases",
+    "level": 3,
+    "question": "Does the patient have an active hypertension diagnosis?",
+    "structured_intent": {
+      "function": "has_condition",
+      "params": {
+        "code": "http://snomed.info/sct|59621000"
+      }
+    },
+    "bundle": "bundles/edge-coded-values.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "Condition/condition-htn-coded"
+    ]
+  },
+  {
+    "id": "std-edge-012",
+    "category": "edge_cases",
+    "level": 3,
+    "question": "What was measured during the patient's most recent visit?",
+    "structured_intent": {
+      "function": "observations_in_encounter",
+      "params": {
+        "encounter_id": "most_recent"
+      }
+    },
+    "bundle": "bundles/htn-temporal-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-edge-013",
+    "category": "edge_cases",
+    "level": 3,
+    "question": "What were the results of the most recent basic metabolic panel?",
+    "structured_intent": {
+      "function": "panel_results",
+      "params": {
+        "panel_code": "http://loinc.org|51990-0",
+        "date": "most_recent"
+      }
+    },
+    "bundle": "bundles/edge-missing-dates.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-edge-014",
+    "category": "edge_cases",
+    "level": 3,
+    "question": "What medications are prescribed for hypertension?",
+    "structured_intent": {
+      "function": "medications_for_condition",
+      "params": {
+        "condition_code": "http://snomed.info/sct|59621000"
+      }
+    },
+    "bundle": "bundles/edge-missing-dates.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-edge-015",
+    "category": "edge_cases",
+    "level": 3,
+    "question": "What is the patient's SpO2?",
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|2708-6"
+      }
+    },
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 94
+    },
+    "expected_provenance": [
+      "Observation/obs-spo2-g2-may"
+    ]
+  }
+]
