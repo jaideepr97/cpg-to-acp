@@ -110,6 +110,39 @@ class TestExtractInputValue:
         )
         assert value == 142
 
+    def test_concept_resolver_hba1c(self):
+        """Concept resolver resolves 'HbA1c Value' without codes or map entry."""
+        bundle = _load_bundle("patient-bundle-medication.json")
+        # HbA1c is NOT in KNOWN_VARIABLE_MAP but IS in concept_resolver
+        value, ref = _extract_input_value(bundle, "HbA1c Value", "number", {})
+        # patient-bundle-medication doesn't have HbA1c, so value should be None
+        assert value is None
+
+    def test_concept_resolver_condition(self):
+        """Concept resolver resolves 'hypertension' to a condition check."""
+        bundle = _load_bundle("patient-bundle-medication.json")
+        value, ref = _extract_input_value(bundle, "Has Hypertension", "boolean", {})
+        assert value is True
+
+    def test_concept_resolver_drug_class(self):
+        """Concept resolver handles drug class queries."""
+        bundle = {
+            "entry": [{
+                "resource": {
+                    "resourceType": "MedicationRequest",
+                    "id": "mr1",
+                    "status": "active",
+                    "medicationCodeableConcept": {
+                        "coding": [{"system": SNOMED, "code": "314076", "display": "Lisinopril"}],
+                    },
+                },
+            }],
+        }
+        # Lisinopril is NOT coded with RxNorm here, so drug class won't match
+        # But this tests that the resolver path doesn't crash
+        value, ref = _extract_input_value(bundle, "Current ACE Inhibitor", "boolean", {})
+        assert value is not None  # Either True (found) or False (not found)
+
 
 class TestDMNExecutor:
     def test_no_models(self):

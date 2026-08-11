@@ -12,11 +12,14 @@ from typing import Any
 import mlflow
 
 from acp_writer.state import CarePlanComposerState
+from acp_writer.tools.concept_resolver import resolve as resolve_concept
 from acp_writer.tools.ips_extractor import (
     extract_allergy,
     extract_condition,
     extract_medication,
     extract_observation,
+    extract_patient_age,
+    extract_procedure,
 )
 
 logger = logging.getLogger(__name__)
@@ -71,19 +74,81 @@ def _try_extract_by_code(
     return None, None
 
 
+def _execute_resolved(ips_bundle: dict, resolved: Any, reference_date=None) -> tuple[Any, str | None]:
+    """Execute an extraction based on a ResolvedConcept."""
+    if resolved.action == "extract_observation":
+        result = extract_observation(ips_bundle, resolved.system, resolved.code)
+        if result.found:
+            return result.value, result.fhir_reference
+        return None, None
+
+    if resolved.action == "extract_condition":
+        all_codes = resolved.codes or [f"{resolved.system}|{resolved.code}"]
+        for code_token in all_codes:
+            if "|" not in code_token:
+                continue
+            sys, cd = code_token.rsplit("|", 1)
+            result = extract_condition(ips_bundle, sys, cd)
+            if result.found:
+                return True, result.fhir_reference
+        return False, None
+
+    if resolved.action == "extract_medication":
+        result = extract_medication(ips_bundle, resolved.system, resolved.code)
+        return result.found, result.fhir_reference
+
+    if resolved.action == "extract_allergy":
+        result = extract_allergy(ips_bundle, resolved.system, resolved.code)
+        return result.found, result.fhir_reference
+
+    if resolved.action == "extract_drug_class":
+        for code_token in (resolved.codes or []):
+            if "|" not in code_token:
+                continue
+            sys, cd = code_token.rsplit("|", 1)
+            result = extract_medication(ips_bundle, sys, cd)
+            if result.found:
+                return True, result.fhir_reference
+        return False, None
+
+    if resolved.action == "compute_age" and reference_date:
+        from datetime import date
+        if isinstance(reference_date, str):
+            reference_date = date.fromisoformat(reference_date)
+        result = extract_patient_age(ips_bundle, reference_date)
+        if result.found:
+            return result.value, result.fhir_reference
+        return None, None
+
+    if resolved.action == "compute_bmi":
+        w = extract_observation(ips_bundle, LOINC, "29463-7")
+        h = extract_observation(ips_bundle, LOINC, "8302-2")
+        if w.found and h.found:
+            try:
+                bmi = round(float(w.value) / (float(h.value) / 100) ** 2, 1)
+                return bmi, w.fhir_reference
+            except (ValueError, TypeError, ZeroDivisionError):
+                pass
+        return None, None
+
+    return None, None
+
+
 def _extract_input_value(
     ips_bundle: dict,
     var_name: str,
     var_type: str,
     prior_results: dict[str, dict],
     codes: list[str] | None = None,
+    reference_date: str | None = None,
 ) -> tuple[Any, str | None]:
     """Extract a DMN input value from the IPS or prior DMN results.
 
-    Resolution order:
+    Layered resolution (priority chain):
     1. Prior DMN results (chained decisions)
     2. DecisionVariable.codes (when provided by cpg-ingester)
-    3. KNOWN_VARIABLE_MAP (hardcoded fallback)
+    3. Concept resolver (deterministic clinical term → FHIR code mapping)
+    4. KNOWN_VARIABLE_MAP (legacy hardcoded fallback)
 
     Returns (value, fhir_reference) tuple.
     """
@@ -108,6 +173,12 @@ def _extract_input_value(
                 value, ref = _try_extract_by_code(ips_bundle, system, code, var_type)
                 if value is not None:
                     return value, ref
+
+    resolved = resolve_concept(var_name)
+    if resolved:
+        value, ref = _execute_resolved(ips_bundle, resolved, reference_date)
+        if value is not None:
+            return value, ref
 
     mapping = KNOWN_VARIABLE_MAP.get(key)
     if mapping:
@@ -174,11 +245,13 @@ def dmn_executor(state: CarePlanComposerState) -> dict:
         inputs: dict[str, Any] = {}
         fhir_refs: list[str] = []
 
+        today = datetime.now(timezone.utc).date().isoformat()
         expected_inputs = model_info.get("inputs", [])
         for var in expected_inputs:
             value, ref = _extract_input_value(
                 ips_bundle, var["name"], var.get("type", "string"), prior_results,
                 codes=var.get("codes"),
+                reference_date=today,
             )
             if value is not None:
                 inputs[var["name"]] = value
