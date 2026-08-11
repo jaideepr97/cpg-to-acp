@@ -44,6 +44,10 @@ _TEMPORAL_FUNCTIONS = {
     "cross_resource_temporal", "trend_declining",
     "observation_at",
 }
+_GRAPH_ONLY_FUNCTIONS = {
+    "medications_for_condition", "observations_in_encounter",
+    "panel_results", "condition_medications",
+}
 
 
 class CurrentImplementationBackend:
@@ -126,6 +130,12 @@ class CurrentImplementationBackend:
 
         if func in _TEMPORAL_FUNCTIONS:
             return self._run_temporal(func, params, bundle, reference_date, code_str)
+
+        if func in _GRAPH_ONLY_FUNCTIONS:
+            return QAAnswer(
+                value=None, kind="insufficient_data", insufficient_data=True,
+                error=f"Reference traversal not supported in flat extraction: {func}",
+            )
 
         return QAAnswer(
             value=None,

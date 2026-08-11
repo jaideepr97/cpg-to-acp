@@ -124,12 +124,66 @@ def build_fhir_graph(bundle: dict) -> "nx.DiGraph":
             status_codings = resource.get("clinicalStatus", {}).get("coding", [])
             node_attrs["clinicalStatus"] = status_codings[0].get("code", "unknown") if status_codings else "unknown"
 
+        elif rt == "Encounter":
+            node_attrs["period_start"] = resource.get("period", {}).get("start")
+            node_attrs["period_start_dt"] = _parse_dt(node_attrs["period_start"])
+            node_attrs["class"] = resource.get("class", {}).get("code", "")
+
+        elif rt == "DiagnosticReport":
+            for coding in resource.get("code", {}).get("coding", []):
+                node_attrs.setdefault("codes", []).append(f"{coding.get('system', '')}|{coding.get('code', '')}")
+                node_attrs["display"] = coding.get("display", "")
+            node_attrs["effectiveDateTime"] = resource.get("effectiveDateTime")
+            node_attrs["effective_dt"] = _parse_dt(node_attrs["effectiveDateTime"])
+            node_attrs["status"] = resource.get("status", "unknown")
+
+        elif rt == "Procedure":
+            for coding in resource.get("code", {}).get("coding", []):
+                node_attrs.setdefault("codes", []).append(f"{coding.get('system', '')}|{coding.get('code', '')}")
+                node_attrs["display"] = coding.get("display", "")
+            node_attrs["status"] = resource.get("status", "unknown")
+            perf = resource.get("performedDateTime") or resource.get("performedPeriod", {}).get("start")
+            node_attrs["performedDateTime"] = perf
+
         G.add_node(node_id, **node_attrs)
 
         subject = resource.get("subject", {}).get("reference")
         if subject:
             G.add_edge(node_id, subject, relation="subject")
             G.add_edge(subject, node_id, relation="has_resource")
+
+        for reason_ref in resource.get("reasonReference", []):
+            ref = reason_ref.get("reference")
+            if ref:
+                G.add_edge(node_id, ref, relation="indication")
+                G.add_edge(ref, node_id, relation="indicated_treatment")
+
+        encounter_ref = resource.get("encounter", {}).get("reference")
+        if encounter_ref:
+            G.add_edge(node_id, encounter_ref, relation="during_encounter")
+            G.add_edge(encounter_ref, node_id, relation="has_observation")
+
+        for result_ref in resource.get("result", []):
+            ref = result_ref.get("reference")
+            if ref:
+                G.add_edge(node_id, ref, relation="has_result")
+                G.add_edge(ref, node_id, relation="result_of")
+
+        for member_ref in resource.get("hasMember", []):
+            ref = member_ref.get("reference")
+            if ref:
+                G.add_edge(node_id, ref, relation="has_member")
+
+        for derived_ref in resource.get("derivedFrom", []):
+            ref = derived_ref.get("reference")
+            if ref:
+                G.add_edge(node_id, ref, relation="derived_from")
+                G.add_edge(ref, node_id, relation="source_for")
+
+        for based_ref in resource.get("basedOn", []):
+            ref = based_ref.get("reference")
+            if ref:
+                G.add_edge(node_id, ref, relation="based_on")
 
     return G
 
@@ -201,6 +255,19 @@ class GraphBackedBackend:
             from acp_writer.benchmark.backends.current import CurrentImplementationBackend
             backend = CurrentImplementationBackend()
             return backend._run_temporal(func, params, bundle, reference_date, code_str)
+
+        if func == "medications_for_condition":
+            return self._graph_medications_for_condition(G, code_str)
+
+        if func == "observations_in_encounter":
+            encounter_ref = params.get("encounter_ref", "latest")
+            return self._graph_encounter_observations(G, encounter_ref)
+
+        if func == "panel_results":
+            return self._graph_panel_results(G, code_str)
+
+        if func == "condition_medications":
+            return self._graph_medications_for_condition(G, code_str)
 
         return QAAnswer(value=None, kind="insufficient_data", insufficient_data=True,
                        error=f"Unsupported function: {func}")
@@ -355,3 +422,118 @@ class GraphBackedBackend:
                               provenance=[node_id, anchor_node])
 
         return QAAnswer(value=False, kind="boolean", provenance=[anchor_node])
+
+    def _graph_medications_for_condition(self, G: "nx.DiGraph", condition_code: str) -> QAAnswer:
+        """Find all medications prescribed for a specific condition via graph edges."""
+        condition_node = None
+        for node_id, attrs in G.nodes(data=True):
+            if attrs.get("resourceType") != "Condition":
+                continue
+            if condition_code in attrs.get("codes", []):
+                condition_node = node_id
+                break
+
+        if not condition_node:
+            return QAAnswer(value=None, kind="insufficient_data", insufficient_data=True)
+
+        med_names = []
+        provenance = [condition_node]
+        for pred in G.predecessors(condition_node):
+            edge_data = G.edges[pred, condition_node]
+            if edge_data.get("relation") != "indication":
+                continue
+            pred_attrs = G.nodes[pred]
+            if pred_attrs.get("resourceType") not in ("MedicationRequest", "MedicationStatement"):
+                continue
+            if pred_attrs.get("status") in ("cancelled", "entered-in-error", "stopped"):
+                continue
+            display = pred_attrs.get("display", pred)
+            med_names.append(display)
+            provenance.append(pred)
+
+        if not med_names:
+            return QAAnswer(value=[], kind="code", provenance=provenance)
+
+        return QAAnswer(value=med_names, kind="code", provenance=provenance)
+
+    def _graph_encounter_observations(self, G: "nx.DiGraph", encounter_ref: str) -> QAAnswer:
+        """Find all observations from a specific encounter via graph edges."""
+        if encounter_ref == "latest":
+            enc_nodes = []
+            for node_id, attrs in G.nodes(data=True):
+                if attrs.get("resourceType") == "Encounter":
+                    enc_nodes.append((attrs.get("period_start_dt"), node_id))
+            if not enc_nodes:
+                return QAAnswer(value=None, kind="insufficient_data", insufficient_data=True)
+            enc_nodes.sort(key=lambda e: e[0] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+            encounter_ref = enc_nodes[0][1]
+        elif not encounter_ref.startswith("Encounter/"):
+            encounter_ref = f"Encounter/{encounter_ref}"
+
+        if encounter_ref not in G:
+            return QAAnswer(value=None, kind="insufficient_data", insufficient_data=True)
+
+        obs_list = []
+        provenance = [encounter_ref]
+        for succ in G.successors(encounter_ref):
+            edge_data = G.edges[encounter_ref, succ]
+            if edge_data.get("relation") != "has_observation":
+                continue
+            succ_attrs = G.nodes[succ]
+            if succ_attrs.get("resourceType") == "Observation":
+                display = succ_attrs.get("display", succ)
+                value = succ_attrs.get("value")
+                unit = succ_attrs.get("unit", "")
+                components = succ_attrs.get("components", {})
+                if components:
+                    for comp_code, comp_data in components.items():
+                        obs_list.append({
+                            "name": comp_data.get("display", comp_code),
+                            "value": comp_data["value"],
+                            "unit": comp_data.get("unit", ""),
+                        })
+                elif value is not None:
+                    obs_list.append({"name": display, "value": value, "unit": unit or ""})
+                provenance.append(succ)
+
+        return QAAnswer(
+            value=obs_list if obs_list else None,
+            kind="code" if obs_list else "insufficient_data",
+            provenance=provenance,
+            insufficient_data=not obs_list,
+        )
+
+    def _graph_panel_results(self, G: "nx.DiGraph", panel_code: str) -> QAAnswer:
+        """Find all component results of a diagnostic report/panel via graph edges."""
+        panel_node = None
+        for node_id, attrs in G.nodes(data=True):
+            if attrs.get("resourceType") != "DiagnosticReport":
+                continue
+            if panel_code in attrs.get("codes", []):
+                panel_node = node_id
+                break
+
+        if not panel_node:
+            return QAAnswer(value=None, kind="insufficient_data", insufficient_data=True)
+
+        results = []
+        provenance = [panel_node]
+        for succ in G.successors(panel_node):
+            edge_data = G.edges[panel_node, succ]
+            if edge_data.get("relation") != "has_result":
+                continue
+            succ_attrs = G.nodes[succ]
+            if succ_attrs.get("resourceType") == "Observation":
+                display = succ_attrs.get("display", succ)
+                value = succ_attrs.get("value")
+                unit = succ_attrs.get("unit", "")
+                if value is not None:
+                    results.append({"name": display, "value": value, "unit": unit or ""})
+                provenance.append(succ)
+
+        return QAAnswer(
+            value=results if results else None,
+            kind="code" if results else "insufficient_data",
+            provenance=provenance,
+            insufficient_data=not results,
+        )
