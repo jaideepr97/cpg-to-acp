@@ -4,55 +4,105 @@
     "category": "lookup",
     "level": 1,
     "question": "What is the patient's most recent systolic blood pressure?",
-    "structured_intent": {"function": "latest_value", "params": {"code": "http://loinc.org|8480-6"}},
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|8480-6"
+      }
+    },
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 144},
-    "expected_provenance": ["Observation/bp-2026-05-30"]
+    "expected": {
+      "kind": "number",
+      "value": 144
+    },
+    "expected_provenance": [
+      "Observation/bp-2026-05-30"
+    ]
   },
   {
     "id": "smoke-lookup-002",
     "category": "lookup",
     "level": 1,
     "question": "What is the patient's most recent diastolic blood pressure?",
-    "structured_intent": {"function": "latest_value", "params": {"code": "http://loinc.org|8462-4"}},
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|8462-4"
+      }
+    },
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 91},
-    "expected_provenance": ["Observation/bp-2026-05-30"]
+    "expected": {
+      "kind": "number",
+      "value": 91
+    },
+    "expected_provenance": [
+      "Observation/bp-2026-05-30"
+    ]
   },
   {
     "id": "smoke-lookup-003",
     "category": "lookup",
     "level": 1,
     "question": "What is the patient's heart rate?",
-    "structured_intent": {"function": "latest_value", "params": {"code": "http://loinc.org|8867-4"}},
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|8867-4"
+      }
+    },
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 78},
-    "expected_provenance": ["Observation/obs-hr-01"]
+    "expected": {
+      "kind": "number",
+      "value": 78
+    },
+    "expected_provenance": [
+      "Observation/obs-hr-01"
+    ]
   },
   {
     "id": "smoke-lookup-004",
     "category": "lookup",
     "level": 1,
     "question": "What is the patient's body temperature?",
-    "structured_intent": {"function": "latest_value", "params": {"code": "http://loinc.org|8310-5"}},
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|8310-5"
+      }
+    },
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 36.8},
-    "expected_provenance": ["Observation/obs-temp-01"]
+    "expected": {
+      "kind": "number",
+      "value": 36.8
+    },
+    "expected_provenance": [
+      "Observation/obs-temp-01"
+    ]
   },
   {
     "id": "smoke-lookup-005",
     "category": "lookup",
     "level": 1,
     "question": "What is the patient's oxygen saturation?",
-    "structured_intent": {"function": "latest_value", "params": {"code": "http://loinc.org|2708-6"}},
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|2708-6"
+      }
+    },
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 97},
-    "expected_provenance": ["Observation/obs-spo2-01"]
+    "expected": {
+      "kind": "number",
+      "value": 97
+    },
+    "expected_provenance": [
+      "Observation/obs-spo2-01"
+    ]
   },
   {
     "id": "smoke-lookup-006",
@@ -61,8 +111,13 @@
     "question": "What is the patient's HbA1c?",
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 7.8},
-    "expected_provenance": ["Observation/obs-hba1c-01"]
+    "expected": {
+      "kind": "number",
+      "value": 7.8
+    },
+    "expected_provenance": [
+      "Observation/obs-hba1c-01"
+    ]
   },
   {
     "id": "smoke-lookup-007",
@@ -71,8 +126,13 @@
     "question": "What is the patient's eGFR?",
     "bundle": "bundles/ckd-declining-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 40},
-    "expected_provenance": ["Observation/egfr-2026-05-28"]
+    "expected": {
+      "kind": "number",
+      "value": 40
+    },
+    "expected_provenance": [
+      "Observation/egfr-2026-05-28"
+    ]
   },
   {
     "id": "smoke-lookup-008",
@@ -81,8 +141,13 @@
     "question": "What is the patient's serum creatinine?",
     "bundle": "bundles/ckd-declining-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 1.6},
-    "expected_provenance": ["Observation/creat-2026-05-28"]
+    "expected": {
+      "kind": "number",
+      "value": 1.6
+    },
+    "expected_provenance": [
+      "Observation/creat-2026-05-28"
+    ]
   },
   {
     "id": "smoke-lookup-009",
@@ -91,8 +156,13 @@
     "question": "What is the patient's serum potassium?",
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 4.2},
-    "expected_provenance": ["Observation/obs-k-01"]
+    "expected": {
+      "kind": "number",
+      "value": 4.2
+    },
+    "expected_provenance": [
+      "Observation/obs-k-01"
+    ]
   },
   {
     "id": "smoke-lookup-010",
@@ -101,50 +171,88 @@
     "question": "What is the patient's fasting blood glucose?",
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 142},
-    "expected_provenance": ["Observation/obs-fbg-01"]
+    "expected": {
+      "kind": "number",
+      "value": 142
+    },
+    "expected_provenance": [
+      "Observation/obs-fbg-01"
+    ]
   },
-
   {
     "id": "smoke-boolean-001",
     "category": "boolean",
     "level": 1,
     "question": "Does the patient have an active hypertension diagnosis?",
-    "structured_intent": {"function": "has_condition", "params": {"code": "http://snomed.info/sct|59621000"}},
+    "structured_intent": {
+      "function": "has_condition",
+      "params": {
+        "code": "http://snomed.info/sct|59621000"
+      }
+    },
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "boolean", "value": true},
-    "expected_provenance": ["Condition/condition-htn-01"]
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    },
+    "expected_provenance": [
+      "Condition/condition-htn-01"
+    ]
   },
   {
     "id": "smoke-boolean-002",
     "category": "boolean",
     "level": 1,
     "question": "Does the patient have a penicillin allergy?",
-    "structured_intent": {"function": "has_allergy", "params": {"code": "http://snomed.info/sct|91936005"}},
+    "structured_intent": {
+      "function": "has_allergy",
+      "params": {
+        "code": "http://snomed.info/sct|91936005"
+      }
+    },
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "boolean", "value": true}
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
   },
   {
     "id": "smoke-boolean-003",
     "category": "boolean",
     "level": 1,
     "question": "Does the patient have an active heart failure diagnosis?",
-    "structured_intent": {"function": "has_condition", "params": {"code": "http://snomed.info/sct|84114007"}},
+    "structured_intent": {
+      "function": "has_condition",
+      "params": {
+        "code": "http://snomed.info/sct|84114007"
+      }
+    },
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "boolean", "value": false}
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
   },
   {
     "id": "smoke-boolean-004",
     "category": "boolean",
     "level": 1,
     "question": "Is the patient currently on warfarin?",
-    "structured_intent": {"function": "has_medication", "params": {"code": "http://www.nlm.nih.gov/research/umls/rxnorm|11289"}},
+    "structured_intent": {
+      "function": "has_medication",
+      "params": {
+        "code": "http://www.nlm.nih.gov/research/umls/rxnorm|11289"
+      }
+    },
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "boolean", "value": false}
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
   },
   {
     "id": "smoke-boolean-005",
@@ -153,7 +261,10 @@
     "question": "Does the patient have diabetes?",
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "boolean", "value": true}
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
   },
   {
     "id": "smoke-boolean-006",
@@ -162,7 +273,10 @@
     "question": "Does the patient have kidney disease?",
     "bundle": "bundles/ckd-declining-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "boolean", "value": true}
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
   },
   {
     "id": "smoke-boolean-007",
@@ -171,7 +285,10 @@
     "question": "Is the patient currently on metformin?",
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "boolean", "value": true}
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
   },
   {
     "id": "smoke-boolean-008",
@@ -180,9 +297,11 @@
     "question": "Does the patient have high blood pressure?",
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "boolean", "value": true}
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
   },
-
   {
     "id": "smoke-bridging-001",
     "category": "bridging",
@@ -190,8 +309,13 @@
     "question": "Systolic BP",
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 144},
-    "expected_provenance": ["Observation/bp-2026-05-30"]
+    "expected": {
+      "kind": "number",
+      "value": 144
+    },
+    "expected_provenance": [
+      "Observation/bp-2026-05-30"
+    ]
   },
   {
     "id": "smoke-bridging-002",
@@ -200,8 +324,13 @@
     "question": "Diastolic BP",
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 91},
-    "expected_provenance": ["Observation/bp-2026-05-30"]
+    "expected": {
+      "kind": "number",
+      "value": 91
+    },
+    "expected_provenance": [
+      "Observation/bp-2026-05-30"
+    ]
   },
   {
     "id": "smoke-bridging-003",
@@ -210,7 +339,10 @@
     "question": "Has Diabetes",
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "boolean", "value": true}
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
   },
   {
     "id": "smoke-bridging-004",
@@ -219,7 +351,10 @@
     "question": "Has CKD",
     "bundle": "bundles/ckd-declining-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "boolean", "value": true}
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
   },
   {
     "id": "smoke-bridging-005",
@@ -228,7 +363,10 @@
     "question": "HbA1c Value",
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 7.8}
+    "expected": {
+      "kind": "number",
+      "value": 7.8
+    }
   },
   {
     "id": "smoke-bridging-006",
@@ -237,7 +375,10 @@
     "question": "Patient Age",
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 67}
+    "expected": {
+      "kind": "number",
+      "value": 67
+    }
   },
   {
     "id": "smoke-bridging-007",
@@ -246,7 +387,10 @@
     "question": "Blood Sugar Level",
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 142}
+    "expected": {
+      "kind": "number",
+      "value": 142
+    }
   },
   {
     "id": "smoke-bridging-008",
@@ -255,9 +399,11 @@
     "question": "Smoking Status",
     "bundle": "bundles/edge-coded-values.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "code", "value": "449868002"}
+    "expected": {
+      "kind": "code",
+      "value": "449868002"
+    }
   },
-
   {
     "id": "smoke-drugclass-001",
     "category": "drug_class",
@@ -265,7 +411,10 @@
     "question": "Is the patient currently on any ACE inhibitor?",
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "boolean", "value": true}
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
   },
   {
     "id": "smoke-drugclass-002",
@@ -274,7 +423,10 @@
     "question": "Is the patient currently on any statin medication?",
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "boolean", "value": true}
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
   },
   {
     "id": "smoke-drugclass-003",
@@ -283,7 +435,10 @@
     "question": "Is the patient currently on any calcium channel blocker?",
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "boolean", "value": true}
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
   },
   {
     "id": "smoke-drugclass-004",
@@ -292,9 +447,11 @@
     "question": "Is the patient currently on any beta-blocker?",
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "boolean", "value": false}
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
   },
-
   {
     "id": "smoke-derived-001",
     "category": "derived",
@@ -302,7 +459,10 @@
     "question": "What is the patient's BMI?",
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 32.1}
+    "expected": {
+      "kind": "number",
+      "value": 32.1
+    }
   },
   {
     "id": "smoke-derived-002",
@@ -311,7 +471,10 @@
     "question": "What is the patient's age?",
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 67}
+    "expected": {
+      "kind": "number",
+      "value": 67
+    }
   },
   {
     "id": "smoke-derived-003",
@@ -320,7 +483,10 @@
     "question": "What is the patient's age?",
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": 55}
+    "expected": {
+      "kind": "number",
+      "value": 55
+    }
   },
   {
     "id": "smoke-derived-004",
@@ -329,169 +495,313 @@
     "question": "What is the patient's urine albumin-to-creatinine ratio category (A1/A2/A3)?",
     "bundle": "bundles/ckd-declining-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "code", "value": "A2"}
+    "expected": {
+      "kind": "code",
+      "value": "A2"
+    }
   },
-
   {
     "id": "smoke-temporal-001",
     "category": "temporal",
     "level": 4,
     "question": "How many systolic BP readings >= 140 mmHg in the 3 months before the reference date?",
-    "structured_intent": {"function": "observation_count", "params": {"code": "http://loinc.org|8480-6", "duration": "P3M", "threshold": 140, "comparator": "ge"}},
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|8480-6",
+        "duration": "P3M",
+        "threshold": 140,
+        "comparator": "ge"
+      }
+    },
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "count", "value": 5},
-    "expected_provenance": ["Observation/bp-2026-03-14", "Observation/bp-2026-04-02", "Observation/bp-2026-04-28", "Observation/bp-2026-05-20", "Observation/bp-2026-05-30"]
+    "expected": {
+      "kind": "count",
+      "value": 5
+    },
+    "expected_provenance": [
+      "Observation/bp-2026-03-14",
+      "Observation/bp-2026-04-02",
+      "Observation/bp-2026-04-28",
+      "Observation/bp-2026-05-20",
+      "Observation/bp-2026-05-30"
+    ]
   },
   {
     "id": "smoke-temporal-002",
     "category": "temporal",
     "level": 4,
     "question": "How many consecutive systolic BP readings above 140 from the most recent backward?",
-    "structured_intent": {"function": "consecutive_above", "params": {"code": "http://loinc.org|8480-6", "threshold": 140}},
+    "structured_intent": {
+      "function": "consecutive_above",
+      "params": {
+        "code": "http://loinc.org|8480-6",
+        "threshold": 140
+      }
+    },
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "count", "value": 5}
+    "expected": {
+      "kind": "count",
+      "value": 5
+    }
   },
   {
     "id": "smoke-temporal-003",
     "category": "temporal",
     "level": 4,
     "question": "What is the eGFR rate of change over the past year (mL/min/1.73m2 per year)?",
-    "structured_intent": {"function": "rate_of_change", "params": {"code": "http://loinc.org|33914-3", "duration": "P1Y"}},
+    "structured_intent": {
+      "function": "rate_of_change",
+      "params": {
+        "code": "http://loinc.org|33914-3",
+        "duration": "P1Y"
+      }
+    },
     "bundle": "bundles/ckd-declining-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "number", "value": -8.0}
+    "expected": {
+      "kind": "number",
+      "value": -8.0
+    }
   },
   {
     "id": "smoke-temporal-004",
     "category": "temporal",
     "level": 4,
     "question": "How many BP readings are recorded in the past 6 months?",
-    "structured_intent": {"function": "observation_count", "params": {"code": "http://loinc.org|85354-9", "duration": "P6M"}},
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|85354-9",
+        "duration": "P6M"
+      }
+    },
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "count", "value": 8}
+    "expected": {
+      "kind": "count",
+      "value": 8
+    }
   },
   {
     "id": "smoke-temporal-005",
     "category": "temporal",
     "level": 4,
     "question": "Was a basic metabolic panel obtained within 2 weeks of starting lisinopril?",
-    "structured_intent": {"function": "cross_resource_temporal", "params": {"anchor_resource": "MedicationRequest", "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|314076", "target_code": "http://loinc.org|51990-0", "window": "P14D"}},
+    "structured_intent": {
+      "function": "cross_resource_temporal",
+      "params": {
+        "anchor_resource": "MedicationRequest",
+        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|314076",
+        "target_code": "http://loinc.org|51990-0",
+        "window": "P14D"
+      }
+    },
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "boolean", "value": true}
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
   },
   {
     "id": "smoke-temporal-006",
     "category": "temporal",
     "level": 4,
     "question": "How many eGFR measurements are in the past year?",
-    "structured_intent": {"function": "observation_count", "params": {"code": "http://loinc.org|33914-3", "duration": "P1Y"}},
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|33914-3",
+        "duration": "P1Y"
+      }
+    },
     "bundle": "bundles/ckd-declining-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "count", "value": 5}
+    "expected": {
+      "kind": "count",
+      "value": 5
+    }
   },
   {
     "id": "smoke-temporal-007",
     "category": "temporal",
     "level": 4,
     "question": "Is the patient's most recent eGFR lower than the one before it?",
-    "structured_intent": {"function": "trend_declining", "params": {"code": "http://loinc.org|33914-3"}},
+    "structured_intent": {
+      "function": "trend_declining",
+      "params": {
+        "code": "http://loinc.org|33914-3"
+      }
+    },
     "bundle": "bundles/ckd-declining-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "boolean", "value": true}
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
   },
   {
     "id": "smoke-temporal-008",
     "category": "temporal",
     "level": 4,
-    "question": "Has the patient's BP been confirmed elevated (SBP >= 140) on at least 2 separate occasions?",
-    "structured_intent": {"function": "observation_count", "params": {"code": "http://loinc.org|8480-6", "duration": "P12M", "threshold": 140, "comparator": "ge"}},
+    "question": "How many systolic BP readings >= 140 mmHg in the past 12 months?",
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|8480-6",
+        "duration": "P12M",
+        "threshold": 140,
+        "comparator": "ge"
+      }
+    },
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "boolean", "value": true}
+    "expected": {
+      "kind": "count",
+      "value": 7
+    }
   },
-
   {
     "id": "smoke-insuff-001",
     "category": "insufficient_data",
     "level": 1,
     "question": "What is the patient's TSH level?",
-    "structured_intent": {"function": "latest_value", "params": {"code": "http://loinc.org|3016-3"}},
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|3016-3"
+      }
+    },
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "insufficient_data"}
+    "expected": {
+      "kind": "insufficient_data"
+    }
   },
   {
     "id": "smoke-insuff-002",
     "category": "insufficient_data",
     "level": 1,
     "question": "What is the patient's ejection fraction?",
-    "structured_intent": {"function": "latest_value", "params": {"code": "http://loinc.org|10230-1"}},
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|10230-1"
+      }
+    },
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "insufficient_data"}
+    "expected": {
+      "kind": "insufficient_data"
+    }
   },
   {
     "id": "smoke-insuff-003",
     "category": "insufficient_data",
     "level": 1,
     "question": "What is the patient's INR?",
-    "structured_intent": {"function": "latest_value", "params": {"code": "http://loinc.org|6301-6"}},
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|6301-6"
+      }
+    },
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "insufficient_data"}
+    "expected": {
+      "kind": "insufficient_data"
+    }
   },
   {
     "id": "smoke-insuff-004",
     "category": "insufficient_data",
     "level": 1,
     "question": "What is the patient's BNP level?",
-    "structured_intent": {"function": "latest_value", "params": {"code": "http://loinc.org|30934-4"}},
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|30934-4"
+      }
+    },
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "insufficient_data"}
+    "expected": {
+      "kind": "insufficient_data"
+    }
   },
   {
     "id": "smoke-insuff-005",
     "category": "insufficient_data",
     "level": 2,
     "question": "Does the patient have a history of bariatric surgery?",
-    "structured_intent": {"function": "has_procedure", "params": {"code": "http://snomed.info/sct|9174002"}},
+    "structured_intent": {
+      "function": "has_procedure",
+      "params": {
+        "code": "http://snomed.info/sct|9174002"
+      }
+    },
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "insufficient_data"}
+    "expected": {
+      "kind": "insufficient_data"
+    }
   },
   {
     "id": "smoke-insuff-006",
     "category": "insufficient_data",
     "level": 2,
     "question": "Does the patient have a family history of cardiovascular disease?",
-    "structured_intent": {"function": "has_family_history", "params": {"code": "http://snomed.info/sct|266894000"}},
+    "structured_intent": {
+      "function": "has_family_history",
+      "params": {
+        "code": "http://snomed.info/sct|266894000"
+      }
+    },
     "bundle": "bundles/complex-patient-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "insufficient_data"}
+    "expected": {
+      "kind": "insufficient_data"
+    }
   },
   {
     "id": "smoke-insuff-007",
     "category": "insufficient_data",
     "level": 2,
     "question": "What is the patient's serum sodium level?",
-    "structured_intent": {"function": "latest_value", "params": {"code": "http://loinc.org|2951-2"}},
+    "structured_intent": {
+      "function": "latest_value",
+      "params": {
+        "code": "http://loinc.org|2951-2"
+      }
+    },
     "bundle": "bundles/htn-temporal-01.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "insufficient_data"}
+    "expected": {
+      "kind": "insufficient_data"
+    }
   },
   {
-    "id": "smoke-insuff-008",
-    "category": "insufficient_data",
+    "id": "smoke-temporal-009",
+    "category": "temporal",
     "level": 4,
     "question": "How many systolic BP readings >= 140 in the past month?",
-    "structured_intent": {"function": "observation_count", "params": {"code": "http://loinc.org|8480-6", "duration": "P1M", "threshold": 140, "comparator": "ge"}},
+    "structured_intent": {
+      "function": "observation_count",
+      "params": {
+        "code": "http://loinc.org|8480-6",
+        "duration": "P1M",
+        "threshold": 140,
+        "comparator": "ge"
+      }
+    },
     "bundle": "bundles/edge-missing-dates.json",
     "reference_date": "2026-06-01",
-    "expected": {"kind": "insufficient_data"}
+    "expected": {
+      "kind": "count",
+      "value": 0
+    }
   }
 ]

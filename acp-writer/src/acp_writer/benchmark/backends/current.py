@@ -1,7 +1,7 @@
-"""CurrentImplementationBackend — wraps the existing ips_extractor + KNOWN_VARIABLE_MAP.
+"""CurrentImplementationBackend — wraps the acp-writer extraction layer.
 
-Faithfully represents what the current acp-writer can answer.
-Does not add capabilities beyond what _extract_input_value does today.
+Uses the full extraction capability: direct extraction functions,
+temporal index + primitives, and variable name resolution.
 """
 
 import re
@@ -20,6 +20,14 @@ from acp_writer.tools.ips_extractor import (
     extract_patient_age,
     extract_procedure,
 )
+from acp_writer.tools.temporal_index import build_temporal_index
+from acp_writer.tools.temporal_queries import (
+    consecutive_above,
+    cross_resource_temporal,
+    observation_count,
+    observations_in_window,
+    rate_of_change,
+)
 
 _OBSERVATION_FUNCTIONS = {"latest_value", "observation_value"}
 _CONDITION_FUNCTIONS = {"has_condition", "condition_check"}
@@ -29,6 +37,12 @@ _PROCEDURE_FUNCTIONS = {"has_procedure", "procedure_check"}
 _FAMILY_HISTORY_FUNCTIONS = {"has_family_history", "family_history_check"}
 _DIAGNOSTIC_REPORT_FUNCTIONS = {"has_diagnostic_report", "diagnostic_report_check"}
 _AGE_FUNCTIONS = {"patient_age", "age"}
+_TEMPORAL_FUNCTIONS = {
+    "observation_count", "observations_in_window",
+    "consecutive_above", "rate_of_change",
+    "cross_resource_temporal", "trend_declining",
+    "observation_at",
+}
 
 
 class CurrentImplementationBackend:
@@ -47,6 +61,9 @@ class CurrentImplementationBackend:
         func = structured_intent.get("function", "")
         params = structured_intent.get("params", {})
         code_str = params.get("code", "")
+
+        if func in _TEMPORAL_FUNCTIONS and func == "cross_resource_temporal":
+            return self._run_temporal(func, params, bundle, reference_date, "")
 
         if "|" not in code_str:
             return QAAnswer(
@@ -106,6 +123,9 @@ class CurrentImplementationBackend:
                 )
             return QAAnswer(value=None, kind="insufficient_data", insufficient_data=True)
 
+        if func in _TEMPORAL_FUNCTIONS:
+            return self._run_temporal(func, params, bundle, reference_date, code_str)
+
         return QAAnswer(
             value=None,
             kind="insufficient_data",
@@ -153,6 +173,114 @@ class CurrentImplementationBackend:
             value=result.found,
             kind="boolean",
             provenance=[result.fhir_reference] if result.fhir_reference else [],
+        )
+
+    def _run_temporal(
+        self, func: str, params: dict, bundle: dict, reference_date: date, code_str: str,
+    ) -> QAAnswer:
+        """Route temporal functions to the temporal query primitives."""
+        index = build_temporal_index(bundle)
+
+        if func == "observations_in_window":
+            result = observations_in_window(
+                index, code_str, params.get("duration", "P12M"), reference_date,
+            )
+            if result.found and isinstance(result.value, list):
+                latest = result.value[0] if result.value else None
+                return QAAnswer(
+                    value=latest["value"] if latest else None,
+                    kind="number",
+                    provenance=result.provenance,
+                )
+            return QAAnswer(value=None, kind="insufficient_data", insufficient_data=True)
+
+        if func == "observation_count":
+            result = observation_count(
+                index, code_str,
+                params.get("duration", "P12M"),
+                reference_date,
+                threshold=params.get("threshold"),
+                comparator=params.get("comparator"),
+            )
+            if result.found:
+                return QAAnswer(
+                    value=result.value, kind="count", provenance=result.provenance,
+                )
+            return QAAnswer(value=None, kind="insufficient_data", insufficient_data=True)
+
+        if func == "consecutive_above":
+            result = consecutive_above(
+                index, code_str, params.get("threshold", 0), reference_date,
+            )
+            if result.found:
+                return QAAnswer(
+                    value=result.value, kind="count", provenance=result.provenance,
+                )
+            return QAAnswer(value=None, kind="insufficient_data", insufficient_data=True)
+
+        if func == "rate_of_change":
+            result = rate_of_change(
+                index, code_str, params.get("duration", "P1Y"), reference_date,
+            )
+            if result.found:
+                return QAAnswer(
+                    value=result.value, kind="number", provenance=result.provenance,
+                )
+            return QAAnswer(
+                value=None, kind="insufficient_data", insufficient_data=True,
+                error=result.data_quality,
+            )
+
+        if func == "cross_resource_temporal":
+            anchor_code = params.get("anchor_code", "")
+            target_code = params.get("target_code", "")
+            window = params.get("window", "P14D")
+            result = cross_resource_temporal(
+                index, bundle, anchor_code, target_code, window,
+            )
+            if result.found:
+                return QAAnswer(
+                    value=result.value, kind="boolean", provenance=result.provenance,
+                )
+            return QAAnswer(
+                value=None, kind="insufficient_data", insufficient_data=True,
+                error=result.data_quality,
+            )
+
+        if func == "trend_declining":
+            obs_list = index.get_observations(code_str)
+            dated = [o for o in obs_list if o.has_date and o.effective_dt is not None]
+            if len(dated) < 2:
+                return QAAnswer(value=None, kind="insufficient_data", insufficient_data=True)
+            dated.sort(key=lambda o: o.effective_dt, reverse=True)
+            try:
+                declining = float(dated[0].value) < float(dated[1].value)
+            except (ValueError, TypeError):
+                return QAAnswer(value=None, kind="insufficient_data", insufficient_data=True)
+            return QAAnswer(
+                value=declining, kind="boolean",
+                provenance=[dated[0].fhir_reference, dated[1].fhir_reference],
+            )
+
+        if func == "observation_at":
+            target_str = params.get("target_date", "")
+            from acp_writer.tools.temporal_index import _parse_datetime
+            target_dt = _parse_datetime(target_str)
+            if not target_dt:
+                return QAAnswer(value=None, kind="insufficient_data", insufficient_data=True)
+            obs_list = index.get_observations(code_str)
+            dated = [o for o in obs_list if o.has_date and o.effective_dt is not None]
+            if not dated:
+                return QAAnswer(value=None, kind="insufficient_data", insufficient_data=True)
+            closest = min(dated, key=lambda o: abs((o.effective_dt - target_dt).total_seconds()))
+            return QAAnswer(
+                value=closest.value, kind="number",
+                provenance=[closest.fhir_reference],
+            )
+
+        return QAAnswer(
+            value=None, kind="insufficient_data", insufficient_data=True,
+            error=f"Unknown temporal function: {func}",
         )
 
     def _try_variable_map(self, question: str, bundle: dict) -> QAAnswer:

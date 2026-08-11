@@ -67,8 +67,8 @@ class TestConditionCheck:
         assert answer.kind == "boolean"
 
 
-class TestUnsupportedFunction:
-    def test_temporal_returns_insufficient_data(self):
+class TestTemporalFunction:
+    def test_observation_count_works(self):
         backend = CurrentImplementationBackend()
         bundle = _load("htn-temporal-01.json")
         answer = backend.answer(
@@ -77,8 +77,20 @@ class TestUnsupportedFunction:
             reference_date=date(2026, 6, 1),
             structured_intent={"function": "observation_count", "params": {"code": "http://loinc.org|8480-6", "duration": "P3M", "threshold": 140, "comparator": "ge"}},
         )
+        assert not answer.insufficient_data
+        assert answer.value == 5
+        assert answer.kind == "count"
+
+    def test_unsupported_function_returns_insufficient_data(self):
+        backend = CurrentImplementationBackend()
+        bundle = _load("htn-temporal-01.json")
+        answer = backend.answer(
+            question="unknown query",
+            bundle=bundle,
+            reference_date=date(2026, 6, 1),
+            structured_intent={"function": "totally_unknown_function", "params": {"code": "http://loinc.org|8480-6"}},
+        )
         assert answer.insufficient_data
-        assert answer.value is None
 
 
 class TestVariableMapFallback:
