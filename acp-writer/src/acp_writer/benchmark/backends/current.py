@@ -13,14 +13,22 @@ from acp_writer.nodes.dmn_executor import KNOWN_VARIABLE_MAP
 from acp_writer.tools.ips_extractor import (
     extract_allergy,
     extract_condition,
+    extract_diagnostic_report,
+    extract_family_history,
     extract_medication,
     extract_observation,
+    extract_patient_age,
+    extract_procedure,
 )
 
 _OBSERVATION_FUNCTIONS = {"latest_value", "observation_value"}
 _CONDITION_FUNCTIONS = {"has_condition", "condition_check"}
 _MEDICATION_FUNCTIONS = {"has_medication", "medication_check"}
 _ALLERGY_FUNCTIONS = {"has_allergy", "allergy_check"}
+_PROCEDURE_FUNCTIONS = {"has_procedure", "procedure_check"}
+_FAMILY_HISTORY_FUNCTIONS = {"has_family_history", "family_history_check"}
+_DIAGNOSTIC_REPORT_FUNCTIONS = {"has_diagnostic_report", "diagnostic_report_check"}
+_AGE_FUNCTIONS = {"patient_age", "age"}
 
 
 class CurrentImplementationBackend:
@@ -61,6 +69,42 @@ class CurrentImplementationBackend:
 
         if func in _ALLERGY_FUNCTIONS:
             return self._extract_allergy(bundle, system, code)
+
+        if func in _PROCEDURE_FUNCTIONS:
+            result = extract_procedure(bundle, system, code)
+            return QAAnswer(
+                value=result.found if result.found else False,
+                kind="boolean",
+                provenance=[result.fhir_reference] if result.fhir_reference else [],
+                insufficient_data=not result.found,
+            )
+
+        if func in _FAMILY_HISTORY_FUNCTIONS:
+            result = extract_family_history(bundle, system, code)
+            return QAAnswer(
+                value=result.found if result.found else False,
+                kind="boolean",
+                provenance=[result.fhir_reference] if result.fhir_reference else [],
+                insufficient_data=not result.found,
+            )
+
+        if func in _DIAGNOSTIC_REPORT_FUNCTIONS:
+            result = extract_diagnostic_report(bundle, system, code)
+            return QAAnswer(
+                value=result.found if result.found else False,
+                kind="boolean",
+                provenance=[result.fhir_reference] if result.fhir_reference else [],
+                insufficient_data=not result.found,
+            )
+
+        if func in _AGE_FUNCTIONS:
+            result = extract_patient_age(bundle, reference_date)
+            if result.found:
+                return QAAnswer(
+                    value=result.value, kind="number",
+                    provenance=[result.fhir_reference] if result.fhir_reference else [],
+                )
+            return QAAnswer(value=None, kind="insufficient_data", insufficient_data=True)
 
         return QAAnswer(
             value=None,

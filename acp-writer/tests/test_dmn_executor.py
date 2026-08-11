@@ -78,6 +78,38 @@ class TestExtractInputValue:
         value, ref = _extract_input_value({"entry": []}, "Unknown Variable", "string", {})
         assert value is None
 
+    def test_extract_via_codes_observation(self):
+        bundle = _load_bundle("patient-bundle-medication.json")
+        codes = [f"{LOINC}|8480-6"]
+        value, ref = _extract_input_value(
+            bundle, "SBP Reading", "number", {}, codes=codes
+        )
+        assert value == 142
+
+    def test_extract_via_codes_condition(self):
+        bundle = _load_bundle("patient-bundle-medication.json")
+        codes = [f"{SNOMED}|44054006"]
+        value, ref = _extract_input_value(
+            bundle, "Diabetes Present", "boolean", {}, codes=codes
+        )
+        assert value is True
+
+    def test_codes_take_priority_over_map(self):
+        """When codes are provided, they are used even if the name matches the map."""
+        bundle = _load_bundle("patient-bundle-medication.json")
+        codes = [f"{LOINC}|8462-4"]
+        value, ref = _extract_input_value(
+            bundle, "Systolic BP", "number", {}, codes=codes
+        )
+        assert value == 92
+
+    def test_codes_none_falls_back_to_map(self):
+        bundle = _load_bundle("patient-bundle-medication.json")
+        value, ref = _extract_input_value(
+            bundle, "Systolic BP", "number", {}, codes=None
+        )
+        assert value == 142
+
 
 class TestDMNExecutor:
     def test_no_models(self):

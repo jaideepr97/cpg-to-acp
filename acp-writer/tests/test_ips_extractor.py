@@ -3,11 +3,17 @@
 import json
 from pathlib import Path
 
+from datetime import date
+
 from acp_writer.tools.ips_extractor import (
     extract_allergy,
     extract_condition,
+    extract_diagnostic_report,
+    extract_family_history,
     extract_medication,
     extract_observation,
+    extract_patient_age,
+    extract_procedure,
 )
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -228,6 +234,226 @@ class TestExtractAllergy:
             ],
         }
         result = extract_allergy(bundle, SNOMED, "91936005")
+        assert not result.found
+
+
+class TestObservationValueTypes:
+    def test_value_codeable_concept(self):
+        bundle = {
+            "entry": [{
+                "resource": {
+                    "resourceType": "Observation",
+                    "id": "obs-smoking",
+                    "status": "final",
+                    "effectiveDateTime": "2026-04-01",
+                    "code": {"coding": [{"system": LOINC, "code": "72166-2"}]},
+                    "valueCodeableConcept": {
+                        "coding": [{"system": SNOMED, "code": "449868002", "display": "Current every day smoker"}]
+                    },
+                },
+            }],
+        }
+        result = extract_observation(bundle, LOINC, "72166-2")
+        assert result.found
+        assert result.value == "449868002"
+
+    def test_value_codeable_concept_text_fallback(self):
+        bundle = {
+            "entry": [{
+                "resource": {
+                    "resourceType": "Observation",
+                    "id": "obs-coded-text",
+                    "status": "final",
+                    "effectiveDateTime": "2026-04-01",
+                    "code": {"coding": [{"system": LOINC, "code": "72166-2"}]},
+                    "valueCodeableConcept": {"text": "Never smoker"},
+                },
+            }],
+        }
+        result = extract_observation(bundle, LOINC, "72166-2")
+        assert result.found
+        assert result.value == "Never smoker"
+
+    def test_value_string(self):
+        bundle = {
+            "entry": [{
+                "resource": {
+                    "resourceType": "Observation",
+                    "id": "obs-string",
+                    "status": "final",
+                    "effectiveDateTime": "2026-03-20",
+                    "code": {"coding": [{"system": LOINC, "code": "5811-5"}]},
+                    "valueString": "Trace",
+                },
+            }],
+        }
+        result = extract_observation(bundle, LOINC, "5811-5")
+        assert result.found
+        assert result.value == "Trace"
+
+    def test_value_boolean(self):
+        bundle = {
+            "entry": [{
+                "resource": {
+                    "resourceType": "Observation",
+                    "id": "obs-bool",
+                    "status": "final",
+                    "effectiveDateTime": "2026-04-01",
+                    "code": {"coding": [{"system": LOINC, "code": "11111-1"}]},
+                    "valueBoolean": True,
+                },
+            }],
+        }
+        result = extract_observation(bundle, LOINC, "11111-1")
+        assert result.found
+        assert result.value is True
+
+    def test_value_quantity_still_works(self):
+        bundle = {
+            "entry": [{
+                "resource": {
+                    "resourceType": "Observation",
+                    "id": "obs-qty",
+                    "status": "final",
+                    "effectiveDateTime": "2026-05-01",
+                    "code": {"coding": [{"system": LOINC, "code": "8480-6"}]},
+                    "valueQuantity": {"value": 140, "unit": "mmHg"},
+                },
+            }],
+        }
+        result = extract_observation(bundle, LOINC, "8480-6")
+        assert result.found
+        assert result.value == 140
+        assert result.unit == "mmHg"
+
+    def test_no_value_at_all(self):
+        bundle = {
+            "entry": [{
+                "resource": {
+                    "resourceType": "Observation",
+                    "id": "obs-empty",
+                    "status": "final",
+                    "code": {"coding": [{"system": LOINC, "code": "51990-0"}]},
+                },
+            }],
+        }
+        result = extract_observation(bundle, LOINC, "51990-0")
+        assert not result.found
+
+
+class TestExtractProcedure:
+    def test_procedure_present(self):
+        bundle = {
+            "entry": [{
+                "resource": {
+                    "resourceType": "Procedure",
+                    "id": "proc-1",
+                    "status": "completed",
+                    "code": {"coding": [{"system": SNOMED, "code": "73761001", "display": "Colonoscopy"}]},
+                    "performedDateTime": "2025-06-15",
+                },
+            }],
+        }
+        result = extract_procedure(bundle, SNOMED, "73761001")
+        assert result.found
+        assert result.value is True
+        assert result.date == "2025-06-15"
+
+    def test_procedure_absent(self):
+        result = extract_procedure({"entry": []}, SNOMED, "73761001")
+        assert not result.found
+
+    def test_not_done_excluded(self):
+        bundle = {
+            "entry": [{
+                "resource": {
+                    "resourceType": "Procedure",
+                    "id": "proc-1",
+                    "status": "not-done",
+                    "code": {"coding": [{"system": SNOMED, "code": "73761001"}]},
+                },
+            }],
+        }
+        result = extract_procedure(bundle, SNOMED, "73761001")
+        assert not result.found
+
+
+class TestExtractFamilyHistory:
+    def test_family_history_present(self):
+        bundle = {
+            "entry": [{
+                "resource": {
+                    "resourceType": "FamilyMemberHistory",
+                    "id": "fmh-1",
+                    "status": "completed",
+                    "relationship": {"coding": [{"system": SNOMED, "code": "72705000", "display": "Mother"}]},
+                    "condition": [{
+                        "code": {"coding": [{"system": SNOMED, "code": "266894000", "display": "Cardiovascular disease"}]},
+                    }],
+                },
+            }],
+        }
+        result = extract_family_history(bundle, SNOMED, "266894000")
+        assert result.found
+        assert result.value is True
+
+    def test_family_history_absent(self):
+        result = extract_family_history({"entry": []}, SNOMED, "266894000")
+        assert not result.found
+
+
+class TestExtractPatientAge:
+    def test_age_calculation(self):
+        bundle = {
+            "entry": [{
+                "resource": {
+                    "resourceType": "Patient",
+                    "id": "p1",
+                    "birthDate": "1958-11-30",
+                },
+            }],
+        }
+        result = extract_patient_age(bundle, date(2026, 6, 1))
+        assert result.found
+        assert result.value == 67
+
+    def test_age_before_birthday(self):
+        bundle = {
+            "entry": [{
+                "resource": {
+                    "resourceType": "Patient",
+                    "id": "p1",
+                    "birthDate": "1971-03-15",
+                },
+            }],
+        }
+        result = extract_patient_age(bundle, date(2026, 6, 1))
+        assert result.value == 55
+
+    def test_age_on_birthday(self):
+        bundle = {
+            "entry": [{
+                "resource": {
+                    "resourceType": "Patient",
+                    "id": "p1",
+                    "birthDate": "1971-06-01",
+                },
+            }],
+        }
+        result = extract_patient_age(bundle, date(2026, 6, 1))
+        assert result.value == 55
+
+    def test_no_patient(self):
+        result = extract_patient_age({"entry": []}, date(2026, 6, 1))
+        assert not result.found
+
+    def test_no_birth_date(self):
+        bundle = {
+            "entry": [{
+                "resource": {"resourceType": "Patient", "id": "p1"},
+            }],
+        }
+        result = extract_patient_age(bundle, date(2026, 6, 1))
         assert not result.found
 
 

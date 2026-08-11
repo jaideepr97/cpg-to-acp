@@ -25,6 +25,15 @@ class DecisionVariable(BaseModel):
     type: str
     description: str | None = None
     codes: list[str] | None = None
+    """Clinical terminology codes for this variable.
+
+    Format: ``["<system-url>|<code>", ...]`` using the FHIR token search
+    format, e.g. ``["http://loinc.org|8480-6"]`` for systolic BP.
+
+    Populated by cpg-ingester during DMN generation (see GitHub #85).
+    acp-writer uses these to map DMN inputs to FHIR patient data,
+    falling back to KNOWN_VARIABLE_MAP when codes are absent.
+    """
 
 
 class DecisionModelSummary(BaseModel):
