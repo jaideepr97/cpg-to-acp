@@ -21,6 +21,7 @@ from acp_writer.tools.ips_extractor import (
     extract_procedure,
 )
 from acp_writer.tools.temporal_index import build_temporal_index
+from acp_writer.tools.concept_resolver import resolve as resolve_concept
 from acp_writer.tools.temporal_queries import (
     consecutive_above,
     cross_resource_temporal,
@@ -56,7 +57,7 @@ class CurrentImplementationBackend:
         structured_intent: dict[str, Any] | None = None,
     ) -> QAAnswer:
         if structured_intent is None:
-            return self._try_variable_map(question, bundle)
+            return self._try_variable_map(question, bundle, reference_date)
 
         func = structured_intent.get("function", "")
         params = structured_intent.get("params", {})
@@ -283,10 +284,15 @@ class CurrentImplementationBackend:
             error=f"Unknown temporal function: {func}",
         )
 
-    def _try_variable_map(self, question: str, bundle: dict) -> QAAnswer:
-        """Attempt to answer by matching question text to KNOWN_VARIABLE_MAP."""
-        key = re.sub(r"([a-z])([A-Z])", r"\1 \2", question).lower().strip()
+    def _try_variable_map(
+        self, question: str, bundle: dict, reference_date: date,
+    ) -> QAAnswer:
+        """Resolve a question using the concept resolver, falling back to KNOWN_VARIABLE_MAP."""
+        resolved = resolve_concept(question)
+        if resolved:
+            return self._execute_resolved(resolved, bundle, reference_date)
 
+        key = re.sub(r"([a-z])([A-Z])", r"\1 \2", question).lower().strip()
         for map_key, (system, code, extract_type) in KNOWN_VARIABLE_MAP.items():
             if map_key in key:
                 if extract_type == "observation":
@@ -300,5 +306,79 @@ class CurrentImplementationBackend:
             value=None,
             kind="insufficient_data",
             insufficient_data=True,
-            error="No matching variable in KNOWN_VARIABLE_MAP",
+            error="Could not resolve clinical concept from question",
+        )
+
+    def _execute_resolved(
+        self, resolved: Any, bundle: dict, reference_date: date,
+    ) -> QAAnswer:
+        """Execute an extraction based on a ResolvedConcept."""
+        if resolved.action == "extract_observation":
+            return self._extract_observation(bundle, resolved.system, resolved.code)
+
+        if resolved.action == "extract_condition":
+            if resolved.codes:
+                for code_token in resolved.codes:
+                    if "|" not in code_token:
+                        continue
+                    sys, cd = code_token.rsplit("|", 1)
+                    result = extract_condition(bundle, sys, cd)
+                    if result.found:
+                        return QAAnswer(
+                            value=True, kind="boolean",
+                            provenance=[result.fhir_reference] if result.fhir_reference else [],
+                        )
+                return QAAnswer(value=False, kind="boolean")
+            return self._extract_condition(bundle, resolved.system, resolved.code)
+
+        if resolved.action == "extract_medication":
+            return self._extract_medication(bundle, resolved.system, resolved.code)
+
+        if resolved.action == "extract_allergy":
+            return self._extract_allergy(bundle, resolved.system, resolved.code)
+
+        if resolved.action == "extract_drug_class":
+            for code_token in (resolved.codes or []):
+                if "|" not in code_token:
+                    continue
+                system, code = code_token.rsplit("|", 1)
+                result = extract_medication(bundle, system, code)
+                if result.found:
+                    return QAAnswer(
+                        value=True, kind="boolean",
+                        provenance=[result.fhir_reference] if result.fhir_reference else [],
+                    )
+            return QAAnswer(value=False, kind="boolean")
+
+        if resolved.action == "compute_age":
+            result = extract_patient_age(bundle, reference_date)
+            if result.found:
+                return QAAnswer(
+                    value=result.value, kind="number",
+                    provenance=[result.fhir_reference] if result.fhir_reference else [],
+                )
+            return QAAnswer(value=None, kind="insufficient_data", insufficient_data=True)
+
+        if resolved.action == "compute_bmi":
+            weight_result = extract_observation(bundle, "http://loinc.org", "29463-7")
+            height_result = extract_observation(bundle, "http://loinc.org", "8302-2")
+            if weight_result.found and height_result.found:
+                try:
+                    weight_kg = float(weight_result.value)
+                    height_cm = float(height_result.value)
+                    height_m = height_cm / 100
+                    bmi = round(weight_kg / (height_m ** 2), 1)
+                    provenance = []
+                    if weight_result.fhir_reference:
+                        provenance.append(weight_result.fhir_reference)
+                    if height_result.fhir_reference:
+                        provenance.append(height_result.fhir_reference)
+                    return QAAnswer(value=bmi, kind="number", provenance=provenance)
+                except (ValueError, TypeError, ZeroDivisionError):
+                    pass
+            return QAAnswer(value=None, kind="insufficient_data", insufficient_data=True)
+
+        return QAAnswer(
+            value=None, kind="insufficient_data", insufficient_data=True,
+            error=f"Unknown action: {resolved.action}",
         )
