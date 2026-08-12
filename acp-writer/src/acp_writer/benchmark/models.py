@@ -14,6 +14,8 @@ class QAAnswer:
     provenance: list[str] = field(default_factory=list)
     insufficient_data: bool = False
     error: str | None = None
+    answered_by: str | None = None
+    resolution_basis: str | None = None
 
 
 @dataclass

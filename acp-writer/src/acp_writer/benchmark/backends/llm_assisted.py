@@ -1,10 +1,12 @@
-"""LLM-assisted benchmark backend — concept resolver + LLM query plan + agent fallback.
+"""LLM-assisted benchmark backend — concept resolver + pipeline + agent fallback.
 
-Implements the full layered resolution strategy:
-1. Structured intent (if provided)
-2. Concept resolver (deterministic)
-3. LLM query plan synthesis (C2)
-4. LLM agent with tools (C3)
+Layered resolution with fall-through semantics:
+1. Structured intent (if provided) → deterministic execution
+2. Concept resolver (deterministic) → positive/insufficient short-circuit;
+   negative booleans fall through to LLM (not definitive without pipeline)
+3. LLM query plan synthesis → execute plan
+4. LLM agent with concept-based tools → open-vocabulary fallback
+5. Answer guardrails → verify before returning
 """
 
 import logging
@@ -54,11 +56,21 @@ class LLMAssistedBackend(CurrentImplementationBackend):
         structured_intent: dict[str, Any] | None = None,
     ) -> QAAnswer:
         if structured_intent is not None:
-            return super().answer(question, bundle, reference_date, structured_intent)
+            result = super().answer(question, bundle, reference_date, structured_intent)
+            result.answered_by = "structured_intent"
+            return result
 
         resolved = resolve_concept(question)
         if resolved:
-            return self._execute_resolved(resolved, bundle, reference_date)
+            result = self._execute_resolved(resolved, bundle, reference_date)
+            if result.value is True or result.insufficient_data:
+                result.answered_by = "resolver"
+                return result
+            if result.value is not False:
+                result.answered_by = "resolver"
+                return result
+            # Negative boolean from resolver → fall through to LLM
+            # (the resolver's negative is not definitive without the full pipeline)
 
         return self._llm_resolve(question, bundle, reference_date)
 
@@ -66,6 +78,7 @@ class LLMAssistedBackend(CurrentImplementationBackend):
         self, question: str, bundle: dict, reference_date: date,
     ) -> QAAnswer:
         """Try LLM query plan synthesis, falling back to agent."""
+        from acp_writer.tools.answer_guardrails import verify_answer
         from acp_writer.tools.bundle_inventory import build_bundle_inventory
 
         condensed = serialize_ips(bundle)
@@ -80,17 +93,32 @@ class LLMAssistedBackend(CurrentImplementationBackend):
                 structured_intent=plan,
             )
             if not result.insufficient_data:
+                result.answered_by = "query_plan"
                 return result
 
         from acp_writer.tools.qa_agent import agent_answer
 
         agent_result = agent_answer(question, bundle, reference_date, llm)
+
+        verified = verify_answer(agent_result, question, bundle, inventory)
+
+        if verified.get("guardrail"):
+            return QAAnswer(
+                value=None,
+                kind="insufficient_data",
+                provenance=verified.get("provenance", []),
+                insufficient_data=True,
+                error=f"guardrail:{verified['guardrail']}",
+                answered_by="guardrail_downgrade",
+            )
+
         return QAAnswer(
-            value=agent_result.get("answer"),
-            kind=self._infer_kind(agent_result.get("answer")),
-            provenance=agent_result.get("provenance", []),
-            insufficient_data=agent_result.get("insufficient_data", False),
-            error=agent_result.get("error"),
+            value=verified.get("answer"),
+            kind=self._infer_kind(verified.get("answer")),
+            provenance=verified.get("provenance", []),
+            insufficient_data=verified.get("insufficient_data", False),
+            error=verified.get("error"),
+            answered_by="agent",
         )
 
     @staticmethod
