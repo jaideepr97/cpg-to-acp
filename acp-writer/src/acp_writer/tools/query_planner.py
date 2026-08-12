@@ -89,6 +89,10 @@ Common code tokens:
 
 Duration format: P followed by number and unit (Y=years, M=months, W=weeks, D=days). E.g. P3M = 3 months.
 
+The JSON object MUST have exactly two keys: "function" and "params".
+Example: {"function": "latest_value", "params": {"code": "http://loinc.org|4548-4"}}
+Example: {"function": "patient_age", "params": {}}
+
 Respond with ONLY a valid JSON object. No markdown, no explanation."""
 
 
@@ -103,6 +107,9 @@ def validate_plan(plan: dict) -> list[str]:
         errors.append("Missing required field: function")
     elif plan["function"] not in QUERY_PLAN_SCHEMA["properties"]["function"]["enum"]:
         errors.append(f"Unknown function: {plan['function']}")
+
+    if "parameters" in plan and "params" not in plan:
+        plan["params"] = plan.pop("parameters")
 
     if "params" not in plan:
         errors.append("Missing required field: params")

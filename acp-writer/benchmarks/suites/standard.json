@@ -2234,7 +2234,10 @@
     "reference_date": "2026-06-01",
     "expected": {
       "kind": "code",
-      "value": ["Metformin 1000 MG", "Glipizide 5 MG"]
+      "value": [
+        "Metformin 1000 MG",
+        "Glipizide 5 MG"
+      ]
     },
     "expected_provenance": [
       "MedicationRequest/medrx-metformin-g1",
@@ -2256,7 +2259,10 @@
     "reference_date": "2026-06-01",
     "expected": {
       "kind": "code",
-      "value": ["Lisinopril 20 MG", "Amlodipine 5 MG"]
+      "value": [
+        "Lisinopril 20 MG",
+        "Amlodipine 5 MG"
+      ]
     },
     "expected_provenance": [
       "MedicationRequest/medrx-lisinopril-g1",
@@ -2278,7 +2284,9 @@
     "reference_date": "2026-06-01",
     "expected": {
       "kind": "code",
-      "value": ["Lisinopril 20 MG"]
+      "value": [
+        "Lisinopril 20 MG"
+      ]
     },
     "expected_provenance": [
       "MedicationRequest/medrx-lisinopril-g1"
@@ -2299,7 +2307,9 @@
     "reference_date": "2026-06-01",
     "expected": {
       "kind": "code",
-      "value": ["Atorvastatin 40 MG"]
+      "value": [
+        "Atorvastatin 40 MG"
+      ]
     },
     "expected_provenance": [
       "MedicationRequest/medrx-atorvastatin-g1"
@@ -2320,7 +2330,11 @@
     "reference_date": "2026-06-01",
     "expected": {
       "kind": "code",
-      "value": ["Metoprolol succinate 50 MG", "Furosemide 40 MG", "Lisinopril 10 MG"]
+      "value": [
+        "Metoprolol succinate 50 MG",
+        "Furosemide 40 MG",
+        "Lisinopril 10 MG"
+      ]
     },
     "expected_provenance": [
       "MedicationRequest/medrx-metoprolol-g2",
@@ -2343,7 +2357,10 @@
     "reference_date": "2026-06-01",
     "expected": {
       "kind": "code",
-      "value": ["Metoprolol succinate 50 MG", "Apixaban 5 MG"]
+      "value": [
+        "Metoprolol succinate 50 MG",
+        "Apixaban 5 MG"
+      ]
     },
     "expected_provenance": [
       "MedicationRequest/medrx-metoprolol-g2",
@@ -2365,7 +2382,9 @@
     "reference_date": "2026-06-01",
     "expected": {
       "kind": "code",
-      "value": ["Tiotropium 18 MCG"]
+      "value": [
+        "Tiotropium 18 MCG"
+      ]
     },
     "expected_provenance": [
       "MedicationRequest/medrx-tiotropium-g2"
@@ -2386,7 +2405,9 @@
     "reference_date": "2026-06-01",
     "expected": {
       "kind": "code",
-      "value": ["Metformin hydrochloride 1000 MG"]
+      "value": [
+        "Metformin hydrochloride 1000 MG"
+      ]
     },
     "expected_provenance": [
       "MedicationRequest/medrx-metformin-g2"
@@ -2613,9 +2634,21 @@
     "expected": {
       "kind": "code",
       "value": [
-        {"name": "Creatinine", "value": 1.6, "unit": "mg/dL"},
-        {"name": "Potassium", "value": 4.5, "unit": "mEq/L"},
-        {"name": "Estimated glomerular filtration rate", "value": 42, "unit": "mL/min/1.73m2"}
+        {
+          "name": "Creatinine",
+          "value": 1.6,
+          "unit": "mg/dL"
+        },
+        {
+          "name": "Potassium",
+          "value": 4.5,
+          "unit": "mEq/L"
+        },
+        {
+          "name": "Estimated glomerular filtration rate",
+          "value": 42,
+          "unit": "mL/min/1.73m2"
+        }
       ]
     },
     "expected_provenance": [
@@ -2642,9 +2675,21 @@
     "expected": {
       "kind": "code",
       "value": [
-        {"name": "Creatinine", "value": 1.7, "unit": "mg/dL"},
-        {"name": "Potassium", "value": 4.8, "unit": "mEq/L"},
-        {"name": "Estimated glomerular filtration rate", "value": 39, "unit": "mL/min/1.73m2"}
+        {
+          "name": "Creatinine",
+          "value": 1.7,
+          "unit": "mg/dL"
+        },
+        {
+          "name": "Potassium",
+          "value": 4.8,
+          "unit": "mEq/L"
+        },
+        {
+          "name": "Estimated glomerular filtration rate",
+          "value": 39,
+          "unit": "mL/min/1.73m2"
+        }
       ]
     },
     "expected_provenance": [
@@ -2671,9 +2716,21 @@
     "expected": {
       "kind": "code",
       "value": [
-        {"name": "Natriuretic peptide B [Mass/volume] in Serum or Plasma", "value": 450, "unit": "pg/mL"},
-        {"name": "Creatinine [Mass/volume] in Serum or Plasma", "value": 1.3, "unit": "mg/dL"},
-        {"name": "Potassium [Moles/volume] in Serum or Plasma", "value": 4.1, "unit": "mEq/L"}
+        {
+          "name": "Natriuretic peptide B [Mass/volume] in Serum or Plasma",
+          "value": 450,
+          "unit": "pg/mL"
+        },
+        {
+          "name": "Creatinine [Mass/volume] in Serum or Plasma",
+          "value": 1.3,
+          "unit": "mg/dL"
+        },
+        {
+          "name": "Potassium [Moles/volume] in Serum or Plasma",
+          "value": 4.1,
+          "unit": "mEq/L"
+        }
       ]
     },
     "expected_provenance": [
@@ -2700,9 +2757,21 @@
     "expected": {
       "kind": "code",
       "value": [
-        {"name": "Creatinine", "value": 1.7, "unit": "mg/dL"},
-        {"name": "Potassium", "value": 4.8, "unit": "mEq/L"},
-        {"name": "Estimated glomerular filtration rate", "value": 39, "unit": "mL/min/1.73m2"}
+        {
+          "name": "Creatinine",
+          "value": 1.7,
+          "unit": "mg/dL"
+        },
+        {
+          "name": "Potassium",
+          "value": 4.8,
+          "unit": "mEq/L"
+        },
+        {
+          "name": "Estimated glomerular filtration rate",
+          "value": 39,
+          "unit": "mL/min/1.73m2"
+        }
       ]
     },
     "expected_provenance": [
@@ -2729,9 +2798,21 @@
     "expected": {
       "kind": "code",
       "value": [
-        {"name": "Natriuretic peptide B [Mass/volume] in Serum or Plasma", "value": 450, "unit": "pg/mL"},
-        {"name": "Creatinine [Mass/volume] in Serum or Plasma", "value": 1.3, "unit": "mg/dL"},
-        {"name": "Potassium [Moles/volume] in Serum or Plasma", "value": 4.1, "unit": "mEq/L"}
+        {
+          "name": "Natriuretic peptide B [Mass/volume] in Serum or Plasma",
+          "value": 450,
+          "unit": "pg/mL"
+        },
+        {
+          "name": "Creatinine [Mass/volume] in Serum or Plasma",
+          "value": 1.3,
+          "unit": "mg/dL"
+        },
+        {
+          "name": "Potassium [Moles/volume] in Serum or Plasma",
+          "value": 4.1,
+          "unit": "mEq/L"
+        }
       ]
     },
     "expected_provenance": [
@@ -2934,12 +3015,36 @@
     "expected": {
       "kind": "code",
       "value": [
-        {"name": "Systolic blood pressure", "value": 145, "unit": "mmHg"},
-        {"name": "Diastolic blood pressure", "value": 90, "unit": "mmHg"},
-        {"name": "Hemoglobin A1c", "value": 7.6, "unit": "%"},
-        {"name": "Creatinine", "value": 1.7, "unit": "mg/dL"},
-        {"name": "Estimated glomerular filtration rate", "value": 39, "unit": "mL/min/1.73m2"},
-        {"name": "Potassium", "value": 4.8, "unit": "mEq/L"}
+        {
+          "name": "Systolic blood pressure",
+          "value": 145,
+          "unit": "mmHg"
+        },
+        {
+          "name": "Diastolic blood pressure",
+          "value": 90,
+          "unit": "mmHg"
+        },
+        {
+          "name": "Hemoglobin A1c",
+          "value": 7.6,
+          "unit": "%"
+        },
+        {
+          "name": "Creatinine",
+          "value": 1.7,
+          "unit": "mg/dL"
+        },
+        {
+          "name": "Estimated glomerular filtration rate",
+          "value": 39,
+          "unit": "mL/min/1.73m2"
+        },
+        {
+          "name": "Potassium",
+          "value": 4.8,
+          "unit": "mEq/L"
+        }
       ]
     },
     "expected_provenance": [
@@ -2967,14 +3072,46 @@
     "expected": {
       "kind": "code",
       "value": [
-        {"name": "Systolic blood pressure", "value": 132, "unit": "mmHg"},
-        {"name": "Diastolic blood pressure", "value": 80, "unit": "mmHg"},
-        {"name": "Heart rate", "value": 72, "unit": "/min"},
-        {"name": "Natriuretic peptide B", "value": 380, "unit": "pg/mL"},
-        {"name": "Creatinine", "value": 1.4, "unit": "mg/dL"},
-        {"name": "Potassium", "value": 4.6, "unit": "mEq/L"},
-        {"name": "Oxygen saturation", "value": 94, "unit": "%"},
-        {"name": "Body weight", "value": 88, "unit": "kg"}
+        {
+          "name": "Systolic blood pressure",
+          "value": 132,
+          "unit": "mmHg"
+        },
+        {
+          "name": "Diastolic blood pressure",
+          "value": 80,
+          "unit": "mmHg"
+        },
+        {
+          "name": "Heart rate",
+          "value": 72,
+          "unit": "/min"
+        },
+        {
+          "name": "Natriuretic peptide B",
+          "value": 380,
+          "unit": "pg/mL"
+        },
+        {
+          "name": "Creatinine",
+          "value": 1.4,
+          "unit": "mg/dL"
+        },
+        {
+          "name": "Potassium",
+          "value": 4.6,
+          "unit": "mEq/L"
+        },
+        {
+          "name": "Oxygen saturation",
+          "value": 94,
+          "unit": "%"
+        },
+        {
+          "name": "Body weight",
+          "value": 88,
+          "unit": "kg"
+        }
       ]
     },
     "expected_provenance": [
@@ -3004,13 +3141,41 @@
     "expected": {
       "kind": "code",
       "value": [
-        {"name": "Systolic blood pressure", "value": 152, "unit": "mmHg"},
-        {"name": "Diastolic blood pressure", "value": 94, "unit": "mmHg"},
-        {"name": "Hemoglobin A1c", "value": 8.2, "unit": "%"},
-        {"name": "Creatinine", "value": 1.6, "unit": "mg/dL"},
-        {"name": "Estimated glomerular filtration rate", "value": 42, "unit": "mL/min/1.73m2"},
-        {"name": "Potassium", "value": 4.5, "unit": "mEq/L"},
-        {"name": "LDL Cholesterol", "value": 128, "unit": "mg/dL"}
+        {
+          "name": "Systolic blood pressure",
+          "value": 152,
+          "unit": "mmHg"
+        },
+        {
+          "name": "Diastolic blood pressure",
+          "value": 94,
+          "unit": "mmHg"
+        },
+        {
+          "name": "Hemoglobin A1c",
+          "value": 8.2,
+          "unit": "%"
+        },
+        {
+          "name": "Creatinine",
+          "value": 1.6,
+          "unit": "mg/dL"
+        },
+        {
+          "name": "Estimated glomerular filtration rate",
+          "value": 42,
+          "unit": "mL/min/1.73m2"
+        },
+        {
+          "name": "Potassium",
+          "value": 4.5,
+          "unit": "mEq/L"
+        },
+        {
+          "name": "LDL Cholesterol",
+          "value": 128,
+          "unit": "mg/dL"
+        }
       ]
     },
     "expected_provenance": [
@@ -3039,14 +3204,46 @@
     "expected": {
       "kind": "code",
       "value": [
-        {"name": "Systolic blood pressure", "value": 128, "unit": "mmHg"},
-        {"name": "Diastolic blood pressure", "value": 78, "unit": "mmHg"},
-        {"name": "Heart rate", "value": 68, "unit": "/min"},
-        {"name": "Natriuretic peptide B", "value": 450, "unit": "pg/mL"},
-        {"name": "Hemoglobin A1c", "value": 7.2, "unit": "%"},
-        {"name": "Creatinine", "value": 1.3, "unit": "mg/dL"},
-        {"name": "Potassium", "value": 4.1, "unit": "mEq/L"},
-        {"name": "Left ventricular ejection fraction", "value": 35, "unit": "%"}
+        {
+          "name": "Systolic blood pressure",
+          "value": 128,
+          "unit": "mmHg"
+        },
+        {
+          "name": "Diastolic blood pressure",
+          "value": 78,
+          "unit": "mmHg"
+        },
+        {
+          "name": "Heart rate",
+          "value": 68,
+          "unit": "/min"
+        },
+        {
+          "name": "Natriuretic peptide B",
+          "value": 450,
+          "unit": "pg/mL"
+        },
+        {
+          "name": "Hemoglobin A1c",
+          "value": 7.2,
+          "unit": "%"
+        },
+        {
+          "name": "Creatinine",
+          "value": 1.3,
+          "unit": "mg/dL"
+        },
+        {
+          "name": "Potassium",
+          "value": 4.1,
+          "unit": "mEq/L"
+        },
+        {
+          "name": "Left ventricular ejection fraction",
+          "value": 35,
+          "unit": "%"
+        }
       ]
     },
     "expected_provenance": [
@@ -3076,12 +3273,36 @@
     "expected": {
       "kind": "code",
       "value": [
-        {"name": "Systolic blood pressure", "value": 145, "unit": "mmHg"},
-        {"name": "Diastolic blood pressure", "value": 90, "unit": "mmHg"},
-        {"name": "Hemoglobin A1c", "value": 7.6, "unit": "%"},
-        {"name": "Creatinine", "value": 1.7, "unit": "mg/dL"},
-        {"name": "Estimated glomerular filtration rate", "value": 39, "unit": "mL/min/1.73m2"},
-        {"name": "Potassium", "value": 4.8, "unit": "mEq/L"}
+        {
+          "name": "Systolic blood pressure",
+          "value": 145,
+          "unit": "mmHg"
+        },
+        {
+          "name": "Diastolic blood pressure",
+          "value": 90,
+          "unit": "mmHg"
+        },
+        {
+          "name": "Hemoglobin A1c",
+          "value": 7.6,
+          "unit": "%"
+        },
+        {
+          "name": "Creatinine",
+          "value": 1.7,
+          "unit": "mg/dL"
+        },
+        {
+          "name": "Estimated glomerular filtration rate",
+          "value": 39,
+          "unit": "mL/min/1.73m2"
+        },
+        {
+          "name": "Potassium",
+          "value": 4.8,
+          "unit": "mEq/L"
+        }
       ]
     },
     "expected_provenance": [
@@ -3109,14 +3330,46 @@
     "expected": {
       "kind": "code",
       "value": [
-        {"name": "Systolic blood pressure", "value": 132, "unit": "mmHg"},
-        {"name": "Diastolic blood pressure", "value": 80, "unit": "mmHg"},
-        {"name": "Heart rate", "value": 72, "unit": "/min"},
-        {"name": "Natriuretic peptide B", "value": 380, "unit": "pg/mL"},
-        {"name": "Creatinine", "value": 1.4, "unit": "mg/dL"},
-        {"name": "Potassium", "value": 4.6, "unit": "mEq/L"},
-        {"name": "Oxygen saturation", "value": 94, "unit": "%"},
-        {"name": "Body weight", "value": 88, "unit": "kg"}
+        {
+          "name": "Systolic blood pressure",
+          "value": 132,
+          "unit": "mmHg"
+        },
+        {
+          "name": "Diastolic blood pressure",
+          "value": 80,
+          "unit": "mmHg"
+        },
+        {
+          "name": "Heart rate",
+          "value": 72,
+          "unit": "/min"
+        },
+        {
+          "name": "Natriuretic peptide B",
+          "value": 380,
+          "unit": "pg/mL"
+        },
+        {
+          "name": "Creatinine",
+          "value": 1.4,
+          "unit": "mg/dL"
+        },
+        {
+          "name": "Potassium",
+          "value": 4.6,
+          "unit": "mEq/L"
+        },
+        {
+          "name": "Oxygen saturation",
+          "value": 94,
+          "unit": "%"
+        },
+        {
+          "name": "Body weight",
+          "value": 88,
+          "unit": "kg"
+        }
       ]
     },
     "expected_provenance": [
@@ -3894,5 +4147,363 @@
     "expected_provenance": [
       "Observation/obs-spo2-g2-may"
     ]
+  },
+  {
+    "id": "std-llmreq-001",
+    "category": "llm_required",
+    "level": 3,
+    "question": "What is the patient's glycosylated hemoglobin fraction?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 7.8
+    }
+  },
+  {
+    "id": "std-llmreq-002",
+    "category": "llm_required",
+    "level": 3,
+    "question": "What is the patient's GFR by the CKD-EPI equation?",
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 40
+    }
+  },
+  {
+    "id": "std-llmreq-003",
+    "category": "llm_required",
+    "level": 3,
+    "question": "What is the patient's spot urine albumin-to-creatinine ratio?",
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 58
+    }
+  },
+  {
+    "id": "std-llmreq-004",
+    "category": "llm_required",
+    "level": 3,
+    "question": "What is the patient's left ventricular systolic function?",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 35
+    }
+  },
+  {
+    "id": "std-llmreq-005",
+    "category": "llm_required",
+    "level": 3,
+    "question": "What is the patient's NT-proBNP or BNP level?",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 380
+    }
+  },
+  {
+    "id": "std-llmreq-006",
+    "category": "llm_required",
+    "level": 3,
+    "question": "What is the patient's non-HDL cholesterol?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-llmreq-007",
+    "category": "llm_required",
+    "level": 3,
+    "question": "What is the patient's peripheral oxygen saturation?",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 94
+    }
+  },
+  {
+    "id": "std-llmreq-008",
+    "category": "llm_required",
+    "level": 3,
+    "question": "Does the patient carry a diagnosis of congestive cardiomyopathy?",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-llmreq-009",
+    "category": "llm_required",
+    "level": 3,
+    "question": "Is the patient on any antihyperglycemic agent?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-llmreq-010",
+    "category": "llm_required",
+    "level": 3,
+    "question": "Does the patient have degenerative joint disease?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-llmreq-011",
+    "category": "llm_required",
+    "level": 3,
+    "question": "Is the patient prescribed an HMG-CoA reductase inhibitor?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-llmreq-012",
+    "category": "llm_required",
+    "level": 3,
+    "question": "Does the patient have irregular heart rhythm?",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-llmreq-013",
+    "category": "llm_required",
+    "level": 3,
+    "question": "What is the patient's serum bicarbonate level?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "std-llmreq-014",
+    "category": "llm_required",
+    "level": 3,
+    "question": "Is the patient on direct oral anticoagulant therapy?",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-llmreq-015",
+    "category": "llm_required",
+    "level": 3,
+    "question": "What is the patient's resting pulse?",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 72
+    }
+  },
+  {
+    "id": "std-llmcx-001",
+    "category": "llm_required_complex",
+    "level": 5,
+    "question": "Is the patient on any medication that requires renal dose adjustment given their kidney function?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-llmcx-002",
+    "category": "llm_required_complex",
+    "level": 5,
+    "question": "Does the patient have any contraindication to ACE inhibitor therapy?",
+    "bundle": "bundles/graph-linked-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-llmcx-003",
+    "category": "llm_required_complex",
+    "level": 5,
+    "question": "Is the patient's diabetes well-controlled based on their most recent HbA1c?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-llmcx-004",
+    "category": "llm_required_complex",
+    "level": 5,
+    "question": "How many cardiovascular risk factors does this patient have?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 4
+    }
+  },
+  {
+    "id": "std-llmcx-005",
+    "category": "llm_required_complex",
+    "level": 5,
+    "question": "Is the patient's kidney function declining faster than expected (more than 5 mL/min/year)?",
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-llmcx-006",
+    "category": "llm_required_complex",
+    "level": 5,
+    "question": "Is the patient on appropriate anticoagulation for their atrial fibrillation?",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-llmcx-007",
+    "category": "llm_required_complex",
+    "level": 5,
+    "question": "Is the patient on any medication that could worsen their heart failure?",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-llmcx-008",
+    "category": "llm_required_complex",
+    "level": 5,
+    "question": "Based on the patient's eGFR and albuminuria, what is their CKD risk category?",
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": "high"
+    }
+  },
+  {
+    "id": "std-llmcx-009",
+    "category": "llm_required_complex",
+    "level": 5,
+    "question": "Is the patient's blood pressure at goal given their comorbidities?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-llmcx-010",
+    "category": "llm_required_complex",
+    "level": 5,
+    "question": "Should the patient's metformin dose be adjusted based on their current kidney function?",
+    "bundle": "bundles/ckd-declining-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-llmcx-011",
+    "category": "llm_required_complex",
+    "level": 6,
+    "question": "Is the patient on guideline-directed medical therapy for heart failure with reduced ejection fraction?",
+    "bundle": "bundles/graph-linked-02.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-llmcx-012",
+    "category": "llm_required_complex",
+    "level": 5,
+    "question": "How many classes of antihypertensive medication is the patient currently taking?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 3
+    }
+  },
+  {
+    "id": "std-llmcx-013",
+    "category": "llm_required_complex",
+    "level": 5,
+    "question": "Is the patient at increased risk of hyperkalemia based on their medications and kidney function?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "std-llmcx-014",
+    "category": "llm_required_complex",
+    "level": 5,
+    "question": "Does the patient's medication list include any drug-drug interaction concerns?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "std-llmcx-015",
+    "category": "llm_required_complex",
+    "level": 6,
+    "question": "Considering the patient's age, conditions, and medications, what is their overall treatment burden?",
+    "bundle": "bundles/complex-patient-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": "high"
+    }
   }
 ]
