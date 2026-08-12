@@ -67,7 +67,7 @@ log ""
 log "=== Creating BuildConfigs ==="
 
 create_bc() {
-  local name="$1" context="$2" dockerfile="$3"
+  local name="$1" context="$2" containerfile="$3"
   oc apply -f - <<EOF
 apiVersion: build.openshift.io/v1
 kind: BuildConfig
@@ -84,7 +84,7 @@ spec:
   strategy:
     type: Docker
     dockerStrategy:
-      dockerfilePath: $dockerfile
+      dockerfilePath: $containerfile
   output:
     to:
       kind: ImageStreamTag
@@ -96,12 +96,12 @@ spec:
   failedBuildsHistoryLimit: 3
   successfulBuildsHistoryLimit: 3
 EOF
-  log "  $name: contextDir=$context dockerfile=$dockerfile -> $name:$IMAGE_TAG"
+  log "  $name: contextDir=$context containerfile=$containerfile -> $name:$IMAGE_TAG"
 }
 
-create_bc "mock-ehr-app"    "mock-EHR/ui"          "Dockerfile"
-create_bc "ips-viewer"      "mock-EHR/ips-viewer"  "Dockerfile"
-create_bc "medplum-loader"  "mock-EHR"             "deploy/Dockerfile.loader"
+create_bc "mock-ehr-app"    "mock-EHR/ui"          "Containerfile"
+create_bc "ips-viewer"      "mock-EHR/ips-viewer"  "Containerfile"
+create_bc "medplum-loader"  "mock-EHR"             "deploy/Containerfile.loader"
 
 # --- Step 3: Push public images to internal registry ---
 # Docker Hub rate-limits pulls from the cluster. We pull amd64 images

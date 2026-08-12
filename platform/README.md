@@ -26,7 +26,7 @@ LiteLLM provides a unified OpenAI-compatible endpoint that proxies requests to a
 2. Run via compose (see root `compose.yml`) or standalone:
    ```bash
    cd platform/litellm
-   podman build -f deploy/Dockerfile -t cpg-litellm .
+   podman build -f deploy/Containerfile -t cpg-litellm .
    podman run -p 4000:4000 --env-file deploy/.env cpg-litellm
    ```
 

@@ -152,8 +152,8 @@ curl -s -X POST "$GATEWAY/mcp" \
 | `acp-writer/src/acp_writer/mcp_proxy.py` | acp-writer MCP server (8 tools) |
 | `mock-EHR/src/mock_ehr/mcp_app.py` | mock-EHR MCP server entry point |
 | `mock-EHR/src/mock_ehr/mcp_server.py` | mock-EHR MCP tool definitions |
-| `acp-writer/deploy/pods/Dockerfile.mcp` | acp-writer-mcp container image |
-| `mock-EHR/deploy/Dockerfile.mcp` | mock-ehr-mcp container image |
+| `acp-writer/deploy/pods/Containerfile.mcp` | acp-writer-mcp container image |
+| `mock-EHR/deploy/Containerfile.mcp` | mock-ehr-mcp container image |
 | `deploy/mcp-gateway/gateway.yaml` | Gateway + MCPGatewayExtension + Route |
 | `deploy/mcp-gateway/acp-writer-mcp.yaml` | acp-writer-mcp Deployment + Service |
 | `deploy/mcp-gateway/mock-ehr-mcp.yaml` | mock-ehr-mcp Deployment + Service |
