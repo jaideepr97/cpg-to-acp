@@ -49,7 +49,7 @@ Producers must not assume a specific consumer runtime. Consumers are pluggable b
 
 ### Deployment
 
-- Each component owns its own deployment artifacts (Dockerfiles, manifests, Helm charts, etc.).
+- Each component owns its own deployment artifacts (Containerfiles, manifests, Helm charts, etc.).
 - A root-level deployment file (e.g., docker-compose) is allowed only as a thin wrapper that references component-level deployments.
 
 ## Development Rules

@@ -1,11 +1,13 @@
 """Assembly pod service — deterministic cross-reference resolution and integrity checks.
 
-Consumes: analysis_result_ref. Produces: assembly_result_ref.
+Consumes: generate_result_ref (or analysis_result_ref for legacy flow).
+Produces: assembly_result_ref.
 Security profile: no external network, no LLM.
 """
 
 import logging
 import tempfile
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -29,12 +31,14 @@ async def assemble(request: Request):
     """Assemble validated outputs from DMN and Rec generation."""
     data = await request.json()
 
-    analysis = resolve_ref(data, "analysis_result", _store)
-    if isinstance(analysis, dict) and "dmn_results" in analysis:
-        cpg_metadata = analysis.get("cpg_metadata", data.get("cpg_metadata", {}))
-        item_manifest = analysis.get("item_manifest", data.get("item_manifest", []))
-        dmn_results = analysis.get("dmn_results", [])
-        recommendation_results = analysis.get("recommendation_results", [])
+    source = resolve_ref(data, "generate_result", _store)
+    if not isinstance(source, dict) or "dmn_results" not in source:
+        source = resolve_ref(data, "analysis_result", _store)
+    if isinstance(source, dict) and "dmn_results" in source:
+        cpg_metadata = source.get("cpg_metadata", data.get("cpg_metadata", {}))
+        item_manifest = source.get("item_manifest", data.get("item_manifest", []))
+        dmn_results = source.get("dmn_results", [])
+        recommendation_results = source.get("recommendation_results", [])
     else:
         cpg_metadata = data.get("cpg_metadata", {})
         item_manifest = data.get("item_manifest", [])
@@ -60,7 +64,9 @@ async def assemble(request: Request):
             "assembly_report": result.get("assembly_report", {}),
         }
 
+        completed_at = datetime.now(timezone.utc).isoformat()
         _, ref = store_artifact(_store, f"{uuid4()}/assembly_result.json", output)
         if ref:
-            return {"assembly_result_ref": ref}
+            return {"assembly_result_ref": ref, "completed_at": completed_at}
+        output["completed_at"] = completed_at
         return output

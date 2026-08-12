@@ -1,0 +1,291 @@
+"""Mock data for BFF development. Not shipped in production images."""
+
+from datetime import datetime, timezone
+from typing import Any
+
+SECTION_MAP = [
+    {"heading": "1. Introduction", "page_start": 1, "page_end": 5, "classification": "background"},
+    {"heading": "2. Methodology", "page_start": 6, "page_end": 12, "classification": "methods"},
+    {"heading": "3. Blood Pressure Thresholds", "page_start": 13, "page_end": 22, "classification": "decision"},
+    {"heading": "4. Pharmacological Treatment", "page_start": 23, "page_end": 38, "classification": "recommendation"},
+    {"heading": "5. Lifestyle Modifications", "page_start": 39, "page_end": 45, "classification": "recommendation"},
+    {"heading": "6. Monitoring and Follow-up", "page_start": 46, "page_end": 52, "classification": "decision"},
+    {"heading": "7. Special Populations", "page_start": 53, "page_end": 61, "classification": "recommendation"},
+    {"heading": "8. References", "page_start": 62, "page_end": 70, "classification": "background"},
+]
+
+METADATA: dict[str, Any] = {
+    "cpg_id": "SYN-HTN-2026-001",
+    "title": "AHA Hypertension CPG 2024",
+    "version": "2024.1",
+    "issuing_body": "American Heart Association",
+    "grading_system": "ACC/AHA",
+    "scope": "Management of high blood pressure in adults",
+}
+
+DECISIONS = [
+    {
+        "dmn_xml": '<?xml version="1.0" encoding="UTF-8"?>\n<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/">\n  <decision id="bp-threshold" name="Blood Pressure Treatment Threshold">\n    <!-- simplified for mock -->\n  </decision>\n</definitions>',
+        "item": {
+            "name": "Blood Pressure Treatment Threshold",
+            "type": "decision_table",
+            "category": "Diagnosis",
+            "section": "3. Blood Pressure Thresholds",
+        },
+        "decision_model_summary": {
+            "id": "bp-threshold",
+            "name": "Blood Pressure Treatment Threshold",
+            "inputs": [
+                {"name": "systolicBP", "type": "number"},
+                {"name": "diastolicBP", "type": "number"},
+                {"name": "patientAge", "type": "number"},
+                {"name": "hasDiabetes", "type": "boolean"},
+            ],
+            "outputs": [
+                {"name": "treatmentRequired", "type": "boolean"},
+                {"name": "urgency", "type": "string"},
+            ],
+            "category": "Diagnosis",
+        },
+    },
+    {
+        "dmn_xml": '<?xml version="1.0" encoding="UTF-8"?>\n<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/">\n  <decision id="monitoring-freq" name="Monitoring Frequency">\n    <!-- simplified for mock -->\n  </decision>\n</definitions>',
+        "item": {
+            "name": "Monitoring Frequency",
+            "type": "decision_table",
+            "category": "Monitoring",
+            "section": "6. Monitoring and Follow-up",
+        },
+        "decision_model_summary": {
+            "id": "monitoring-freq",
+            "name": "Monitoring Frequency",
+            "inputs": [
+                {"name": "currentBP", "type": "number"},
+                {"name": "controlStatus", "type": "string"},
+            ],
+            "outputs": [
+                {"name": "visitIntervalWeeks", "type": "number"},
+                {"name": "labFrequency", "type": "string"},
+            ],
+            "category": "Monitoring",
+        },
+    },
+]
+
+RECOMMENDATIONS = [
+    {
+        "id": "rec-001",
+        "source_cpg": "SYN-HTN-2026-001",
+        "title": "First-line pharmacological therapy with ACE inhibitor or ARB",
+        "content": "For adults with confirmed hypertension and an average BP ≥130/80 mmHg, initiate pharmacological treatment with an ACE inhibitor, ARB, calcium channel blocker, or thiazide diuretic.",
+        "recommendation_type": "pharmacological",
+        "section": "4. Pharmacological Treatment",
+        "certainty": {
+            "strength": "strong-for",
+            "evidence_quality": "high",
+            "grading_system": "ACC/AHA",
+            "original_grade": "I (A)",
+        },
+        "rationale": "Multiple large-scale RCTs demonstrate that these four drug classes reduce cardiovascular events and mortality in hypertensive adults.",
+        "scope_notes": "Applies to adults ≥18 years without contraindications.",
+        "cross_references": [
+            {"target_id": "bp-threshold", "target_type": "decision", "relationship": "depends-on"},
+        ],
+        "source_location": {
+            "page_start": 25,
+            "page_end": 28,
+            "source_text": "We recommend initiating pharmacological treatment...",
+        },
+    },
+    {
+        "id": "rec-002",
+        "source_cpg": "SYN-HTN-2026-001",
+        "title": "Lifestyle modifications for all hypertensive patients",
+        "content": "All patients with hypertension should receive counseling on lifestyle modifications including dietary sodium reduction, increased physical activity, weight management, and moderation of alcohol consumption.",
+        "recommendation_type": "lifestyle",
+        "section": "5. Lifestyle Modifications",
+        "certainty": {
+            "strength": "strong-for",
+            "evidence_quality": "moderate",
+            "grading_system": "ACC/AHA",
+            "original_grade": "I (B-R)",
+        },
+        "rationale": "Lifestyle changes can reduce systolic BP by 5-10 mmHg and may reduce the need for pharmacological intervention.",
+    },
+    {
+        "id": "rec-003",
+        "source_cpg": "SYN-HTN-2026-001",
+        "title": "Combination therapy for stage 2 hypertension",
+        "content": "For adults with stage 2 hypertension (BP ≥140/90 mmHg), initiate therapy with two first-line agents of different classes.",
+        "recommendation_type": "pharmacological",
+        "section": "4. Pharmacological Treatment",
+        "certainty": {
+            "strength": "conditional-for",
+            "evidence_quality": "moderate",
+            "grading_system": "ACC/AHA",
+            "original_grade": "IIa (B-NR)",
+        },
+        "rationale": "Combination therapy achieves target BP faster and more reliably than monotherapy in patients with stage 2 hypertension.",
+        "scope_notes": "Consider patient comorbidities and potential drug interactions when selecting combination.",
+        "cross_references": [
+            {"target_id": "bp-threshold", "target_type": "decision", "relationship": "depends-on"},
+            {"target_id": "rec-001", "target_type": "recommendation", "relationship": "builds-on"},
+        ],
+    },
+]
+
+ASSEMBLY_REPORT: dict[str, Any] = {
+    "cpg_id": "SYN-HTN-2026-001",
+    "recommendations_count": 3,
+    "dmn_models_count": 2,
+    "escalated_count": 1,
+    "integrity_errors": [],
+}
+
+ESCALATED_ITEMS = [
+    {
+        "name": "Renal denervation for resistant hypertension",
+        "type": "recommendation",
+        "section": "7. Special Populations",
+        "reason": "Automated reviewers could not verify evidence quality — emerging intervention with limited long-term data.",
+    },
+]
+
+DELIVERY_STATUS: dict[str, Any] = {
+    "delivered": True,
+    "acp_writer_url": "http://acp-writer:8082",
+    "results": {
+        "metadata": {"status": 201, "cpg_id": "SYN-HTN-2026-001"},
+        "dmn_models": [
+            {"status": 201, "name": "Blood Pressure Treatment Threshold"},
+            {"status": 201, "name": "Monitoring Frequency"},
+        ],
+        "recommendations": {"status": 201, "count": 3},
+        "errors": [],
+    },
+}
+
+
+def _make_steps(up_to: str) -> list[dict[str, Any]]:
+    all_steps = [
+        "Parse", "Analyze", "ReviewManifest",
+        "Generate", "ReviewArtifacts",
+        "Assemble", "Deliver", "Done",
+    ]
+    now = datetime.now(timezone.utc)
+    result = []
+    reached = False
+    for name in all_steps:
+        if name == up_to:
+            reached = True
+            result.append({"name": name, "status": "active", "startedAt": now.isoformat()})
+        elif not reached:
+            result.append({"name": name, "status": "completed", "startedAt": now.isoformat(), "completedAt": now.isoformat()})
+        else:
+            result.append({"name": name, "status": "pending"})
+    return result
+
+
+def _completed_steps() -> list[dict[str, Any]]:
+    steps = _make_steps("Done")
+    now = datetime.now(timezone.utc).isoformat()
+    for s in steps:
+        s["status"] = "completed"
+        s.setdefault("startedAt", now)
+        s["completedAt"] = now
+    return steps
+
+
+def _failed_steps() -> list[dict[str, Any]]:
+    steps = _make_steps("Analyze")
+    for s in steps:
+        if s["status"] == "active":
+            s["status"] = "failed"
+    return steps
+
+
+RUNS: dict[str, dict[str, Any]] = {
+    "run-001": {
+        "id": "run-001",
+        "status": "completed",
+        "cpgName": "AHA Hypertension CPG 2024",
+        "createdAt": "2026-08-05T14:30:00Z",
+        "currentStep": "Done",
+    },
+    "run-002": {
+        "id": "run-002",
+        "status": "awaiting_artifact_review",
+        "cpgName": "ADA Diabetes Standards of Care 2026",
+        "createdAt": "2026-08-06T09:15:00Z",
+        "currentStep": "ReviewArtifacts",
+    },
+    "run-003": {
+        "id": "run-003",
+        "status": "awaiting_manifest_review",
+        "cpgName": "KDIGO CKD Guideline 2025",
+        "createdAt": "2026-08-06T10:45:00Z",
+        "currentStep": "ReviewManifest",
+    },
+    "run-004": {
+        "id": "run-004",
+        "status": "analyzing",
+        "cpgName": "ESC Heart Failure Guidelines 2025",
+        "createdAt": "2026-08-06T11:20:00Z",
+        "currentStep": "Analyze",
+    },
+    "run-005": {
+        "id": "run-005",
+        "status": "failed",
+        "cpgName": "WHO Malaria Treatment Guidelines",
+        "createdAt": "2026-08-04T08:00:00Z",
+        "currentStep": "Analyze",
+    },
+}
+
+RUN_DETAILS: dict[str, dict[str, Any]] = {
+    "run-001": {
+        **RUNS["run-001"],
+        "steps": _completed_steps(),
+        "metadata": METADATA,
+        "sectionMap": SECTION_MAP,
+        "decisions": DECISIONS,
+        "recommendations": RECOMMENDATIONS,
+        "assemblyReport": ASSEMBLY_REPORT,
+        "escalatedItems": ESCALATED_ITEMS,
+        "deliveryStatus": DELIVERY_STATUS,
+    },
+    "run-002": {
+        **RUNS["run-002"],
+        "steps": _make_steps("ReviewArtifacts"),
+        "awaitingReview": "pre-delivery",
+        "reviewIteration": 2,
+        "previousFeedback": {
+            "action": "request_changes",
+            "feedback": [
+                {"itemId": "bp-threshold", "itemType": "decision", "comment": "Threshold should be 140/90 not 130/80 for patients over 65"},
+            ],
+            "overallComment": "Please adjust the BP threshold decision table for elderly patients.",
+        },
+        "metadata": {**METADATA, "cpg_id": "SYN-DM2-2026-001", "title": "ADA Diabetes Standards of Care 2026", "issuing_body": "American Diabetes Association"},
+        "sectionMap": SECTION_MAP,
+        "decisions": DECISIONS,
+        "recommendations": RECOMMENDATIONS,
+    },
+    "run-003": {
+        **RUNS["run-003"],
+        "steps": _make_steps("ReviewManifest"),
+        "awaitingReview": "manifest",
+        "reviewIteration": 1,
+        "metadata": {**METADATA, "cpg_id": "KDIGO-CKD-2025", "title": "KDIGO CKD Guideline 2025", "issuing_body": "KDIGO"},
+        "sectionMap": SECTION_MAP,
+    },
+    "run-004": {
+        **RUNS["run-004"],
+        "steps": _make_steps("Analyze"),
+        "metadata": {**METADATA, "cpg_id": "ESC-HF-2025", "title": "ESC Heart Failure Guidelines 2025", "issuing_body": "European Society of Cardiology"},
+    },
+    "run-005": {
+        **RUNS["run-005"],
+        "steps": _failed_steps(),
+    },
+}

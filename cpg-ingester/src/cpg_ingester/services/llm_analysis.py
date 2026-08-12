@@ -1,6 +1,14 @@
-"""LLM Analysis pod service — all LLM-calling nodes with in-process LangGraph review loops.
+"""LLM Analysis pod service — structure analysis and artifact generation.
 
-Consumes: parse_result_ref. Produces: analysis_result_ref.
+Two async endpoints:
+  /api/v1/analyze-async  — classify sections, build manifest, extract metadata
+  /api/v1/generate-async — generate DMN decision tables and recommendations
+
+Split so human review gates can approve the manifest before spending LLM
+tokens on generation.
+
+Consumes: parse_result_ref (analyze) or analysis_result_ref (generate).
+Produces: analysis_result_ref or generate_result_ref.
 Security profile: LLM inference endpoint only (via MaaS on OpenShift).
 """
 
@@ -36,7 +44,10 @@ def health():
 
 
 def _do_analyze(data: dict) -> dict:
-    """Run the full LLM analysis. Used by both sync and async endpoints."""
+    """Run structure analysis: classify sections, build manifest, extract metadata.
+
+    Stops before generation so the manifest can be reviewed first.
+    """
     parse_result = resolve_ref(data, "parse_result", _store)
     if isinstance(parse_result, dict) and "markdown" in parse_result:
         markdown = parse_result["markdown"]
@@ -44,6 +55,10 @@ def _do_analyze(data: dict) -> dict:
     else:
         markdown = data.get("markdown", "")
         docling_json = data.get("docling_json", {})
+
+    review_feedback = data.get("review_feedback")
+    review_comment = data.get("review_comment")
+    review_iteration = data.get("review_iteration", 0)
 
     with tempfile.TemporaryDirectory() as output_dir:
         state = {
@@ -54,6 +69,10 @@ def _do_analyze(data: dict) -> dict:
             "llm_model": LLM_MODEL,
             "llm_api_key": LLM_API_KEY,
         }
+
+        if review_feedback and review_iteration:
+            state["review_feedback"] = review_feedback
+            state["review_comment"] = review_comment
 
         updates = structure_analyzer(state)
         state.update(updates)
@@ -76,19 +95,14 @@ def _do_analyze(data: dict) -> dict:
         updates = metadata_extractor(state)
         state.update(updates)
 
-        from cpg_ingester.generation import generate_all
-        updates = generate_all(state)
-        state.update(updates)
-
         result = {
+            "markdown": markdown,
             "section_map": state.get("section_map", []),
             "abbreviations": state.get("abbreviations", {}),
             "grading_definitions": state.get("grading_definitions", ""),
             "archetype": state.get("archetype", ""),
             "item_manifest": state.get("item_manifest", []),
             "cpg_metadata": state.get("cpg_metadata", {}),
-            "dmn_results": state.get("dmn_results", []),
-            "recommendation_results": state.get("recommendation_results", []),
         }
 
         _, ref = store_artifact(_store, f"{uuid4()}/analysis_result.json", result)
@@ -96,6 +110,55 @@ def _do_analyze(data: dict) -> dict:
             return {"analysis_result_ref": ref}
         if _store:
             raise RuntimeError("Artifact store available but failed to store analysis result")
+        return result
+
+
+def _do_generate(data: dict) -> dict:
+    """Generate DMN decision tables and recommendations from an approved manifest."""
+    from cpg_ingester.generation import generate_all
+
+    analysis = resolve_ref(data, "analysis_result", _store)
+    if not isinstance(analysis, dict) or "item_manifest" not in analysis:
+        raise ValueError("analysis_result must contain item_manifest")
+
+    review_feedback = data.get("review_feedback")
+    review_comment = data.get("review_comment")
+    review_iteration = data.get("review_iteration", 0)
+
+    with tempfile.TemporaryDirectory() as output_dir:
+        state = {
+            "markdown": analysis.get("markdown", ""),
+            "section_map": analysis.get("section_map", []),
+            "abbreviations": analysis.get("abbreviations", {}),
+            "grading_definitions": analysis.get("grading_definitions", ""),
+            "archetype": analysis.get("archetype", ""),
+            "item_manifest": analysis.get("item_manifest", []),
+            "cpg_metadata": analysis.get("cpg_metadata", {}),
+            "output_dir": output_dir,
+            "litellm_url": LITELLM_URL,
+            "llm_model": LLM_MODEL,
+            "llm_api_key": LLM_API_KEY,
+        }
+
+        if review_feedback and review_iteration:
+            state["review_feedback"] = review_feedback
+            state["review_comment"] = review_comment
+
+        updates = generate_all(state)
+        state.update(updates)
+
+        result = {
+            "cpg_metadata": state.get("cpg_metadata", {}),
+            "item_manifest": state.get("item_manifest", []),
+            "dmn_results": state.get("dmn_results", []),
+            "recommendation_results": state.get("recommendation_results", []),
+        }
+
+        _, ref = store_artifact(_store, f"{uuid4()}/generate_result.json", result)
+        if ref:
+            return {"generate_result_ref": ref}
+        if _store:
+            raise RuntimeError("Artifact store available but failed to store generate result")
         return result
 
 
@@ -119,10 +182,43 @@ async def analyze_async(request: Request, background_tasks: BackgroundTasks):
 
 
 def _run_analyze_background(data: dict, callback_url: str, process_instance_id: str):
+    iteration = data.pop("review_iteration", 0) or 0
     try:
         result = _do_analyze(data)
     except Exception as e:
         logger.error("Analyze background task failed: %s", e)
         result = {"error": str(e)}
 
+    result["iteration"] = iteration
     post_callback(callback_url, process_instance_id, "analyze-done", result)
+
+
+@app.post("/api/v1/generate")
+async def generate(request: Request):
+    """Generate DMN and recommendations from an approved analysis (sync)."""
+    data = await request.json()
+    return _do_generate(data)
+
+
+@app.post("/api/v1/generate-async")
+async def generate_async(request: Request, background_tasks: BackgroundTasks):
+    """Async version: accept immediately, run generation in background, POST callback."""
+    data = await request.json()
+    callback_url = data.pop("callback_url", "")
+    process_instance_id = data.pop("process_instance_id", "")
+    background_tasks.add_task(
+        _run_generate_background, data, callback_url, process_instance_id
+    )
+    return {"status": "accepted"}
+
+
+def _run_generate_background(data: dict, callback_url: str, process_instance_id: str):
+    iteration = data.pop("review_iteration", 0) or 0
+    try:
+        result = _do_generate(data)
+    except Exception as e:
+        logger.error("Generate background task failed: %s", e)
+        result = {"error": str(e)}
+
+    result["iteration"] = iteration
+    post_callback(callback_url, process_instance_id, "generate-done", result)

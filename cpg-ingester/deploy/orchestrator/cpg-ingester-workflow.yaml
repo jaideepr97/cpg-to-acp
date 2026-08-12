@@ -5,44 +5,67 @@ metadata:
   annotations:
     sonataflow.org/profile: dev
     sonataflow.org/description: "CPG Ingester pipeline orchestration"
-    sonataflow.org/version: "0.2.0"
+    sonataflow.org/version: "0.3.0"
 spec:
   podTemplate:
     container:
       env:
         - name: INGESTION_URL
-          value: "http://cpg-ing-ingestion:8080"
+          value: "http://cpg-ingester-ingestion:8080"
         - name: LLM_ANALYSIS_URL
-          value: "http://cpg-ing-llm-analysis:8080"
+          value: "http://cpg-ingester-llm-analysis:8080"
         - name: ASSEMBLY_URL
-          value: "http://cpg-ing-assembly:8080"
+          value: "http://cpg-ingester-assembly:8080"
         - name: DELIVERY_URL
-          value: "http://cpg-ing-delivery:8080"
+          value: "http://cpg-ingester-delivery:8080"
+        - name: BFF_URL
+          value: "http://cpg-ingester-bff:8080"
   flow:
     specVersion: "0.8"
     start: Parse
     events:
+      # Async pod callbacks
       - name: parseDone
         source: ""
         type: parse-done
       - name: analyzeDone
         source: ""
         type: analyze-done
+      - name: generateDone
+        source: ""
+        type: generate-done
+      # Human review callbacks (sent by BFF on user action)
+      - name: manifestReviewed
+        source: ""
+        type: manifest-reviewed
+      - name: artifactsReviewed
+        source: ""
+        type: artifacts-reviewed
     functions:
       # Async functions (long-running: Docling ML + LLM calls)
       - name: parsepdfasync
         type: custom
-        operation: rest:post:http://cpg-ing-ingestion:8080/api/v1/parse-async
+        operation: rest:post:http://cpg-ingester-ingestion:8080/api/v1/parse-async
       - name: analyzeasync
         type: custom
-        operation: rest:post:http://cpg-ing-llm-analysis:8080/api/v1/analyze-async
+        operation: rest:post:http://cpg-ingester-llm-analysis:8080/api/v1/analyze-async
+      - name: generateasync
+        type: custom
+        operation: rest:post:http://cpg-ingester-llm-analysis:8080/api/v1/generate-async
       # Sync functions (fast: deterministic + bounded REST)
       - name: assemble
         type: custom
-        operation: rest:post:http://cpg-ing-assembly:8080/api/v1/assemble
+        operation: rest:post:http://cpg-ingester-assembly:8080/api/v1/assemble
       - name: deliver
         type: custom
-        operation: rest:post:http://cpg-ing-delivery:8080/api/v1/deliver
+        operation: rest:post:http://cpg-ingester-delivery:8080/api/v1/deliver
+      # Review notification (BFF sets awaiting_review marker)
+      - name: notifymanifetreview
+        type: custom
+        operation: rest:post:http://cpg-ingester-bff:8080/api/v1/notify-review
+      - name: notifyartifactreview
+        type: custom
+        operation: rest:post:http://cpg-ingester-bff:8080/api/v1/notify-review
     states:
       # --- Phase 1: PDF parsing (async callback — Docling ML, 30-120s) ---
 
@@ -55,7 +78,6 @@ spec:
               callback_url: "http://cpgingester:80/wait-parse"
               process_instance_id: "$WORKFLOW.instanceId"
               pdf_ref: "${ .pdf_ref }"
-        eventRef: parseDone
         eventRef: parseDone
         eventDataFilter:
           toStateData: "${ .parseResult }"
@@ -74,12 +96,152 @@ spec:
               callback_url: "http://cpgingester:80/wait-analyze"
               process_instance_id: "$WORKFLOW.instanceId"
               parse_result_ref: "${ .parseResult.parse_result_ref }"
+              review_feedback: "${ .manifestReview.feedback }"
+              review_comment: "${ .manifestReview.overallComment }"
+              review_iteration: "${ .manifestReviewCount }"
         eventRef: analyzeDone
         eventDataFilter:
           toStateData: "${ .analysisResult }"
-        transition: Assemble
+        transition: ValidateAnalysisIteration
 
-      # --- Phase 3: Assembly (sync — deterministic, <1s) ---
+      - name: ValidateAnalysisIteration
+        type: switch
+        dataConditions:
+          - name: iterationMatch
+            condition: "${ (.analysisResult.iteration // 0) == (.manifestReviewCount // 0) }"
+            transition: ReviewManifest
+        defaultCondition:
+          transition: DrainStaleAnalysis
+
+      - name: DrainStaleAnalysis
+        type: callback
+        action:
+          functionRef:
+            refName: notifymanifetreview
+            arguments:
+              process_instance_id: "$WORKFLOW.instanceId"
+              review_type: "drain"
+        eventRef: analyzeDone
+        eventDataFilter:
+          toStateData: "${ .analysisResult }"
+        transition: ValidateAnalysisIteration
+
+      # --- Phase 3: Human review of manifest (structure, classifications) ---
+
+      - name: ReviewManifest
+        type: callback
+        action:
+          functionRef:
+            refName: notifymanifetreview
+            arguments:
+              process_instance_id: "$WORKFLOW.instanceId"
+              review_type: "manifest"
+              analysis_result_ref: "${ .analysisResult.analysis_result_ref }"
+              review_iteration: "${ .manifestReviewCount }"
+              previous_feedback: "${ .manifestReview }"
+        eventRef: manifestReviewed
+        eventDataFilter:
+          toStateData: "${ .manifestReview }"
+        transition: IncrementManifestReview
+
+      - name: IncrementManifestReview
+        type: inject
+        data: {}
+        stateDataFilter:
+          output: "${ . + {manifestReviewCount: ((.manifestReviewCount // 0) + 1)} }"
+        transition: CheckManifestReview
+
+      - name: CheckManifestReview
+        type: switch
+        dataConditions:
+          - name: approved
+            condition: "${ .manifestReview.action == \"approve\" }"
+            transition: Generate
+          - name: changesRequested
+            condition: "${ .manifestReview.action == \"request_changes\" }"
+            transition: Analyze
+        defaultCondition:
+          transition: Generate
+
+      # --- Phase 4: Generation (async callback — DMN + recs, 5-30 min) ---
+
+      - name: Generate
+        type: callback
+        action:
+          functionRef:
+            refName: generateasync
+            arguments:
+              callback_url: "http://cpgingester:80/wait-generate"
+              process_instance_id: "$WORKFLOW.instanceId"
+              analysis_result_ref: "${ .analysisResult.analysis_result_ref }"
+              review_feedback: "${ .artifactsReview.feedback }"
+              review_comment: "${ .artifactsReview.overallComment }"
+              review_iteration: "${ .artifactReviewCount }"
+        eventRef: generateDone
+        eventDataFilter:
+          toStateData: "${ .generateResult }"
+        transition: ValidateGenerateIteration
+
+      - name: ValidateGenerateIteration
+        type: switch
+        dataConditions:
+          - name: iterationMatch
+            condition: "${ (.generateResult.iteration // 0) == (.artifactReviewCount // 0) }"
+            transition: ReviewArtifacts
+        defaultCondition:
+          transition: DrainStaleGenerate
+
+      - name: DrainStaleGenerate
+        type: callback
+        action:
+          functionRef:
+            refName: notifyartifactreview
+            arguments:
+              process_instance_id: "$WORKFLOW.instanceId"
+              review_type: "drain"
+        eventRef: generateDone
+        eventDataFilter:
+          toStateData: "${ .generateResult }"
+        transition: ValidateGenerateIteration
+
+      # --- Phase 5: Human review of generated artifacts (DMN, recs) ---
+
+      - name: ReviewArtifacts
+        type: callback
+        action:
+          functionRef:
+            refName: notifyartifactreview
+            arguments:
+              process_instance_id: "$WORKFLOW.instanceId"
+              review_type: "pre-delivery"
+              generate_result_ref: "${ .generateResult.generate_result_ref }"
+              review_iteration: "${ .artifactReviewCount }"
+              previous_feedback: "${ .artifactsReview }"
+        eventRef: artifactsReviewed
+        eventDataFilter:
+          toStateData: "${ .artifactsReview }"
+        transition: IncrementArtifactReview
+
+      - name: IncrementArtifactReview
+        type: inject
+        data: {}
+        stateDataFilter:
+          output: "${ . + {artifactReviewCount: ((.artifactReviewCount // 0) + 1)} }"
+        transition: CheckArtifactReview
+
+      - name: CheckArtifactReview
+        type: switch
+        dataConditions:
+          - name: approved
+            condition: "${ .artifactsReview.action == \"approve\" }"
+            transition: Assemble
+          - name: changesRequested
+            condition: "${ .artifactsReview.action == \"request_changes\" }"
+            transition: Generate
+        defaultCondition:
+          transition: Assemble
+
+      # --- Phase 6: Assembly (sync — deterministic, <1s) ---
 
       - name: Assemble
         type: operation
@@ -88,13 +250,13 @@ spec:
             functionRef:
               refName: assemble
               arguments:
-                analysis_result_ref: "${ .analysisResult.analysis_result_ref }"
+                generate_result_ref: "${ .generateResult.generate_result_ref }"
             actionDataFilter:
               results: "${ . }"
               toStateData: "${ .assemblyResult }"
         transition: Deliver
 
-      # --- Phase 4: Delivery to acp-writer (sync — bounded REST, 10-30s) ---
+      # --- Phase 7: Delivery to acp-writer (sync — bounded REST, 10-30s) ---
 
       - name: Deliver
         type: operation

@@ -8,6 +8,7 @@ instance.
 
 import json
 import logging
+from datetime import datetime, timezone
 from uuid import uuid4
 
 import requests
@@ -25,6 +26,7 @@ def post_callback(
 
     Returns True if the callback was delivered successfully.
     """
+    data.setdefault("completed_at", datetime.now(timezone.utc).isoformat())
     cloud_event = {
         "specversion": "1.0",
         "id": str(uuid4()),

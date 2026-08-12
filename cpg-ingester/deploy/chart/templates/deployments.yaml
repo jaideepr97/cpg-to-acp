@@ -49,6 +49,10 @@ spec:
             - name: ACP_WRITER_URL
               value: {{ $pod.env.acpWriterUrl | quote }}
             {{- end }}
+            {{- if $pod.env.bffHost }}
+            - name: BFF_HOST
+              value: {{ $pod.env.bffHost | quote }}
+            {{- end }}
             {{- end }}
           readinessProbe:
             httpGet:

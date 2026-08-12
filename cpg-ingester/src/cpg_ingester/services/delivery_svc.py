@@ -7,6 +7,7 @@ Security profile: acp-writer API access only.
 import logging
 import os
 import tempfile
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
 
@@ -60,4 +61,5 @@ async def deliver(request: Request):
 
         return {
             "delivery_status": result.get("delivery_status", {}),
+            "completed_at": datetime.now(timezone.utc).isoformat(),
         }
