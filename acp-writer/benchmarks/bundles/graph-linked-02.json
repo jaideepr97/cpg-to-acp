@@ -128,7 +128,7 @@
         "id": "medrx-furosemide-g2",
         "status": "active",
         "medicationCodeableConcept": {
-          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "310429", "display": "Furosemide 40 MG"}]
+          "coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "197417", "display": "Furosemide 40 MG"}]
         },
         "subject": {"reference": "Patient/patient-graph-02"},
         "authoredOn": "2024-06-01",

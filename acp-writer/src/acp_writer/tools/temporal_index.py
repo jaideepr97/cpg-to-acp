@@ -75,9 +75,10 @@ def build_temporal_index(bundle: dict) -> TemporalIndex:
     """Build an in-memory temporal index from a FHIR IPS bundle."""
     index = TemporalIndex()
 
-    for obs in _get_resources(bundle, "Observation"):
-        obs_id = obs.get("id", "unknown")
-        ref = f"Observation/{obs_id}"
+    from acp_writer.tools.ips_extractor import _get_resources_with_entry, _resource_ref
+
+    for obs, entry in _get_resources_with_entry(bundle, "Observation"):
+        ref = _resource_ref(obs, entry)
         effective_str = _get_effective_date(obs)
         effective_dt = _parse_datetime(effective_str)
 
@@ -90,14 +91,14 @@ def build_temporal_index(bundle: dict) -> TemporalIndex:
             code_token = f"{system}|{code}"
 
             value, unit = _extract_obs_value(obs)
-            entry = IndexedObservation(
+            idx_obs = IndexedObservation(
                 effective_dt=effective_dt,
                 value=value,
                 unit=unit,
                 fhir_reference=ref,
                 has_date=effective_dt is not None,
             )
-            index.observations.setdefault(code_token, []).append(entry)
+            index.observations.setdefault(code_token, []).append(idx_obs)
             if not effective_dt:
                 index.undated_count += 1
 
@@ -112,23 +113,22 @@ def build_temporal_index(bundle: dict) -> TemporalIndex:
 
                 value, unit = _extract_obs_value(component)
                 if value is not None:
-                    entry = IndexedObservation(
+                    idx_obs = IndexedObservation(
                         effective_dt=effective_dt,
                         value=value,
                         unit=unit,
                         fhir_reference=ref,
                         has_date=effective_dt is not None,
                     )
-                    index.observations.setdefault(code_token, []).append(entry)
+                    index.observations.setdefault(code_token, []).append(idx_obs)
 
     for resource_type in ["MedicationStatement", "MedicationRequest"]:
-        for med in _get_resources(bundle, resource_type):
+        for med, med_entry in _get_resources_with_entry(bundle, resource_type):
             status = med.get("status", "")
             if status in ("cancelled", "entered-in-error", "stopped"):
                 continue
 
-            med_id = med.get("id", "unknown")
-            ref = f"{resource_type}/{med_id}"
+            ref = _resource_ref(med, med_entry)
 
             start_str = (
                 med.get("authoredOn")

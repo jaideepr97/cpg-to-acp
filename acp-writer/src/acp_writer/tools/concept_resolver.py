@@ -11,6 +11,7 @@ from typing import Any
 LOINC = "http://loinc.org"
 SNOMED = "http://snomed.info/sct"
 RXNORM = "http://www.nlm.nih.gov/research/umls/rxnorm"
+ICD10CM = "http://hl7.org/fhir/sid/icd-10-cm"
 
 
 @dataclass
@@ -133,7 +134,7 @@ _MEDICATION_MAP: dict[str, tuple[str, str]] = {
     "acetaminophen": (RXNORM, "198440"),
     "warfarin": (RXNORM, "11289"),
     "losartan": (RXNORM, "979492"),
-    "furosemide": (RXNORM, "310429"),
+    "furosemide": (RXNORM, "197417"),
 }
 
 _DRUG_CLASS_MAP: dict[str, list[tuple[str, str]]] = {
@@ -164,7 +165,7 @@ _CONDITION_HIERARCHY: dict[str, list[tuple[str, str]]] = {
     ],
     f"{SNOMED}|44054006": [
         (SNOMED, "313436004"),  # Type 2 diabetes mellitus
-        (SNOMED, "E11"),        # ICD-10 T2DM
+        (ICD10CM, "E11"),       # ICD-10-CM T2DM
     ],
 }
 
@@ -250,8 +251,15 @@ def _resolve_observation(term: str) -> ResolvedConcept | None:
     return None
 
 
+def _strip_article(term: str) -> str:
+    """Remove leading article ('a ' or 'an ') from a term."""
+    return re.sub(r"^an?\s+", "", term)
+
+
 def _resolve_boolean(term: str) -> ResolvedConcept | None:
-    for alias_term in [term] + [term.lstrip("an ").lstrip("a ")]:
+    stripped = _strip_article(term)
+    candidates = [term] if stripped == term else [term, stripped]
+    for alias_term in candidates:
         if alias_term in _CONDITION_MAP:
             system, code = _CONDITION_MAP[alias_term]
             hierarchy_key = f"{system}|{code}"
@@ -271,7 +279,7 @@ def _resolve_boolean(term: str) -> ResolvedConcept | None:
             )
 
         for drug_class, members in _DRUG_CLASS_MAP.items():
-            if drug_class in alias_term or alias_term in drug_class:
+            if len(alias_term) >= 3 and (drug_class in alias_term or alias_term in drug_class):
                 return ResolvedConcept(
                     action="extract_drug_class",
                     resource_type="MedicationRequest",

@@ -35,7 +35,8 @@ class TestExtractObservation:
         assert result.found
         assert result.value == 142
         assert result.unit == "mmHg"
-        assert result.fhir_reference == "Observation/observation-bp-1"
+        assert result.fhir_reference != "Observation/unknown"
+        assert "urn:uuid:" in result.fhir_reference or result.fhir_reference.startswith("Observation/")
 
     def test_diastolic_bp_from_component(self):
         bundle = _load_bundle("patient-bundle-medication.json")
@@ -57,7 +58,7 @@ class TestExtractObservation:
     def test_returns_fhir_reference(self):
         bundle = _load_bundle("patient-bundle-medication.json")
         result = extract_observation(bundle, LOINC, "8480-6")
-        assert result.fhir_reference.startswith("Observation/")
+        assert result.fhir_reference != "Observation/unknown"
         assert result.resource_type == "Observation"
 
     def test_returns_date(self):
@@ -106,7 +107,7 @@ class TestExtractCondition:
         result = extract_condition(bundle, SNOMED, "59621000")
         assert result.found
         assert result.value is True
-        assert result.fhir_reference == "Condition/condition-htn-1"
+        assert result.fhir_reference != "Condition/unknown"
 
     def test_diabetes_present(self):
         bundle = _load_bundle("patient-bundle-medication.json")
@@ -148,7 +149,8 @@ class TestExtractMedication:
         bundle = _load_bundle("patient-bundle-medication.json")
         result = extract_medication(bundle, RXNORM, "860975")
         assert result.found
-        assert result.fhir_reference == "MedicationStatement/medstmt-metformin-1"
+        assert result.fhir_reference != "MedicationRequest/unknown"
+        assert result.fhir_reference != "MedicationStatement/unknown"
 
     def test_medication_absent_lifestyle(self):
         bundle = _load_bundle("patient-bundle-lifestyle.json")

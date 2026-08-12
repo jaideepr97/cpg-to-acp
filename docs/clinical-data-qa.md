@@ -36,7 +36,7 @@ If `cpg-ingester` provides clinical terminology codes on DMN input variables (e.
 
 ### Layer 3: Concept Resolver
 
-A deterministic clinical term-to-code mapper (`acp_writer/tools/concept_resolver.py`) that handles the common 80% of clinical concepts without any LLM calls:
+A deterministic clinical term-to-code mapper (`acp-writer/src/acp_writer/tools/concept_resolver.py`) that handles the common 80% of clinical concepts without any LLM calls:
 
 - **60+ observation terms** → LOINC codes (vitals, labs, scores)
 - **20+ condition terms** → SNOMED codes with hierarchy (CKD stage variants)
@@ -51,22 +51,24 @@ A 6-entry hardcoded map (`KNOWN_VARIABLE_MAP`) for backward compatibility. The c
 
 ## Extraction Functions
 
-All extraction functions are in `acp_writer/tools/ips_extractor.py` and return an `ExtractionResult` with `found`, `value`, `unit`, `date`, `fhir_reference`, and `resource_type`.
+All extraction functions are in `acp-writer/src/acp_writer/tools/ips_extractor.py` and return an `ExtractionResult` with `found`, `value`, `unit`, `date`, `fhir_reference`, and `resource_type`.
 
 | Function | FHIR Resource | What it returns |
 |---|---|---|
-| `extract_observation` | Observation | Most recent value by code. Supports `valueQuantity`, `valueCodeableConcept`, `valueString`, `valueBoolean`. Checks both top-level code and components (for panels like BP). |
+| `extract_observation` | Observation | Most recent value by code. Supports `valueQuantity`, `valueCodeableConcept`, `valueString`, `valueBoolean`, `valueRange`. Checks both top-level code and components (for panels like BP). |
 | `extract_condition` | Condition | Boolean: active condition with matching code present? Excludes resolved/inactive/remission. |
-| `extract_medication` | MedicationStatement, MedicationRequest | Boolean: active medication with matching code present? Excludes cancelled/stopped. |
+| `extract_medication` | MedicationStatement, MedicationRequest | Boolean: active medication with matching code present? Excludes cancelled/entered-in-error/stopped. |
 | `extract_allergy` | AllergyIntolerance | Boolean: active allergy with matching code present? |
-| `extract_procedure` | Procedure | Boolean: procedure with matching code present? Excludes not-done. |
+| `extract_procedure` | Procedure | Boolean: procedure with matching code present? Excludes entered-in-error/not-done. |
 | `extract_family_history` | FamilyMemberHistory | Boolean: family history entry with matching condition code? |
-| `extract_diagnostic_report` | DiagnosticReport | Boolean: report with matching code present? |
+| `extract_diagnostic_report` | DiagnosticReport | Boolean: report with matching code present? Excludes entered-in-error/cancelled. |
 | `extract_patient_age` | Patient | Computed age in years from birthDate relative to a reference date. |
 
 ## Temporal Queries
 
-For questions requiring temporal reasoning, the system builds an in-memory **temporal index** (`acp_writer/tools/temporal_index.py`) that groups observations by code and date, then provides five named primitives (`acp_writer/tools/temporal_queries.py`):
+> **Note:** The temporal primitives and LLM-assisted layers described below are NOT wired into the production DMN executor. They are currently reachable only from the benchmark backends and the QA agent. The production extraction path is: prior DMN results → `DecisionVariable.codes` → concept resolver → `KNOWN_VARIABLE_MAP`. Wiring temporal extraction into the production executor is future work tracked by GitHub issue #86.
+
+For questions requiring temporal reasoning, the system builds an in-memory **temporal index** (`acp-writer/src/acp_writer/tools/temporal_index.py`) that groups observations by code and date, then provides five named primitives (`acp-writer/src/acp_writer/tools/temporal_queries.py`):
 
 | Primitive | What it computes | Example |
 |---|---|---|
@@ -76,7 +78,7 @@ For questions requiring temporal reasoning, the system builds an in-memory **tem
 | `rate_of_change` | Least-squares slope normalized per year | "eGFR decline rate" |
 | `cross_resource_temporal` | Whether a target observation exists within a window after an anchor medication start | "Was BMP drawn within 2 weeks of starting lisinopril?" |
 
-Every temporal result includes provenance (FHIR references) and data quality notes (e.g., "2 undated observations excluded").
+Temporal results include provenance (FHIR references) and data quality notes when undated observations were excluded from the query.
 
 ### Temporal Pattern Coverage
 
@@ -108,7 +110,7 @@ graph LR
 
 ## Benchmarking
 
-The QA system includes a benchmark harness (`acp_writer/benchmark/`) for measuring accuracy:
+The QA system includes a benchmark harness (`acp-writer/src/acp_writer/benchmark/`) for measuring accuracy:
 
 ```bash
 # Run the 50-question smoke suite
@@ -118,7 +120,19 @@ python -m acp_writer.benchmark run --suite smoke --backend current --no-mlflow
 python -m acp_writer.benchmark run --suite standard --backend current --no-mlflow
 ```
 
+Three registered backends: `current` (deterministic), `graph` (NetworkX), `llm-assisted` (query planner + tool agent). Use `python -m acp_writer.benchmark list` to see available suites and backends.
+
 See `acp-writer/benchmarks/README.md` for details on adding test cases and backends.
+
+### Additional modules
+
+- **`acp-writer/src/acp_writer/tools/ips_serializer.py`** — condensed IPS serialization for LLM context (83% fewer tokens)
+- **`acp-writer/src/acp_writer/tools/query_planner.py`** — LLM query plan synthesis (text → validated JSON plan)
+- **`acp-writer/src/acp_writer/tools/qa_agent.py`** — LangGraph agent with extraction tools for complex questions
+
+### Benchmark design note
+
+Most suite cases carry a hand-authored `structured_intent`, so the 98%/74.5% scores measure execution of correct query plans plus concept-resolver natural language resolution (where intent is absent), not free-form question understanding.
 
 ## Design Decisions
 

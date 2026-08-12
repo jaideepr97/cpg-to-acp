@@ -57,6 +57,31 @@ def _get_resources(bundle: dict, resource_type: str) -> list[dict]:
     ]
 
 
+def _get_resources_with_entry(bundle: dict, resource_type: str) -> list[tuple[dict, dict]]:
+    """Return (resource, entry) pairs for provenance-aware extraction."""
+    return [
+        (e["resource"], e)
+        for e in bundle.get("entry", [])
+        if e.get("resource", {}).get("resourceType") == resource_type
+    ]
+
+
+def _resource_ref(resource: dict, entry: dict | None = None) -> str:
+    """Compute a resource reference for provenance.
+
+    Prefers resource.id, falls back to entry.fullUrl, then 'unknown'.
+    """
+    rt = resource.get("resourceType", "Resource")
+    rid = resource.get("id")
+    if rid:
+        return f"{rt}/{rid}"
+    if entry:
+        full_url = entry.get("fullUrl")
+        if full_url:
+            return full_url
+    return f"{rt}/unknown"
+
+
 def _has_code(resource: dict, code_field: str, system: str, code: str) -> bool:
     cc = resource.get(code_field, {})
     for coding in cc.get("coding", []):
@@ -124,37 +149,37 @@ def extract_observation(
 
     For panel observations (like BP), checks both top-level code and components.
     """
-    observations = _get_resources(ips_bundle, "Observation")
+    obs_entries = _get_resources_with_entry(ips_bundle, "Observation")
 
-    candidates: list[tuple[str, dict, Any, str | None]] = []
+    candidates: list[tuple[str, dict, dict, Any, str | None]] = []
 
-    for obs in observations:
+    for obs, entry in obs_entries:
         effective = _get_effective_date(obs)
 
         if _has_code(obs, "code", system, code):
             value, unit = _extract_obs_value(obs)
             if value is not None:
-                candidates.append((_parse_date_key(effective), obs, value, unit))
+                candidates.append((_parse_date_key(effective), obs, entry, value, unit))
             continue
 
         for component in obs.get("component", []):
             if _has_code(component, "code", system, code):
                 value, unit = _extract_obs_value(component)
                 if value is not None:
-                    candidates.append((_parse_date_key(effective), obs, value, unit))
+                    candidates.append((_parse_date_key(effective), obs, entry, value, unit))
 
     if not candidates:
         return ExtractionResult(found=False)
 
     candidates.sort(key=lambda x: x[0], reverse=True)
-    _, obs, value, unit = candidates[0]
+    _, obs, entry, value, unit = candidates[0]
 
     return ExtractionResult(
         found=True,
         value=value,
         unit=unit,
         date=_get_effective_date(obs),
-        fhir_reference=f"Observation/{obs.get('id', 'unknown')}",
+        fhir_reference=_resource_ref(obs, entry),
         resource_type="Observation",
     )
 
@@ -164,9 +189,9 @@ def extract_condition(
     ips_bundle: dict, system: str, code: str
 ) -> ExtractionResult:
     """Check if an active condition matching the code is present."""
-    conditions = _get_resources(ips_bundle, "Condition")
+    cond_entries = _get_resources_with_entry(ips_bundle, "Condition")
 
-    for condition in conditions:
+    for condition, entry in cond_entries:
         if not _has_code(condition, "code", system, code):
             continue
 
@@ -181,7 +206,7 @@ def extract_condition(
             return ExtractionResult(
                 found=True,
                 value=True,
-                fhir_reference=f"Condition/{condition.get('id', 'unknown')}",
+                fhir_reference=_resource_ref(condition, entry),
                 resource_type="Condition",
             )
 
@@ -194,8 +219,8 @@ def extract_medication(
 ) -> ExtractionResult:
     """Check if an active medication matching the code is present."""
     for resource_type in ["MedicationStatement", "MedicationRequest"]:
-        resources = _get_resources(ips_bundle, resource_type)
-        for resource in resources:
+        med_entries = _get_resources_with_entry(ips_bundle, resource_type)
+        for resource, entry in med_entries:
             status = resource.get("status", "")
             if status in ("cancelled", "entered-in-error", "stopped"):
                 continue
@@ -204,7 +229,7 @@ def extract_medication(
                 return ExtractionResult(
                     found=True,
                     value=True,
-                    fhir_reference=f"{resource_type}/{resource.get('id', 'unknown')}",
+                    fhir_reference=_resource_ref(resource, entry),
                     resource_type=resource_type,
                 )
 
@@ -216,9 +241,9 @@ def extract_allergy(
     ips_bundle: dict, system: str, code: str
 ) -> ExtractionResult:
     """Check if an active allergy matching the code is present."""
-    allergies = _get_resources(ips_bundle, "AllergyIntolerance")
+    allergy_entries = _get_resources_with_entry(ips_bundle, "AllergyIntolerance")
 
-    for allergy in allergies:
+    for allergy, entry in allergy_entries:
         if not _has_code(allergy, "code", system, code):
             continue
 
@@ -233,7 +258,7 @@ def extract_allergy(
             return ExtractionResult(
                 found=True,
                 value=True,
-                fhir_reference=f"AllergyIntolerance/{allergy.get('id', 'unknown')}",
+                fhir_reference=_resource_ref(allergy, entry),
                 resource_type="AllergyIntolerance",
             )
 
@@ -245,9 +270,9 @@ def extract_procedure(
     ips_bundle: dict, system: str, code: str
 ) -> ExtractionResult:
     """Check if a procedure matching the code is present."""
-    procedures = _get_resources(ips_bundle, "Procedure")
+    proc_entries = _get_resources_with_entry(ips_bundle, "Procedure")
 
-    for proc in procedures:
+    for proc, entry in proc_entries:
         if not _has_code(proc, "code", system, code):
             continue
 
@@ -261,7 +286,7 @@ def extract_procedure(
             date=proc.get("performedDateTime") or (
                 proc.get("performedPeriod", {}).get("start")
             ),
-            fhir_reference=f"Procedure/{proc.get('id', 'unknown')}",
+            fhir_reference=_resource_ref(proc, entry),
             resource_type="Procedure",
         )
 
@@ -273,9 +298,9 @@ def extract_family_history(
     ips_bundle: dict, system: str, code: str
 ) -> ExtractionResult:
     """Check if a family history entry matching the condition code is present."""
-    fmh_resources = _get_resources(ips_bundle, "FamilyMemberHistory")
+    fmh_entries = _get_resources_with_entry(ips_bundle, "FamilyMemberHistory")
 
-    for fmh in fmh_resources:
+    for fmh, entry in fmh_entries:
         status = fmh.get("status", "")
         if status in ("entered-in-error",):
             continue
@@ -285,7 +310,7 @@ def extract_family_history(
                 return ExtractionResult(
                     found=True,
                     value=True,
-                    fhir_reference=f"FamilyMemberHistory/{fmh.get('id', 'unknown')}",
+                    fhir_reference=_resource_ref(fmh, entry),
                     resource_type="FamilyMemberHistory",
                 )
 
@@ -297,9 +322,9 @@ def extract_diagnostic_report(
     ips_bundle: dict, system: str, code: str
 ) -> ExtractionResult:
     """Check if a diagnostic report matching the code is present."""
-    reports = _get_resources(ips_bundle, "DiagnosticReport")
+    report_entries = _get_resources_with_entry(ips_bundle, "DiagnosticReport")
 
-    for report in reports:
+    for report, entry in report_entries:
         if not _has_code(report, "code", system, code):
             continue
 
@@ -313,7 +338,7 @@ def extract_diagnostic_report(
             date=report.get("effectiveDateTime") or (
                 report.get("effectivePeriod", {}).get("start")
             ),
-            fhir_reference=f"DiagnosticReport/{report.get('id', 'unknown')}",
+            fhir_reference=_resource_ref(report, entry),
             resource_type="DiagnosticReport",
         )
 

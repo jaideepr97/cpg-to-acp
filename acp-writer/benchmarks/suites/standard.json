@@ -1826,7 +1826,7 @@
       "function": "cross_resource_temporal",
       "params": {
         "anchor_resource": "MedicationRequest",
-        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|310429",
+        "anchor_code": "http://www.nlm.nih.gov/research/umls/rxnorm|197417",
         "target_code": "http://loinc.org|10230-1",
         "window": "P1M"
       }

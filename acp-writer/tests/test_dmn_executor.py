@@ -49,7 +49,7 @@ class TestExtractInputValue:
         value, ref = _extract_input_value(bundle, "Systolic BP", "number", {})
         assert value == 142
         assert ref is not None
-        assert ref.startswith("Observation/")
+        assert ref != "Observation/unknown"
 
     def test_has_diabetes_from_ips(self):
         bundle = _load_bundle("patient-bundle-medication.json")

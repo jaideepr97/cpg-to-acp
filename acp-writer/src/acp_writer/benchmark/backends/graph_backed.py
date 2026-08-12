@@ -48,15 +48,16 @@ def build_fhir_graph(bundle: dict) -> "nx.DiGraph":
 
     G = nx.DiGraph()
 
-    for entry in bundle.get("entry", []):
-        resource = entry.get("resource", {})
+    from acp_writer.tools.ips_extractor import _resource_ref
+
+    for bundle_entry in bundle.get("entry", []):
+        resource = bundle_entry.get("resource", {})
         rt = resource.get("resourceType", "")
-        rid = resource.get("id", "unknown")
-        node_id = f"{rt}/{rid}"
+        node_id = _resource_ref(resource, bundle_entry)
 
         node_attrs = {
             "resourceType": rt,
-            "fhir_id": rid,
+            "fhir_id": resource.get("id", ""),
         }
 
         if rt == "Patient":

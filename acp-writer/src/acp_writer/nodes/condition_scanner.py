@@ -49,10 +49,17 @@ def _is_active_status(resource: dict, status_field: str = "clinicalStatus") -> b
     return False
 
 
-def _extract_patient_demographics(patient: dict) -> dict[str, Any]:
+def _extract_patient_demographics(patient: dict, entry: dict | None = None) -> dict[str, Any]:
+    pid = patient.get("id", "")
+    if pid:
+        ref = f"Patient/{pid}"
+    elif entry and entry.get("fullUrl"):
+        ref = entry["fullUrl"]
+    else:
+        ref = "Patient/"
     demographics: dict[str, Any] = {
-        "id": patient.get("id", ""),
-        "reference": f"Patient/{patient.get('id', '')}",
+        "id": pid,
+        "reference": ref,
     }
     if patient.get("gender"):
         demographics["gender"] = patient["gender"]
@@ -83,12 +90,16 @@ def condition_scanner(state: CarePlanComposerState) -> dict:
         logger.warning("No IPS bundle provided")
         return {}
 
-    patients = _get_resources(bundle, "Patient")
-    if not patients:
+    patient_entries = [
+        (e["resource"], e)
+        for e in bundle.get("entry", [])
+        if e.get("resource", {}).get("resourceType") == "Patient"
+    ]
+    if not patient_entries:
         logger.warning("No Patient resource in bundle")
         return {}
-    patient = patients[0]
-    demographics = _extract_patient_demographics(patient)
+    patient, patient_entry = patient_entries[0]
+    demographics = _extract_patient_demographics(patient, patient_entry)
     patient_ref = demographics["reference"]
     logger.info("Patient: %s (%s)", demographics.get("name", "unknown"), patient_ref)
 

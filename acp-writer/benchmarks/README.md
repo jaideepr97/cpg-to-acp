@@ -19,16 +19,26 @@ cd acp-writer
 
 ## Directory Structure
 
+The graph backend requires `networkx`. Install it with:
+```bash
+pip install -e ".[benchmark]"
+```
+
+## Directory Structure
+
 ```
 benchmarks/
   suites/         # Test case JSON files (one per suite)
     smoke.json    # 50-question smoke suite
+    standard.json # 200-question standard suite (13 categories)
   bundles/        # FHIR IPS bundles used by test cases
     htn-temporal-01.json     # HTN patient, 8 BP readings over 6 months
     ckd-declining-01.json    # CKD patient, declining eGFR series
     edge-missing-dates.json  # Observations with missing/partial dates
     edge-coded-values.json   # Observations with valueCodeableConcept
     complex-patient-01.json  # 5+ conditions, 10+ meds, multi-year history
+    graph-linked-01.json     # Rich inter-resource references (reasonReference, encounter, result)
+    graph-linked-02.json     # Heart failure patient with inter-resource references
 ```
 
 ## Test Case Format

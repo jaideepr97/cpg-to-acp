@@ -75,7 +75,7 @@ class LLMAssistedBackend(CurrentImplementationBackend):
                 question, bundle, reference_date,
                 structured_intent=plan,
             )
-            if not result.insufficient_data or not result.error:
+            if not result.insufficient_data:
                 return result
 
         from acp_writer.tools.qa_agent import agent_answer
