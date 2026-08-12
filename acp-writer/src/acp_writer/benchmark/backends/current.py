@@ -10,13 +10,20 @@ from typing import Any
 
 from acp_writer.benchmark.models import QAAnswer
 from acp_writer.nodes.dmn_executor import KNOWN_VARIABLE_MAP
+from acp_writer.tools.concept_resolver import (
+    get_all_codes_for_condition,
+    get_all_codes_for_medication,
+)
 from acp_writer.tools.ips_extractor import (
     extract_allergy,
     extract_condition,
+    extract_condition_concept,
     extract_diagnostic_report,
     extract_family_history,
     extract_medication,
+    extract_medication_concept,
     extract_observation,
+    extract_observation_concept,
     extract_patient_age,
     extract_procedure,
 )
@@ -324,40 +331,54 @@ class CurrentImplementationBackend:
     ) -> QAAnswer:
         """Execute an extraction based on a ResolvedConcept."""
         if resolved.action == "extract_observation":
-            return self._extract_observation(bundle, resolved.system, resolved.code)
+            code_tokens = [f"{resolved.system}|{resolved.code}"] if resolved.system and resolved.code else []
+            display_terms = [resolved.code] if resolved.code else []
+            result = extract_observation_concept(bundle, code_tokens=code_tokens or None, display_terms=display_terms or None)
+            if result.found:
+                return QAAnswer(
+                    value=result.value, kind="number",
+                    provenance=[result.fhir_reference] if result.fhir_reference else [],
+                )
+            return QAAnswer(value=None, kind="insufficient_data", insufficient_data=True)
 
         if resolved.action == "extract_condition":
-            if resolved.codes:
-                for code_token in resolved.codes:
-                    if "|" not in code_token:
-                        continue
-                    sys, cd = code_token.rsplit("|", 1)
-                    result = extract_condition(bundle, sys, cd)
-                    if result.found:
-                        return QAAnswer(
-                            value=True, kind="boolean",
-                            provenance=[result.fhir_reference] if result.fhir_reference else [],
-                        )
-                return QAAnswer(value=False, kind="boolean")
-            return self._extract_condition(bundle, resolved.system, resolved.code)
+            code_tokens = resolved.codes or ([f"{resolved.system}|{resolved.code}"] if resolved.system else [])
+            norm_term = resolved.code if not resolved.system else ""
+            _, display_terms = get_all_codes_for_condition(norm_term) if norm_term else ([], [])
+            if not display_terms and resolved.codes:
+                from acp_writer.tools.concept_resolver import _CONDITION_DISPLAY_TERMS, _normalize
+                for concept, terms in _CONDITION_DISPLAY_TERMS.items():
+                    if any(t in (resolved.code or "").lower() for t in terms):
+                        display_terms = terms
+                        break
+            result = extract_condition_concept(bundle, code_tokens=code_tokens or None, display_terms=display_terms or None)
+            return QAAnswer(
+                value=result.found,
+                kind="boolean",
+                provenance=[result.fhir_reference] if result.fhir_reference else [],
+            )
 
         if resolved.action == "extract_medication":
-            return self._extract_medication(bundle, resolved.system, resolved.code)
+            code_tokens = [f"{resolved.system}|{resolved.code}"] if resolved.system and resolved.code else []
+            display_terms = [resolved.code.split("|")[-1]] if resolved.code else []
+            result = extract_medication_concept(bundle, code_tokens=code_tokens or None, display_terms=display_terms or None)
+            return QAAnswer(
+                value=result.found,
+                kind="boolean",
+                provenance=[result.fhir_reference] if result.fhir_reference else [],
+            )
 
         if resolved.action == "extract_allergy":
             return self._extract_allergy(bundle, resolved.system, resolved.code)
 
         if resolved.action == "extract_drug_class":
-            for code_token in (resolved.codes or []):
-                if "|" not in code_token:
-                    continue
-                system, code = code_token.rsplit("|", 1)
-                result = extract_medication(bundle, system, code)
-                if result.found:
-                    return QAAnswer(
-                        value=True, kind="boolean",
-                        provenance=[result.fhir_reference] if result.fhir_reference else [],
-                    )
+            code_tokens = resolved.codes or []
+            result = extract_medication_concept(bundle, code_tokens=code_tokens or None, display_terms=None)
+            if result.found:
+                return QAAnswer(
+                    value=True, kind="boolean",
+                    provenance=[result.fhir_reference] if result.fhir_reference else [],
+                )
             return QAAnswer(value=False, kind="boolean")
 
         if resolved.action == "compute_age":

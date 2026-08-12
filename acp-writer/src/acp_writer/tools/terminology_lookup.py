@@ -349,6 +349,103 @@ def verify(system: str, code: str) -> LookupResult:
     return fn(code)
 
 
+@mlflow.trace(name="terminology_find_candidates")
+def find_candidates(system: str, text: str, n: int = 5) -> list[LookupResult]:
+    """Find top-N candidate codes for a clinical term in a terminology system.
+
+    Like find() but returns multiple candidates for concept resolution.
+    Falls back gracefully to an empty list on network failure.
+    """
+    dispatch = {
+        SNOMED_SYSTEM: lambda t, n: _snomed_find_multi(t, n),
+        RXNORM_SYSTEM: lambda t, n: _rxnorm_find_multi(t, n),
+        LOINC_SYSTEM: lambda t, n: _loinc_find_multi(t, n),
+        ICD10_SYSTEM: lambda t, n: _icd10_find_multi(t, n),
+    }
+    fn = dispatch.get(system)
+    if fn is None:
+        return []
+    try:
+        return fn(text, n)
+    except Exception as exc:
+        logger.warning("Terminology find_candidates failed for %s: %s", system, exc)
+        return []
+
+
+def _snomed_find_multi(text: str, n: int) -> list[LookupResult]:
+    r = _safe_get(
+        f"{_TX_FHIR_BASE}/ValueSet/$expand",
+        params={"filter": text, "url": "http://snomed.info/sct?fhir_vs", "count": n},
+    )
+    if r is None:
+        return []
+    data = r.json()
+    results = []
+    for entry in data.get("expansion", {}).get("contains", [])[:n]:
+        results.append(LookupResult(
+            found=True, system=SNOMED_SYSTEM,
+            code=entry.get("code"), display=entry.get("display"),
+        ))
+    return results
+
+
+def _rxnorm_find_multi(text: str, n: int) -> list[LookupResult]:
+    r = _safe_get(
+        f"{_RXNAV_BASE}/approximateTerm.json",
+        params={"term": text, "maxEntries": n},
+    )
+    if r is None:
+        return []
+    data = r.json()
+    results = []
+    for candidate in data.get("approximateGroup", {}).get("candidate", [])[:n]:
+        rxcui = candidate.get("rxcui")
+        if rxcui:
+            results.append(LookupResult(
+                found=True, system=RXNORM_SYSTEM,
+                code=rxcui, display=candidate.get("name", ""),
+            ))
+    return results
+
+
+def _loinc_find_multi(text: str, n: int) -> list[LookupResult]:
+    r = _safe_get(
+        f"{_NLM_BASE}/loinc_items/v3/search",
+        params={"terms": text, "maxList": n},
+    )
+    if r is None:
+        return []
+    data = r.json()
+    codes = data[1] if len(data) > 1 else []
+    displays = data[3] if len(data) > 3 else []
+    results = []
+    for i, code in enumerate(codes[:n]):
+        display = displays[i][0] if i < len(displays) and displays[i] else None
+        results.append(LookupResult(
+            found=True, system=LOINC_SYSTEM, code=code, display=display,
+        ))
+    return results
+
+
+def _icd10_find_multi(text: str, n: int) -> list[LookupResult]:
+    r = _safe_get(
+        f"{_NLM_BASE}/icd10cm/v3/search",
+        params={"sf": "name,code", "terms": text, "maxList": n},
+    )
+    if r is None:
+        return []
+    data = r.json()
+    codes = data[1] if len(data) > 1 else []
+    displays = data[3] if len(data) > 3 else []
+    results = []
+    for i, code in enumerate(codes[:n]):
+        display = displays[i][0] if i < len(displays) and displays[i] else None
+        results.append(LookupResult(
+            found=True, system=ICD10_SYSTEM, code=code, display=display,
+        ))
+    return results
+
+
 def verify_bundle_codes(bundle: dict) -> list[dict[str, Any]]:
     """Walk all coded fields in a FHIR Bundle and verify each code.
 
