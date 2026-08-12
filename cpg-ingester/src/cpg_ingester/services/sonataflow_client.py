@@ -55,12 +55,27 @@ def infer_current_state(data: dict, instance_status: str) -> str:
         return "Done"
     if "assemblyResult" in data:
         return "Deliver"
-    if data.get("artifactsReview", {}).get("action") == "approve":
+    artifact_review = data.get("artifactsReview", {})
+    if artifact_review.get("action") == "approve":
         return "Assemble"
+    if artifact_review.get("action") == "request_changes":
+        review_at = artifact_review.get("completed_at", "")
+        gen_at = data.get("generateResult", {}).get("completed_at", "")
+        if gen_at and gen_at > review_at:
+            return "ReviewArtifacts"
+        return "Generate"
     if "generateResult" in data:
         return "ReviewArtifacts"
-    if data.get("manifestReview", {}).get("action") == "approve":
+
+    manifest_review = data.get("manifestReview", {})
+    if manifest_review.get("action") == "approve":
         return "Generate"
+    if manifest_review.get("action") == "request_changes":
+        review_at = manifest_review.get("completed_at", "")
+        analysis_at = data.get("analysisResult", {}).get("completed_at", "")
+        if analysis_at and analysis_at > review_at:
+            return "ReviewManifest"
+        return "Analyze"
     if "analysisResult" in data:
         return "ReviewManifest"
     if "parseResult" in data:
@@ -68,18 +83,83 @@ def infer_current_state(data: dict, instance_status: str) -> str:
     return "Parse"
 
 
-def build_steps(current_state: str) -> list[dict[str, str]]:
+def _step_timestamps(data: dict, created_at: str) -> dict[str, dict[str, str]]:
+    """Build a map of step name -> {startedAt, completedAt} from result timestamps.
+
+    Each step starts when the previous step completed. The chain:
+    created_at -> Parse -> Analyze -> ReviewManifest -> Generate ->
+    ReviewArtifacts -> Assemble -> Deliver -> Done
+    """
+    timestamps: dict[str, dict[str, str]] = {}
+    prev = created_at
+
+    step_result_keys = [
+        ("Parse", "parseResult"),
+        ("Analyze", "analysisResult"),
+        ("ReviewManifest", "manifestReview"),
+        ("Generate", "generateResult"),
+        ("ReviewArtifacts", "artifactsReview"),
+        ("Assemble", "assemblyResult"),
+        ("Deliver", "deliveryResult"),
+    ]
+
+    for step_name, result_key in step_result_keys:
+        result = data.get(result_key)
+        if not result or not isinstance(result, dict):
+            if prev:
+                timestamps[step_name] = {"startedAt": prev}
+            break
+        completed = result.get("completed_at", "")
+        entry: dict[str, str] = {}
+        if prev:
+            entry["startedAt"] = prev
+        if completed:
+            entry["completedAt"] = completed
+        timestamps[step_name] = entry
+        prev = completed or prev
+
+    if data.get("status") == "completed" or "deliveryResult" in data:
+        delivery = data.get("deliveryResult", {})
+        done_at = delivery.get("completed_at", "")
+        if done_at:
+            timestamps["Done"] = {"startedAt": done_at, "completedAt": done_at}
+
+    return timestamps
+
+
+def build_steps(current_state: str, data: dict | None = None, created_at: str = "") -> list[dict]:
     """Build the steps array the UI expects from the current state."""
+    ts = _step_timestamps(data or {}, created_at) if data else {}
+    d = data or {}
+    manifest_count = d.get("manifestReviewCount", 0) or 0
+    artifact_count = d.get("artifactReviewCount", 0) or 0
+
+    in_manifest_loop = current_state in ("Analyze", "ReviewManifest") and manifest_count > 0
+    in_artifact_loop = current_state in ("Generate", "ReviewArtifacts") and artifact_count > 0
+
     steps = []
     reached = False
     for name in PIPELINE_STEPS:
         if name == current_state:
             reached = True
-            steps.append({"name": name, "status": "active"})
+            step: dict = {"name": name, "status": "active"}
         elif not reached:
-            steps.append({"name": name, "status": "completed"})
+            step = {"name": name, "status": "completed"}
         else:
-            steps.append({"name": name, "status": "pending"})
+            step = {"name": name, "status": "pending"}
+        if name in ts:
+            step.update(ts[name])
+        if name in ("Analyze", "ReviewManifest"):
+            if in_manifest_loop:
+                step["iteration"] = manifest_count + 1
+            elif manifest_count > 1:
+                step["iteration"] = manifest_count
+        elif name in ("Generate", "ReviewArtifacts"):
+            if in_artifact_loop:
+                step["iteration"] = artifact_count + 1
+            elif artifact_count > 1:
+                step["iteration"] = artifact_count
+        steps.append(step)
     if current_state == "Done":
         for s in steps:
             s["status"] = "completed"
@@ -115,12 +195,13 @@ def map_to_run_detail(instance: dict) -> dict[str, Any]:
     status = instance.get("status", "ACTIVE")
     current_state = infer_current_state(data, status)
 
+    created_at = instance.get("startDate") or data.get("created_at", "")
     detail: dict[str, Any] = {
         "id": instance["id"],
         "status": _STATE_TO_RUN_STATUS.get(current_state, "parsing"),
         "cpgName": data.get("cpg_name", "Unknown CPG"),
-        "createdAt": instance.get("startDate") or data.get("created_at", ""),
-        "steps": build_steps(current_state),
+        "createdAt": created_at,
+        "steps": build_steps(current_state, data, created_at),
         "workflowData": {
             "analysisResult": data.get("analysisResult"),
             "generateResult": data.get("generateResult"),
@@ -147,11 +228,59 @@ def map_to_run_detail(instance: dict) -> dict[str, Any]:
     return detail
 
 
+_GRAPHQL_LIST = """
+query {
+  ProcessInstances(where: {processId: {equal: "%s"}}, orderBy: {start: DESC}) {
+    id state start end variables
+  }
+}
+""" % WORKFLOW_NAME
+
+_GRAPHQL_GET = """
+query ($id: String!) {
+  ProcessInstances(where: {id: {equal: $id}}) {
+    id state start end variables
+  }
+}
+"""
+
+
+def _graphql_to_instance(pi: dict) -> dict:
+    """Normalize a GraphQL ProcessInstance to match REST API shape."""
+    variables = pi.get("variables") or {}
+    if isinstance(variables, str):
+        import json as _json
+        variables = _json.loads(variables)
+    return {
+        "id": pi["id"],
+        "status": pi["state"],
+        "startDate": pi.get("start", ""),
+        "workflowdata": variables.get("workflowdata", {}),
+    }
+
+
 class SonataFlowClient:
-    """REST client for the SonataFlow cpgingester workflow."""
+    """Client for the SonataFlow cpgingester workflow.
+
+    Uses GraphQL (embedded Data Index) for queries so completed instances
+    are included.  Uses REST for mutations (start, abort, send review).
+    """
 
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip("/")
+
+    def _graphql(self, query: str, variables: dict | None = None) -> dict:
+        payload: dict = {"query": query}
+        if variables:
+            payload["variables"] = variables
+        resp = requests.post(
+            f"{self.base_url}/graphql",
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        return resp.json()
 
     def start_workflow(self, pdf_ref: str, cpg_name: str) -> dict:
         resp = requests.post(
@@ -168,20 +297,18 @@ class SonataFlowClient:
         return resp.json()
 
     def list_instances(self) -> list[dict]:
-        resp = requests.get(
-            f"{self.base_url}/{WORKFLOW_NAME}",
-            timeout=10,
-        )
-        resp.raise_for_status()
-        return resp.json()
+        result = self._graphql(_GRAPHQL_LIST)
+        instances = result.get("data", {}).get("ProcessInstances", [])
+        return [_graphql_to_instance(pi) for pi in instances]
 
     def get_instance(self, instance_id: str) -> dict:
-        resp = requests.get(
-            f"{self.base_url}/{WORKFLOW_NAME}/{instance_id}",
-            timeout=10,
-        )
-        resp.raise_for_status()
-        return resp.json()
+        result = self._graphql(_GRAPHQL_GET, {"id": instance_id})
+        instances = result.get("data", {}).get("ProcessInstances", [])
+        if not instances:
+            raise requests.HTTPError(
+                f"Run {instance_id} not found", response=type("R", (), {"status_code": 404})()
+            )
+        return _graphql_to_instance(instances[0])
 
     def abort_instance(self, instance_id: str) -> None:
         resp = requests.delete(
@@ -193,6 +320,7 @@ class SonataFlowClient:
     def send_review(self, instance_id: str, gate: str, review_data: dict) -> None:
         event_type = _REVIEW_EVENT_TYPE[gate]
         wait_path = _REVIEW_WAIT_PATH[gate]
+        review_data.setdefault("completed_at", datetime.now(timezone.utc).isoformat())
         cloud_event = {
             "specversion": "1.0",
             "id": str(uuid4()),
@@ -205,6 +333,6 @@ class SonataFlowClient:
             f"{self.base_url}/{wait_path}",
             json=cloud_event,
             headers={"Content-Type": "application/cloudevents+json"},
-            timeout=10,
+            timeout=60,
         )
         resp.raise_for_status()
