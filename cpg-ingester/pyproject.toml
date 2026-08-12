@@ -21,8 +21,6 @@ dependencies = [
     "lxml>=5.0",
     "fastapi>=0.100",
     "uvicorn>=0.20",
-    "jinja2>=3.1",
-    "python-multipart>=0.0.6",
 ]
 
 [project.scripts]
@@ -30,8 +28,6 @@ cpg-parse = "cpg_ingester.parse:main"
 cpg-extract-dmn = "cpg_ingester.extract_dmn:main"
 cpg-deploy-dmn = "cpg_ingester.deploy:main"
 cpg-ingest = "cpg_ingester.cli:main"
-cpg-ingester-ui = "cpg_ingester.ui.app:main"
-
 [tool.setuptools.packages.find]
 where = ["src"]
 

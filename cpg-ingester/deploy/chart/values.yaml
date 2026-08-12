@@ -60,12 +60,27 @@ pods:
         cpu: 200m
         memory: 512Mi
 
+  bff:
+    enabled: true
+    image: cpg-ingester-bff
+    tag: phase4
+    port: 8080
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
   ui:
     enabled: true
     image: cpg-ingester-ui
-    tag: phase3
-    port: 8090
+    tag: phase4
+    port: 8080
     route: true
+    env:
+      bffHost: cpg-ingester-bff:8080
     resources:
       requests:
         cpu: 50m

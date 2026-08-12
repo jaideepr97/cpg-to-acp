@@ -271,17 +271,31 @@ services:
     profiles:
       - ingester-pods
 
-  cpg-ingester-ui:
+  cpg-ingester-bff:
     build:
       context: .
-      dockerfile: cpg-ingester/deploy/pods/Containerfile.ui
+      dockerfile: cpg-ingester/deploy/pods/Containerfile.bff
     ports:
-      - "8095:8090"
-    depends_on:
-      mlflow:
-        condition: service_healthy
-    environment:
-      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - "8095:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    profiles:
+      - ingester-pods
+
+  cpg-ingester-ui:
+    build:
+      context: ./cpg-ingester/ui
+      dockerfile: Containerfile
+    ports:
+      - "3003:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     profiles:
       - ingester-pods
 
