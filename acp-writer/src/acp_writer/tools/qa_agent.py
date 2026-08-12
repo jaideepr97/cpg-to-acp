@@ -1,8 +1,8 @@
 """LLM agent for complex clinical QA.
 
-Uses LangGraph's prebuilt ReAct agent with clinical extraction tools.
-The agent iteratively queries patient data and applies clinical
-reasoning to answer questions the concept resolver can't handle.
+Uses LangGraph's prebuilt ReAct agent with concept-based tools.
+Tools accept clinical TERMS (not system+code) and delegate to the
+concept-resolution pipeline for open-vocabulary matching.
 """
 
 import json
@@ -16,11 +16,10 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from pydantic import BaseModel, Field
 
+from acp_writer.tools.bundle_inventory import BundleInventory, build_bundle_inventory
+from acp_writer.tools.concept_resolution import resolve_concept_in_bundle
 from acp_writer.tools.ips_extractor import (
-    extract_allergy,
-    extract_condition,
-    extract_medication,
-    extract_observation,
+    extract_observation_concept,
     extract_patient_age,
 )
 from acp_writer.tools.ips_serializer import serialize_ips
@@ -32,126 +31,205 @@ from acp_writer.tools.temporal_queries import (
 
 logger = logging.getLogger(__name__)
 
-_AGENT_SYSTEM_PROMPT = """You are a clinical data analyst answering factual questions about a patient
-using their FHIR IPS (International Patient Summary) data. You have tools to query the patient's
-observations, conditions, medications, and allergies.
+_AGENT_SYSTEM_PROMPT = """You are a clinical data analyst answering factual questions about a patient.
 
-You also receive a condensed text summary of the patient's data. Use BOTH the summary AND the tools:
-- Use the summary to understand the full clinical picture and identify relevant data
-- Use tools to extract precise values when needed for calculations or comparisons
-- For questions about the summary text itself (display names, free text), answer directly from the summary
+You have tools that accept clinical TERMS (not codes). The tools handle terminology
+resolution internally — you don't need to know SNOMED, LOINC, or RxNorm codes.
+
+Available tools:
+- check_condition(term): Check if patient has a condition. Use clinical terms like
+  "diabetes", "hypothyroidism", "heart failure", "acid reflux", etc.
+- check_medication(term): Check if patient is on a medication or drug class.
+  Use terms like "metformin", "ACE inhibitor", "statin", "thyroid medication", etc.
+- lookup_observation(term): Get the most recent value of an observation.
+  Use terms like "blood pressure", "HbA1c", "TSH", "potassium", etc.
+- check_allergy(term): Check if patient has an allergy.
+- get_patient_age(): Get patient's age in years.
+- find_code(system, text): Look up a code in a terminology system.
+- verify_code(system, code): Verify a code exists and get its display name.
+
+Tool results include what was searched and how it matched (by code, display text,
+or terminology lookup). On a miss, you'll see what IS in the patient's record
+for that resource type — use this to refine your search.
 
 Clinical reasoning guidelines:
-- Apply standard clinical knowledge: drug classes, treatment targets, risk scores, contraindications
-- For drug class questions, reason about whether specific medications belong to the asked-about class
-- For treatment target questions, apply standard guidelines (e.g., BP <130/80 for diabetics, HbA1c <7%, LDL <70 for secondary prevention)
-- For risk scoring, explain your calculation step by step
-- When data is genuinely insufficient or ambiguous (e.g., conflicting values), say so clearly
+- Apply standard medical knowledge about drug classes, treatment targets, and risk factors
+- For drug class questions, use the medication term (e.g., "proton pump inhibitor")
+- For negation/absence: only answer "absent" if the tool confirms a definitive miss
+- When data is genuinely ambiguous or conflicting, say insufficient_data
 
-Response format — respond with a JSON object:
-{"answer": <value>, "provenance": [<fhir_references>], "insufficient_data": false, "reasoning": "brief explanation"}
-
-For boolean questions, answer is true or false.
-For numeric questions, answer is the number.
-For "insufficient data", use: {"answer": null, "provenance": [], "insufficient_data": true, "reasoning": "why"}"""
+Respond with a JSON object:
+{"answer": <value>, "provenance": [<fhir_references>], "insufficient_data": false, "reasoning": "brief"}"""
 
 _BUNDLE_HOLDER: dict[str, Any] = {}
+_INVENTORY_HOLDER: dict[str, Any] = {}
 _INDEX_HOLDER: dict[str, Any] = {}
 _REF_DATE_HOLDER: dict[str, Any] = {}
+_LLM_HOLDER: dict[str, Any] = {}
 
 
 @tool
-def lookup_observation(system: str, code: str) -> str:
-    """Look up the most recent observation value by terminology system and code.
+def check_condition(term: str) -> str:
+    """Check if the patient has a condition matching a clinical term.
 
-    Use this to get specific lab values, vital signs, or other measurements.
+    Use natural clinical language — no need for codes.
+    Examples: "diabetes", "hypothyroidism", "heart failure", "acid reflux",
+    "thyroid disorder", "kidney disease", "high blood pressure"
 
-    Args:
-        system: The terminology system URL (e.g., "http://loinc.org")
-        code: The code within that system (e.g., "8480-6" for systolic BP)
-
-    Common codes:
-        Systolic BP: system="http://loinc.org", code="8480-6"
-        Diastolic BP: system="http://loinc.org", code="8462-4"
-        HbA1c: system="http://loinc.org", code="4548-4"
-        eGFR: system="http://loinc.org", code="33914-3"
-        Creatinine: system="http://loinc.org", code="2160-0"
-        Potassium: system="http://loinc.org", code="2823-3"
-        LDL: system="http://loinc.org", code="2089-1"
-        BNP: system="http://loinc.org", code="30934-4"
-        EF: system="http://loinc.org", code="10230-1"
-        Heart rate: system="http://loinc.org", code="8867-4"
-        TSH: system="http://loinc.org", code="3016-3"
-
-    Returns JSON with: found, value, unit, date, fhir_reference
+    Returns what was searched, what matched, and on a miss, lists all
+    conditions in the patient's record so you can refine your search.
     """
+    inventory = _INVENTORY_HOLDER.get("inventory")
     bundle = _BUNDLE_HOLDER.get("bundle", {})
-    result = extract_observation(bundle, system, code)
-    return json.dumps(result.to_dict())
+    llm = _LLM_HOLDER.get("llm")
+    if not inventory:
+        return json.dumps({"error": "No inventory available"})
+
+    result = resolve_concept_in_bundle(term, inventory, "condition", llm_client=llm)
+
+    if result.resolved:
+        entry = result.entries[0]
+        return json.dumps({
+            "found": True,
+            "display": entry.display,
+            "code": entry.code_token,
+            "reference": entry.fhir_reference,
+            "status": entry.status,
+            "match_basis": result.match_basis,
+            "steps_run": result.steps_run,
+        })
+
+    conditions = inventory.conditions()
+    alternatives = [f"{e.display} [{e.system.rsplit('/', 1)[-1] if e.system else 'text'} {e.code}] ({e.status or 'active'})"
+                   for e in conditions[:10]]
+    return json.dumps({
+        "found": False,
+        "definitive_miss": result.definitive_miss,
+        "steps_run": result.steps_run,
+        "note": f"No match for '{term}'. Patient's conditions: {'; '.join(alternatives)}" if alternatives else f"No match for '{term}'. No conditions in record.",
+    })
 
 
 @tool
-def check_condition(system: str, code: str) -> str:
-    """Check if the patient has an active condition.
+def check_medication(term: str) -> str:
+    """Check if the patient is on a medication or drug class.
 
-    Args:
-        system: Usually "http://snomed.info/sct" for SNOMED or "http://hl7.org/fhir/sid/icd-10-cm" for ICD-10
-        code: The condition code (e.g., "44054006" for type 2 diabetes)
+    Use natural terms — drug names or class names work.
+    Examples: "metformin", "ACE inhibitor", "statin", "thyroid medication",
+    "proton pump inhibitor", "blood pressure medication", "anticoagulant"
 
-    Common SNOMED codes:
-        Hypertension: 59621000
-        Type 2 diabetes: 44054006
-        CKD: 709044004
-        Heart failure: 84114007 (or 441530006 for HFrEF)
-        Atrial fibrillation: 49436004
-        Obesity: 414916001
-        Hyperlipidemia: 55822004
-        COPD: 13645005
-        Osteoarthritis: 396275006
-
-    Returns JSON with: found (bool), value (true/false)
+    Returns match details or a list of patient's medications on miss.
     """
-    bundle = _BUNDLE_HOLDER.get("bundle", {})
-    result = extract_condition(bundle, system, code)
-    return json.dumps(result.to_dict())
+    inventory = _INVENTORY_HOLDER.get("inventory")
+    llm = _LLM_HOLDER.get("llm")
+    if not inventory:
+        return json.dumps({"error": "No inventory available"})
+
+    result = resolve_concept_in_bundle(term, inventory, "medication", llm_client=llm)
+
+    if result.resolved:
+        entry = result.entries[0]
+        return json.dumps({
+            "found": True,
+            "display": entry.display or entry.text,
+            "code": entry.code_token if entry.system else "free-text",
+            "reference": entry.fhir_reference,
+            "match_basis": result.match_basis,
+            "steps_run": result.steps_run,
+        })
+
+    meds = inventory.medications()
+    alternatives = [f"{e.display or e.text} [{e.system.rsplit('/', 1)[-1] if e.system else 'text'}]"
+                   for e in meds[:10]]
+    return json.dumps({
+        "found": False,
+        "definitive_miss": result.definitive_miss,
+        "steps_run": result.steps_run,
+        "note": f"No match for '{term}'. Patient's medications: {'; '.join(alternatives)}" if alternatives else f"No match for '{term}'. No medications in record.",
+    })
 
 
 @tool
-def check_medication(system: str, code: str) -> str:
-    """Check if the patient is on a specific medication.
+def lookup_observation(term: str) -> str:
+    """Look up the most recent value of an observation.
 
-    Args:
-        system: Usually "http://www.nlm.nih.gov/research/umls/rxnorm"
-        code: The RxNorm code
+    Use natural terms — no need for LOINC codes.
+    Examples: "blood pressure", "HbA1c", "TSH", "potassium",
+    "fasting glucose", "eGFR", "LDL cholesterol", "BMI"
 
-    Returns JSON with: found (bool)
+    Returns the value, unit, date, and match details, or lists
+    available observations on miss.
     """
+    inventory = _INVENTORY_HOLDER.get("inventory")
     bundle = _BUNDLE_HOLDER.get("bundle", {})
-    result = extract_medication(bundle, system, code)
-    return json.dumps(result.to_dict())
+    llm = _LLM_HOLDER.get("llm")
+    if not inventory:
+        return json.dumps({"error": "No inventory available"})
+
+    result = resolve_concept_in_bundle(term, inventory, "observation", llm_client=llm)
+
+    if result.resolved:
+        entry = result.entries[0]
+        code_tokens = [entry.code_token] if entry.system else None
+        display_terms = [entry.display] if entry.display else None
+        from acp_writer.tools.ips_extractor import extract_observation_concept
+        obs_result = extract_observation_concept(bundle, code_tokens=code_tokens, display_terms=display_terms)
+        if obs_result.found:
+            return json.dumps({
+                "found": True,
+                "value": obs_result.value,
+                "unit": obs_result.unit,
+                "date": obs_result.date,
+                "reference": obs_result.fhir_reference,
+                "display": entry.display,
+                "match_basis": result.match_basis,
+            })
+
+    obs = inventory.observations()
+    seen = set()
+    alternatives = []
+    for e in obs:
+        key = e.display or e.code
+        if key not in seen:
+            seen.add(key)
+            alternatives.append(f"{e.display} [{e.system.rsplit('/', 1)[-1] if e.system else '?'} {e.code}]")
+        if len(alternatives) >= 15:
+            break
+
+    return json.dumps({
+        "found": False,
+        "steps_run": result.steps_run if result else [],
+        "note": f"No match for '{term}'. Available observations: {'; '.join(alternatives)}" if alternatives else f"No observation found for '{term}'.",
+    })
 
 
 @tool
-def check_allergy(system: str, code: str) -> str:
+def check_allergy(term: str) -> str:
     """Check if the patient has an allergy.
 
-    Args:
-        system: Usually "http://snomed.info/sct"
-        code: The allergen SNOMED code
-
-    Returns JSON with: found (bool)
+    Examples: "penicillin", "sulfonamide", "ACE inhibitor allergy"
     """
-    bundle = _BUNDLE_HOLDER.get("bundle", {})
-    result = extract_allergy(bundle, system, code)
-    return json.dumps(result.to_dict())
+    inventory = _INVENTORY_HOLDER.get("inventory")
+    llm = _LLM_HOLDER.get("llm")
+    if not inventory:
+        return json.dumps({"error": "No inventory available"})
+
+    result = resolve_concept_in_bundle(term, inventory, "allergy", llm_client=llm)
+    if result.resolved:
+        entry = result.entries[0]
+        return json.dumps({"found": True, "display": entry.display, "reference": entry.fhir_reference})
+
+    allergies = inventory.allergies()
+    alternatives = [e.display for e in allergies[:5]]
+    return json.dumps({
+        "found": False,
+        "note": f"No allergy match for '{term}'. Patient allergies: {'; '.join(alternatives)}" if alternatives else "No allergies recorded.",
+    })
 
 
 @tool
 def get_patient_age() -> str:
-    """Get the patient's current age in years.
-
-    Returns JSON with: found (bool), value (age in years)
-    """
+    """Get the patient's current age in years."""
     bundle = _BUNDLE_HOLDER.get("bundle", {})
     ref_date = _REF_DATE_HOLDER.get("date", date.today())
     result = extract_patient_age(bundle, ref_date)
@@ -159,23 +237,69 @@ def get_patient_age() -> str:
 
 
 @tool
-def count_observations_in_window(code_token: str, duration: str,
-                                  threshold: float | None = None,
-                                  comparator: str | None = None) -> str:
-    """Count observations matching criteria in a time window.
+def find_code(system: str, text: str) -> str:
+    """Look up a clinical code in a terminology system.
 
     Args:
-        code_token: system|code (e.g., "http://loinc.org|8480-6")
-        duration: ISO 8601 duration (e.g., "P3M" for 3 months)
-        threshold: Optional numeric threshold to filter by
-        comparator: Optional comparator: "ge", "gt", "le", "lt", "eq"
-
-    Returns JSON with: found, value (count), provenance
+        system: "snomed", "rxnorm", "loinc", or "icd10"
+        text: The clinical term to look up
     """
+    system_map = {
+        "snomed": "http://snomed.info/sct",
+        "rxnorm": "http://www.nlm.nih.gov/research/umls/rxnorm",
+        "loinc": "http://loinc.org",
+        "icd10": "http://hl7.org/fhir/sid/icd-10-cm",
+    }
+    full_system = system_map.get(system.lower(), system)
+    from acp_writer.tools.terminology_lookup import find
+    result = find(full_system, text)
+    return json.dumps(result.to_dict())
+
+
+@tool
+def verify_code(system: str, code: str) -> str:
+    """Verify a code exists in a terminology system and get its display name.
+
+    Args:
+        system: "snomed", "rxnorm", "loinc", or "icd10"
+        code: The code to verify
+    """
+    system_map = {
+        "snomed": "http://snomed.info/sct",
+        "rxnorm": "http://www.nlm.nih.gov/research/umls/rxnorm",
+        "loinc": "http://loinc.org",
+        "icd10": "http://hl7.org/fhir/sid/icd-10-cm",
+    }
+    full_system = system_map.get(system.lower(), system)
+    from acp_writer.tools.terminology_lookup import verify
+    result = verify(full_system, code)
+    return json.dumps(result.to_dict())
+
+
+@tool
+def count_observations_in_window(term: str, duration: str,
+                                  threshold: float | None = None,
+                                  comparator: str | None = None) -> str:
+    """Count observations matching a clinical term in a time window.
+
+    Args:
+        term: Clinical term (e.g., "systolic blood pressure")
+        duration: ISO 8601 duration (e.g., "P3M" for 3 months)
+        threshold: Optional numeric threshold
+        comparator: Optional comparator: "ge", "gt", "le", "lt", "eq"
+    """
+    inventory = _INVENTORY_HOLDER.get("inventory")
     index = _INDEX_HOLDER.get("index")
     ref_date = _REF_DATE_HOLDER.get("date", date.today())
-    if not index:
+    llm = _LLM_HOLDER.get("llm")
+    if not index or not inventory:
         return json.dumps({"error": "No temporal index available"})
+
+    resolution = resolve_concept_in_bundle(term, inventory, "observation", llm_client=llm)
+    if not resolution.resolved:
+        return json.dumps({"found": False, "note": f"Could not resolve '{term}' to an observation code"})
+
+    code_token = resolution.entries[0].code_token
     result = observation_count(index, code_token, duration, ref_date, threshold, comparator)
     return json.dumps({"found": result.found, "value": result.value,
                       "provenance": result.provenance,
@@ -183,19 +307,27 @@ def count_observations_in_window(code_token: str, duration: str,
 
 
 @tool
-def get_observation_trend(code_token: str, duration: str) -> str:
+def get_observation_trend(term: str, duration: str) -> str:
     """Compute the rate of change of an observation over time.
 
     Args:
-        code_token: system|code (e.g., "http://loinc.org|33914-3" for eGFR)
+        term: Clinical term (e.g., "eGFR")
         duration: Time window (e.g., "P1Y" for 1 year)
 
     Returns slope normalized per year. Negative = declining.
     """
+    inventory = _INVENTORY_HOLDER.get("inventory")
     index = _INDEX_HOLDER.get("index")
     ref_date = _REF_DATE_HOLDER.get("date", date.today())
-    if not index:
+    llm = _LLM_HOLDER.get("llm")
+    if not index or not inventory:
         return json.dumps({"error": "No temporal index available"})
+
+    resolution = resolve_concept_in_bundle(term, inventory, "observation", llm_client=llm)
+    if not resolution.resolved:
+        return json.dumps({"found": False, "note": f"Could not resolve '{term}'"})
+
+    code_token = resolution.entries[0].code_token
     result = rate_of_change(index, code_token, duration, ref_date)
     return json.dumps({"found": result.found, "value": result.value,
                       "provenance": result.provenance,
@@ -203,18 +335,10 @@ def get_observation_trend(code_token: str, duration: str) -> str:
 
 
 _ALL_TOOLS = [
-    lookup_observation, check_condition, check_medication,
-    check_allergy, get_patient_age, count_observations_in_window,
-    get_observation_trend,
+    check_condition, check_medication, lookup_observation,
+    check_allergy, get_patient_age, find_code, verify_code,
+    count_observations_in_window, get_observation_trend,
 ]
-
-
-class QAResponse(BaseModel):
-    """Structured response from the QA agent."""
-    answer: Any = Field(description="The answer value (number, boolean, string, or null)")
-    provenance: list[str] = Field(default_factory=list, description="FHIR references used")
-    insufficient_data: bool = Field(default=False, description="True if data is insufficient to answer")
-    reasoning: str = Field(default="", description="Brief explanation of the answer")
 
 
 @mlflow.trace(name="qa_agent_answer")
@@ -225,15 +349,17 @@ def agent_answer(
     llm_client: Any,
     max_iterations: int = 10,
 ) -> dict:
-    """Run the ReAct QA agent to answer a clinical question.
+    """Run the ReAct QA agent to answer a clinical question."""
+    inventory = build_bundle_inventory(bundle)
 
-    Returns: {"answer": value, "provenance": [...], "insufficient_data": bool}
-    """
     _BUNDLE_HOLDER["bundle"] = bundle
+    _INVENTORY_HOLDER["inventory"] = inventory
     _INDEX_HOLDER["index"] = build_temporal_index(bundle)
     _REF_DATE_HOLDER["date"] = reference_date
+    _LLM_HOLDER["llm"] = llm_client
 
     condensed = serialize_ips(bundle)
+    inventory_text = inventory.render_for_llm()
 
     try:
         agent = create_react_agent(
@@ -245,10 +371,11 @@ def agent_answer(
         result = agent.invoke(
             {"messages": [HumanMessage(content=(
                 f"Patient summary:\n{condensed}\n\n"
+                f"Bundle inventory:\n{inventory_text}\n\n"
                 f"Reference date: {reference_date.isoformat()}\n\n"
                 f"Question: {question}\n\n"
-                f"Use the tools and the patient summary above to answer. "
-                f"Respond with a JSON object containing answer, provenance, insufficient_data, and reasoning."
+                f"Use the tools to answer. Respond with JSON containing "
+                f"answer, provenance, insufficient_data, and reasoning."
             ))]},
             {"recursion_limit": max_iterations * 2},
         )
@@ -262,8 +389,10 @@ def agent_answer(
                 "error": str(exc)}
     finally:
         _BUNDLE_HOLDER.clear()
+        _INVENTORY_HOLDER.clear()
         _INDEX_HOLDER.clear()
         _REF_DATE_HOLDER.clear()
+        _LLM_HOLDER.clear()
 
 
 def _parse_agent_response(message: Any) -> dict:

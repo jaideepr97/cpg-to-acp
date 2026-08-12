@@ -10,10 +10,8 @@ from typing import Any
 
 from acp_writer.benchmark.models import QAAnswer
 from acp_writer.nodes.dmn_executor import KNOWN_VARIABLE_MAP
-from acp_writer.tools.concept_resolver import (
-    get_all_codes_for_condition,
-    get_all_codes_for_medication,
-)
+from acp_writer.tools.bundle_inventory import build_bundle_inventory
+from acp_writer.tools.concept_resolution import resolve_concept_in_bundle
 from acp_writer.tools.ips_extractor import (
     extract_allergy,
     extract_condition,
@@ -343,15 +341,7 @@ class CurrentImplementationBackend:
 
         if resolved.action == "extract_condition":
             code_tokens = resolved.codes or ([f"{resolved.system}|{resolved.code}"] if resolved.system else [])
-            norm_term = resolved.code if not resolved.system else ""
-            _, display_terms = get_all_codes_for_condition(norm_term) if norm_term else ([], [])
-            if not display_terms and resolved.codes:
-                from acp_writer.tools.concept_resolver import _CONDITION_DISPLAY_TERMS, _normalize
-                for concept, terms in _CONDITION_DISPLAY_TERMS.items():
-                    if any(t in (resolved.code or "").lower() for t in terms):
-                        display_terms = terms
-                        break
-            result = extract_condition_concept(bundle, code_tokens=code_tokens or None, display_terms=display_terms or None)
+            result = extract_condition_concept(bundle, code_tokens=code_tokens or None, display_terms=None)
             return QAAnswer(
                 value=result.found,
                 kind="boolean",

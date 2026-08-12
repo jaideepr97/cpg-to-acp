@@ -112,14 +112,16 @@ def generate_query_plan(
     condensed_ips: str,
     reference_date: date,
     llm_client: Any,
+    inventory_text: str | None = None,
 ) -> dict | None:
     """Use structured output to generate a validated query plan."""
-    user_prompt = (
-        f"Patient data (condensed):\n{condensed_ips}\n\n"
-        f"Reference date: {reference_date.isoformat()}\n\n"
-        f"Question: {question}\n\n"
-        f"Select the function and parameters to answer this question."
-    )
+    parts = [f"Patient data (condensed):\n{condensed_ips}"]
+    if inventory_text:
+        parts.append(f"\nBundle code inventory (use these codes in your plan):\n{inventory_text}")
+    parts.append(f"\nReference date: {reference_date.isoformat()}")
+    parts.append(f"\nQuestion: {question}")
+    parts.append("\nSelect the function and parameters to answer this question. Use codes from the inventory above when available.")
+    user_prompt = "\n".join(parts)
 
     try:
         structured_llm = llm_client.with_structured_output(QueryPlan)

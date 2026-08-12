@@ -66,10 +66,14 @@ class LLMAssistedBackend(CurrentImplementationBackend):
         self, question: str, bundle: dict, reference_date: date,
     ) -> QAAnswer:
         """Try LLM query plan synthesis, falling back to agent."""
+        from acp_writer.tools.bundle_inventory import build_bundle_inventory
+
         condensed = serialize_ips(bundle)
         llm = self._get_llm()
+        inventory = build_bundle_inventory(bundle)
+        inventory_text = inventory.render_for_llm()
 
-        plan = generate_query_plan(question, condensed, reference_date, llm)
+        plan = generate_query_plan(question, condensed, reference_date, llm, inventory_text=inventory_text)
         if plan:
             result = super().answer(
                 question, bundle, reference_date,
