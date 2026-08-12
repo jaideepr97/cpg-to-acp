@@ -11,15 +11,15 @@ spec:
     container:
       env:
         - name: INGESTION_URL
-          value: "http://cpg-ing-ingestion:8080"
+          value: "http://cpg-ingester-ingestion:8080"
         - name: LLM_ANALYSIS_URL
-          value: "http://cpg-ing-llm-analysis:8080"
+          value: "http://cpg-ingester-llm-analysis:8080"
         - name: ASSEMBLY_URL
-          value: "http://cpg-ing-assembly:8080"
+          value: "http://cpg-ingester-assembly:8080"
         - name: DELIVERY_URL
-          value: "http://cpg-ing-delivery:8080"
+          value: "http://cpg-ingester-delivery:8080"
         - name: BFF_URL
-          value: "http://cpg-ing-bff:8095"
+          value: "http://cpg-ingester-bff:8080"
   flow:
     specVersion: "0.8"
     start: Parse
@@ -45,27 +45,27 @@ spec:
       # Async functions (long-running: Docling ML + LLM calls)
       - name: parsepdfasync
         type: custom
-        operation: rest:post:http://cpg-ing-ingestion:8080/api/v1/parse-async
+        operation: rest:post:http://cpg-ingester-ingestion:8080/api/v1/parse-async
       - name: analyzeasync
         type: custom
-        operation: rest:post:http://cpg-ing-llm-analysis:8080/api/v1/analyze-async
+        operation: rest:post:http://cpg-ingester-llm-analysis:8080/api/v1/analyze-async
       - name: generateasync
         type: custom
-        operation: rest:post:http://cpg-ing-llm-analysis:8080/api/v1/generate-async
+        operation: rest:post:http://cpg-ingester-llm-analysis:8080/api/v1/generate-async
       # Sync functions (fast: deterministic + bounded REST)
       - name: assemble
         type: custom
-        operation: rest:post:http://cpg-ing-assembly:8080/api/v1/assemble
+        operation: rest:post:http://cpg-ingester-assembly:8080/api/v1/assemble
       - name: deliver
         type: custom
-        operation: rest:post:http://cpg-ing-delivery:8080/api/v1/deliver
+        operation: rest:post:http://cpg-ingester-delivery:8080/api/v1/deliver
       # Review notification (BFF sets awaiting_review marker)
       - name: notifymanifetreview
         type: custom
-        operation: rest:post:http://cpg-ing-bff:8095/api/v1/notify-review
+        operation: rest:post:http://cpg-ingester-bff:8080/api/v1/notify-review
       - name: notifyartifactreview
         type: custom
-        operation: rest:post:http://cpg-ing-bff:8095/api/v1/notify-review
+        operation: rest:post:http://cpg-ingester-bff:8080/api/v1/notify-review
     states:
       # --- Phase 1: PDF parsing (async callback — Docling ML, 30-120s) ---
 
