@@ -19,27 +19,37 @@ cd acp-writer
 
 ## Directory Structure
 
-The graph backend requires `networkx`. Install it with:
-```bash
-pip install -e ".[benchmark]"
-```
-
-## Directory Structure
-
 ```
 benchmarks/
-  suites/         # Test case JSON files (one per suite)
-    smoke.json    # 50-question smoke suite
-    standard.json # 200-question standard suite (13 categories)
-  bundles/        # FHIR IPS bundles used by test cases
-    htn-temporal-01.json     # HTN patient, 8 BP readings over 6 months
-    ckd-declining-01.json    # CKD patient, declining eGFR series
-    edge-missing-dates.json  # Observations with missing/partial dates
-    edge-coded-values.json   # Observations with valueCodeableConcept
-    complex-patient-01.json  # 5+ conditions, 10+ meds, multi-year history
-    graph-linked-01.json     # Rich inter-resource references (reasonReference, encounter, result)
-    graph-linked-02.json     # Heart failure patient with inter-resource references
+  suites/              # Test case JSON files (one per suite)
+    smoke.json         # 50-question smoke suite
+    standard.json      # 230-question standard suite (13 categories)
+    llm-challenge.json # 85-question LLM challenge suite (6 categories)
+  bundles/             # FHIR IPS bundles used by test cases
+    htn-temporal-01.json        # HTN patient, 8 BP readings over 6 months
+    ckd-declining-01.json       # CKD patient, declining eGFR series
+    edge-missing-dates.json     # Observations with missing/partial dates
+    edge-coded-values.json      # Observations with valueCodeableConcept
+    complex-patient-01.json     # 5+ conditions, 10+ meds, multi-year history
+    graph-linked-01.json        # Rich inter-resource references
+    graph-linked-02.json        # Heart failure patient with inter-resource references
+    messy-data-01.json          # Non-standard coding: ICD-10, free text, wrong LOINC
+    clinical-reasoning-01.json  # Complex cardiac/metabolic patient for reasoning
 ```
+
+## Retired: Graph Backend
+
+The `graph` benchmark backend (NetworkX-based FHIR graph projection) was retired after
+the contender comparison concluded: flat extraction matched graph traversal at 74.5% on
+the 200-question standard suite (2026-08-11 results log). The evidence lives in
+`working/benchmark-results.md` and `dev_docs/design/qa-clinical-data-design.md`.
+
+## Known Ground-Truth Edge Cases
+
+- `llmc-messy-fail-003`: "What is the patient's urine protein in mg/dL?" — bundle has
+  `valueString: "1+"` (qualitative). The system finds the data but can't express it in
+  mg/dL. Expected answer: `insufficient_data`. Whether `1+` constitutes an answer "in
+  mg/dL" is clinically debatable; the suite's expected answer is conservative.
 
 ## Test Case Format
 

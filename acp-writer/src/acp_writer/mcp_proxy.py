@@ -52,41 +52,8 @@ mcp = FastMCP(
 
 
 def _parse_dmn_metadata(dmn_xml: str) -> DecisionModelSummary:
-    root = ET.fromstring(dmn_xml)
-    model_name = root.get("name", "unknown")
-    model_id = model_name.lower().replace(" ", "-")
-
-    from acp_writer.api import _extract_codes, _extract_description
-
-    inputs = []
-    for input_data in root.findall(f"{{{DMN_NS}}}inputData"):
-        var = input_data.find(f"{{{DMN_NS}}}variable")
-        if var is not None:
-            codes = _extract_codes(input_data)
-            desc = _extract_description(input_data)
-            inputs.append(DecisionVariable(
-                name=var.get("name", ""),
-                type=var.get("typeRef", "string"),
-                codes=codes or None,
-                description=desc,
-            ))
-
-    outputs = []
-    for decision in root.findall(f"{{{DMN_NS}}}decision"):
-        dt = decision.find(f"{{{DMN_NS}}}decisionTable")
-        if dt is not None:
-            for output in dt.findall(f"{{{DMN_NS}}}output"):
-                outputs.append(DecisionVariable(
-                    name=output.get("name", ""),
-                    type=output.get("typeRef", "string"),
-                ))
-
-    return DecisionModelSummary(
-        id=model_id,
-        name=model_name,
-        inputs=inputs,
-        outputs=outputs,
-        deployed_at=datetime.now(timezone.utc),
+    from acp_writer.api import _parse_dmn_metadata as _parse
+    return _parse(dmn_xml)
     )
 
 
