@@ -6,7 +6,7 @@ Layered resolution with fall-through semantics:
    negative booleans fall through to LLM (not definitive without pipeline)
 3. LLM query plan synthesis → execute plan
 4. LLM agent with concept-based tools → open-vocabulary fallback
-5. Answer guardrails → verify before returning
+5. Answer guardrails → verify EVERY answer at the choke point before returning
 """
 
 import logging
@@ -58,35 +58,36 @@ class LLMAssistedBackend(CurrentImplementationBackend):
         reference_date: date,
         structured_intent: dict[str, Any] | None = None,
     ) -> QAAnswer:
+        from acp_writer.tools.answer_guardrails import verify_answer, check_definitive_miss
+        from acp_writer.tools.bundle_inventory import build_bundle_inventory
+
+        inventory = build_bundle_inventory(bundle)
+
         if structured_intent is not None:
             result = super().answer(question, bundle, reference_date, structured_intent)
             result.answered_by = "structured_intent"
-            return result
+            return verify_answer(result, question, bundle, inventory)
 
         resolved = resolve_concept(question)
         if resolved:
             result = self._execute_resolved(resolved, bundle, reference_date)
             if result.value is True or result.insufficient_data:
                 result.answered_by = "resolver"
-                return result
+                return verify_answer(result, question, bundle, inventory)
             if result.value is not False:
                 result.answered_by = "resolver"
-                return result
-            # Negative boolean from resolver → fall through to LLM
-            # (the resolver's negative is not definitive without the full pipeline)
+                return verify_answer(result, question, bundle, inventory)
 
-        return self._llm_resolve(question, bundle, reference_date)
+        return self._llm_resolve(question, bundle, reference_date, inventory)
 
     def _llm_resolve(
-        self, question: str, bundle: dict, reference_date: date,
+        self, question: str, bundle: dict, reference_date: date, inventory: "BundleInventory",
     ) -> QAAnswer:
         """Try LLM query plan synthesis, falling back to agent."""
-        from acp_writer.tools.answer_guardrails import verify_answer
-        from acp_writer.tools.bundle_inventory import build_bundle_inventory
+        from acp_writer.tools.answer_guardrails import verify_answer, check_definitive_miss
 
         condensed = serialize_ips(bundle)
         llm = self._get_llm()
-        inventory = build_bundle_inventory(bundle)
         inventory_text = inventory.render_for_llm()
 
         plan = generate_query_plan(question, condensed, reference_date, llm, inventory_text=inventory_text)
@@ -97,32 +98,28 @@ class LLMAssistedBackend(CurrentImplementationBackend):
             )
             if not result.insufficient_data:
                 result.answered_by = "query_plan"
-                return result
+                return verify_answer(result, question, bundle, inventory)
 
         from acp_writer.tools.qa_agent import agent_answer
 
         agent_result = agent_answer(question, bundle, reference_date, llm)
+        tool_ledger = agent_result.get("tool_ledger", [])
 
-        verified = verify_answer(agent_result, question, bundle, inventory)
-
-        if verified.get("guardrail"):
-            return QAAnswer(
-                value=None,
-                kind="insufficient_data",
-                provenance=verified.get("provenance", []),
-                insufficient_data=True,
-                error=f"guardrail:{verified['guardrail']}",
-                answered_by="guardrail_downgrade",
-            )
-
-        return QAAnswer(
-            value=verified.get("answer"),
-            kind=self._infer_kind(verified.get("answer")),
-            provenance=verified.get("provenance", []),
-            insufficient_data=verified.get("insufficient_data", False),
-            error=verified.get("error"),
+        result = QAAnswer(
+            value=agent_result.get("answer"),
+            kind=self._infer_kind(agent_result.get("answer")),
+            provenance=agent_result.get("provenance", []),
+            insufficient_data=agent_result.get("insufficient_data", False),
+            error=agent_result.get("error"),
             answered_by="agent",
         )
+
+        result = verify_answer(result, question, bundle, inventory)
+
+        if result.answered_by != "guardrail_downgrade":
+            result = check_definitive_miss(tool_ledger, result)
+
+        return result
 
     @staticmethod
     def _infer_kind(value: Any) -> str:

@@ -381,18 +381,47 @@ def agent_answer(
         )
 
         last_message = result["messages"][-1]
-        return _parse_agent_response(last_message)
+        parsed = _parse_agent_response(last_message)
+        parsed["tool_ledger"] = _extract_tool_ledger(result["messages"])
+        return parsed
 
     except Exception as exc:
         logger.warning("QA agent failed: %s", exc)
         return {"answer": None, "provenance": [], "insufficient_data": True,
-                "error": str(exc)}
+                "error": str(exc), "tool_ledger": []}
     finally:
         _BUNDLE_HOLDER.clear()
         _INVENTORY_HOLDER.clear()
         _INDEX_HOLDER.clear()
         _REF_DATE_HOLDER.clear()
         _LLM_HOLDER.clear()
+
+
+def _extract_tool_ledger(messages: list) -> list[dict]:
+    """Extract definitive_miss signals from agent tool-call history."""
+    ledger = []
+    for msg in messages:
+        if not hasattr(msg, "content") or not hasattr(msg, "name"):
+            continue
+        name = getattr(msg, "name", None)
+        if not name:
+            continue
+        content = msg.content
+        if isinstance(content, list):
+            content = " ".join(
+                block.get("text", "") if isinstance(block, dict) else str(block)
+                for block in content
+            )
+        try:
+            data = json.loads(content)
+            ledger.append({
+                "type": name,
+                "found": data.get("found", False),
+                "definitive_miss": data.get("definitive_miss", False),
+            })
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return ledger
 
 
 def _parse_agent_response(message: Any) -> dict:

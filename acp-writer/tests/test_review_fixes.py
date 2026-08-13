@@ -27,7 +27,7 @@ class TestFix1LLMFallback:
         agent_called = False
         original_resolve = backend._llm_resolve
 
-        def patched_resolve(question, bundle, reference_date):
+        def patched_resolve(question, bundle, reference_date, inventory=None):
             nonlocal agent_called
             from acp_writer.tools.query_planner import generate_query_plan
             from acp_writer.tools.ips_serializer import serialize_ips
