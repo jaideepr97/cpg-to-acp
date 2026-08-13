@@ -3,6 +3,8 @@
 Uses LangGraph's prebuilt ReAct agent with concept-based tools.
 Tools accept clinical TERMS (not system+code) and delegate to the
 concept-resolution pipeline for open-vocabulary matching.
+
+Tools are built as closures per call — no module-level mutable state.
 """
 
 import json
@@ -61,284 +63,239 @@ Clinical reasoning guidelines:
 Respond with a JSON object:
 {"answer": <value>, "provenance": [<fhir_references>], "insufficient_data": false, "reasoning": "brief"}"""
 
-_BUNDLE_HOLDER: dict[str, Any] = {}
-_INVENTORY_HOLDER: dict[str, Any] = {}
-_INDEX_HOLDER: dict[str, Any] = {}
-_REF_DATE_HOLDER: dict[str, Any] = {}
-_LLM_HOLDER: dict[str, Any] = {}
 
+def _build_tools(
+    bundle: dict,
+    inventory: BundleInventory,
+    index: Any,
+    reference_date: date,
+    llm_client: Any,
+) -> list:
+    """Build tool list with per-call state captured in closures."""
 
-@tool
-def check_condition(term: str) -> str:
-    """Check if the patient has a condition matching a clinical term.
+    @tool
+    def check_condition(term: str) -> str:
+        """Check if the patient has a condition matching a clinical term.
 
-    Use natural clinical language — no need for codes.
-    Examples: "diabetes", "hypothyroidism", "heart failure", "acid reflux",
-    "thyroid disorder", "kidney disease", "high blood pressure"
+        Use natural clinical language — no need for codes.
+        Examples: "diabetes", "hypothyroidism", "heart failure", "acid reflux",
+        "thyroid disorder", "kidney disease", "high blood pressure"
 
-    Returns what was searched, what matched, and on a miss, lists all
-    conditions in the patient's record so you can refine your search.
-    """
-    inventory = _INVENTORY_HOLDER.get("inventory")
-    bundle = _BUNDLE_HOLDER.get("bundle", {})
-    llm = _LLM_HOLDER.get("llm")
-    if not inventory:
-        return json.dumps({"error": "No inventory available"})
+        Returns what was searched, what matched, and on a miss, lists all
+        conditions in the patient's record so you can refine your search.
+        """
+        result = resolve_concept_in_bundle(term, inventory, "condition", llm_client=llm_client)
 
-    result = resolve_concept_in_bundle(term, inventory, "condition", llm_client=llm)
-
-    if result.resolved:
-        entry = result.entries[0]
-        return json.dumps({
-            "found": True,
-            "display": entry.display,
-            "code": entry.code_token,
-            "reference": entry.fhir_reference,
-            "status": entry.status,
-            "match_basis": result.match_basis,
-            "steps_run": result.steps_run,
-        })
-
-    conditions = inventory.conditions()
-    alternatives = [f"{e.display} [{e.system.rsplit('/', 1)[-1] if e.system else 'text'} {e.code}] ({e.status or 'active'})"
-                   for e in conditions[:10]]
-    return json.dumps({
-        "found": False,
-        "definitive_miss": result.definitive_miss,
-        "steps_run": result.steps_run,
-        "note": f"No match for '{term}'. Patient's conditions: {'; '.join(alternatives)}" if alternatives else f"No match for '{term}'. No conditions in record.",
-    })
-
-
-@tool
-def check_medication(term: str) -> str:
-    """Check if the patient is on a medication or drug class.
-
-    Use natural terms — drug names or class names work.
-    Examples: "metformin", "ACE inhibitor", "statin", "thyroid medication",
-    "proton pump inhibitor", "blood pressure medication", "anticoagulant"
-
-    Returns match details or a list of patient's medications on miss.
-    """
-    inventory = _INVENTORY_HOLDER.get("inventory")
-    llm = _LLM_HOLDER.get("llm")
-    if not inventory:
-        return json.dumps({"error": "No inventory available"})
-
-    result = resolve_concept_in_bundle(term, inventory, "medication", llm_client=llm)
-
-    if result.resolved:
-        entry = result.entries[0]
-        return json.dumps({
-            "found": True,
-            "display": entry.display or entry.text,
-            "code": entry.code_token if entry.system else "free-text",
-            "reference": entry.fhir_reference,
-            "match_basis": result.match_basis,
-            "steps_run": result.steps_run,
-        })
-
-    meds = inventory.medications()
-    alternatives = [f"{e.display or e.text} [{e.system.rsplit('/', 1)[-1] if e.system else 'text'}]"
-                   for e in meds[:10]]
-    return json.dumps({
-        "found": False,
-        "definitive_miss": result.definitive_miss,
-        "steps_run": result.steps_run,
-        "note": f"No match for '{term}'. Patient's medications: {'; '.join(alternatives)}" if alternatives else f"No match for '{term}'. No medications in record.",
-    })
-
-
-@tool
-def lookup_observation(term: str) -> str:
-    """Look up the most recent value of an observation.
-
-    Use natural terms — no need for LOINC codes.
-    Examples: "blood pressure", "HbA1c", "TSH", "potassium",
-    "fasting glucose", "eGFR", "LDL cholesterol", "BMI"
-
-    Returns the value, unit, date, and match details, or lists
-    available observations on miss.
-    """
-    inventory = _INVENTORY_HOLDER.get("inventory")
-    bundle = _BUNDLE_HOLDER.get("bundle", {})
-    llm = _LLM_HOLDER.get("llm")
-    if not inventory:
-        return json.dumps({"error": "No inventory available"})
-
-    result = resolve_concept_in_bundle(term, inventory, "observation", llm_client=llm)
-
-    if result.resolved:
-        entry = result.entries[0]
-        code_tokens = [entry.code_token] if entry.system else None
-        display_terms = [entry.display] if entry.display else None
-        from acp_writer.tools.ips_extractor import extract_observation_concept
-        obs_result = extract_observation_concept(bundle, code_tokens=code_tokens, display_terms=display_terms)
-        if obs_result.found:
+        if result.resolved:
+            entry = result.entries[0]
             return json.dumps({
                 "found": True,
-                "value": obs_result.value,
-                "unit": obs_result.unit,
-                "date": obs_result.date,
-                "reference": obs_result.fhir_reference,
                 "display": entry.display,
+                "code": entry.code_token,
+                "reference": entry.fhir_reference,
+                "status": entry.status,
                 "match_basis": result.match_basis,
+                "steps_run": result.steps_run,
             })
 
-    obs = inventory.observations()
-    seen = set()
-    alternatives = []
-    for e in obs:
-        key = e.display or e.code
-        if key not in seen:
-            seen.add(key)
-            alternatives.append(f"{e.display} [{e.system.rsplit('/', 1)[-1] if e.system else '?'} {e.code}]")
-        if len(alternatives) >= 15:
-            break
+        conditions = inventory.conditions()
+        alternatives = [f"{e.display} [{e.system.rsplit('/', 1)[-1] if e.system else 'text'} {e.code}] ({e.status or 'active'})"
+                       for e in conditions[:10]]
+        return json.dumps({
+            "found": False,
+            "definitive_miss": result.definitive_miss,
+            "steps_run": result.steps_run,
+            "note": f"No match for '{term}'. Patient's conditions: {'; '.join(alternatives)}" if alternatives else f"No match for '{term}'. No conditions in record.",
+        })
 
-    return json.dumps({
-        "found": False,
-        "steps_run": result.steps_run if result else [],
-        "note": f"No match for '{term}'. Available observations: {'; '.join(alternatives)}" if alternatives else f"No observation found for '{term}'.",
-    })
+    @tool
+    def check_medication(term: str) -> str:
+        """Check if the patient is on a medication or drug class.
 
+        Use natural terms — drug names or class names work.
+        Examples: "metformin", "ACE inhibitor", "statin", "thyroid medication",
+        "proton pump inhibitor", "blood pressure medication", "anticoagulant"
 
-@tool
-def check_allergy(term: str) -> str:
-    """Check if the patient has an allergy.
+        Returns match details or a list of patient's medications on miss.
+        """
+        result = resolve_concept_in_bundle(term, inventory, "medication", llm_client=llm_client)
 
-    Examples: "penicillin", "sulfonamide", "ACE inhibitor allergy"
-    """
-    inventory = _INVENTORY_HOLDER.get("inventory")
-    llm = _LLM_HOLDER.get("llm")
-    if not inventory:
-        return json.dumps({"error": "No inventory available"})
+        if result.resolved:
+            entry = result.entries[0]
+            return json.dumps({
+                "found": True,
+                "display": entry.display or entry.text,
+                "code": entry.code_token if entry.system else "free-text",
+                "reference": entry.fhir_reference,
+                "match_basis": result.match_basis,
+                "steps_run": result.steps_run,
+            })
 
-    result = resolve_concept_in_bundle(term, inventory, "allergy", llm_client=llm)
-    if result.resolved:
-        entry = result.entries[0]
-        return json.dumps({"found": True, "display": entry.display, "reference": entry.fhir_reference})
+        meds = inventory.medications()
+        alternatives = [f"{e.display or e.text} [{e.system.rsplit('/', 1)[-1] if e.system else 'text'}]"
+                       for e in meds[:10]]
+        return json.dumps({
+            "found": False,
+            "definitive_miss": result.definitive_miss,
+            "steps_run": result.steps_run,
+            "note": f"No match for '{term}'. Patient's medications: {'; '.join(alternatives)}" if alternatives else f"No match for '{term}'. No medications in record.",
+        })
 
-    allergies = inventory.allergies()
-    alternatives = [e.display for e in allergies[:5]]
-    return json.dumps({
-        "found": False,
-        "note": f"No allergy match for '{term}'. Patient allergies: {'; '.join(alternatives)}" if alternatives else "No allergies recorded.",
-    })
+    @tool
+    def lookup_observation(term: str) -> str:
+        """Look up the most recent value of an observation.
 
+        Use natural terms — no need for LOINC codes.
+        Examples: "blood pressure", "HbA1c", "TSH", "potassium",
+        "fasting glucose", "eGFR", "LDL cholesterol", "BMI"
 
-@tool
-def get_patient_age() -> str:
-    """Get the patient's current age in years."""
-    bundle = _BUNDLE_HOLDER.get("bundle", {})
-    ref_date = _REF_DATE_HOLDER.get("date", date.today())
-    result = extract_patient_age(bundle, ref_date)
-    return json.dumps(result.to_dict())
+        Returns the value, unit, date, and match details, or lists
+        available observations on miss.
+        """
+        result = resolve_concept_in_bundle(term, inventory, "observation", llm_client=llm_client)
 
+        if result.resolved:
+            entry = result.entries[0]
+            code_tokens = [entry.code_token] if entry.system else None
+            display_terms = [entry.display] if entry.display else None
+            obs_result = extract_observation_concept(bundle, code_tokens=code_tokens, display_terms=display_terms)
+            if obs_result.found:
+                return json.dumps({
+                    "found": True,
+                    "value": obs_result.value,
+                    "unit": obs_result.unit,
+                    "date": obs_result.date,
+                    "reference": obs_result.fhir_reference,
+                    "display": entry.display,
+                    "match_basis": result.match_basis,
+                })
 
-@tool
-def find_code(system: str, text: str) -> str:
-    """Look up a clinical code in a terminology system.
+        obs = inventory.observations()
+        seen = set()
+        alternatives = []
+        for e in obs:
+            key = e.display or e.code
+            if key not in seen:
+                seen.add(key)
+                alternatives.append(f"{e.display} [{e.system.rsplit('/', 1)[-1] if e.system else '?'} {e.code}]")
+            if len(alternatives) >= 15:
+                break
 
-    Args:
-        system: "snomed", "rxnorm", "loinc", or "icd10"
-        text: The clinical term to look up
-    """
-    system_map = {
-        "snomed": "http://snomed.info/sct",
-        "rxnorm": "http://www.nlm.nih.gov/research/umls/rxnorm",
-        "loinc": "http://loinc.org",
-        "icd10": "http://hl7.org/fhir/sid/icd-10-cm",
-    }
-    full_system = system_map.get(system.lower(), system)
-    from acp_writer.tools.terminology_lookup import find
-    result = find(full_system, text)
-    return json.dumps(result.to_dict())
+        return json.dumps({
+            "found": False,
+            "steps_run": result.steps_run if result else [],
+            "note": f"No match for '{term}'. Available observations: {'; '.join(alternatives)}" if alternatives else f"No observation found for '{term}'.",
+        })
 
+    @tool
+    def check_allergy(term: str) -> str:
+        """Check if the patient has an allergy.
 
-@tool
-def verify_code(system: str, code: str) -> str:
-    """Verify a code exists in a terminology system and get its display name.
+        Examples: "penicillin", "sulfonamide", "ACE inhibitor allergy"
+        """
+        result = resolve_concept_in_bundle(term, inventory, "allergy", llm_client=llm_client)
+        if result.resolved:
+            entry = result.entries[0]
+            return json.dumps({"found": True, "display": entry.display, "reference": entry.fhir_reference})
 
-    Args:
-        system: "snomed", "rxnorm", "loinc", or "icd10"
-        code: The code to verify
-    """
-    system_map = {
-        "snomed": "http://snomed.info/sct",
-        "rxnorm": "http://www.nlm.nih.gov/research/umls/rxnorm",
-        "loinc": "http://loinc.org",
-        "icd10": "http://hl7.org/fhir/sid/icd-10-cm",
-    }
-    full_system = system_map.get(system.lower(), system)
-    from acp_writer.tools.terminology_lookup import verify
-    result = verify(full_system, code)
-    return json.dumps(result.to_dict())
+        allergies = inventory.allergies()
+        alternatives = [e.display for e in allergies[:5]]
+        return json.dumps({
+            "found": False,
+            "note": f"No allergy match for '{term}'. Patient allergies: {'; '.join(alternatives)}" if alternatives else "No allergies recorded.",
+        })
 
+    @tool
+    def get_patient_age() -> str:
+        """Get the patient's current age in years."""
+        result = extract_patient_age(bundle, reference_date)
+        return json.dumps(result.to_dict())
 
-@tool
-def count_observations_in_window(term: str, duration: str,
-                                  threshold: float | None = None,
-                                  comparator: str | None = None) -> str:
-    """Count observations matching a clinical term in a time window.
+    @tool
+    def find_code(system: str, text: str) -> str:
+        """Look up a clinical code in a terminology system.
 
-    Args:
-        term: Clinical term (e.g., "systolic blood pressure")
-        duration: ISO 8601 duration (e.g., "P3M" for 3 months)
-        threshold: Optional numeric threshold
-        comparator: Optional comparator: "ge", "gt", "le", "lt", "eq"
-    """
-    inventory = _INVENTORY_HOLDER.get("inventory")
-    index = _INDEX_HOLDER.get("index")
-    ref_date = _REF_DATE_HOLDER.get("date", date.today())
-    llm = _LLM_HOLDER.get("llm")
-    if not index or not inventory:
-        return json.dumps({"error": "No temporal index available"})
+        Args:
+            system: "snomed", "rxnorm", "loinc", or "icd10"
+            text: The clinical term to look up
+        """
+        system_map = {
+            "snomed": "http://snomed.info/sct",
+            "rxnorm": "http://www.nlm.nih.gov/research/umls/rxnorm",
+            "loinc": "http://loinc.org",
+            "icd10": "http://hl7.org/fhir/sid/icd-10-cm",
+        }
+        full_system = system_map.get(system.lower(), system)
+        from acp_writer.tools.terminology_lookup import find
+        result = find(full_system, text)
+        return json.dumps(result.to_dict())
 
-    resolution = resolve_concept_in_bundle(term, inventory, "observation", llm_client=llm)
-    if not resolution.resolved:
-        return json.dumps({"found": False, "note": f"Could not resolve '{term}' to an observation code"})
+    @tool
+    def verify_code(system: str, code: str) -> str:
+        """Verify a code exists in a terminology system and get its display name.
 
-    code_token = resolution.entries[0].code_token
-    result = observation_count(index, code_token, duration, ref_date, threshold, comparator)
-    return json.dumps({"found": result.found, "value": result.value,
-                      "provenance": result.provenance,
-                      "insufficient_data": result.insufficient_data})
+        Args:
+            system: "snomed", "rxnorm", "loinc", or "icd10"
+            code: The code to verify
+        """
+        system_map = {
+            "snomed": "http://snomed.info/sct",
+            "rxnorm": "http://www.nlm.nih.gov/research/umls/rxnorm",
+            "loinc": "http://loinc.org",
+            "icd10": "http://hl7.org/fhir/sid/icd-10-cm",
+        }
+        full_system = system_map.get(system.lower(), system)
+        from acp_writer.tools.terminology_lookup import verify
+        result = verify(full_system, code)
+        return json.dumps(result.to_dict())
 
+    @tool
+    def count_observations_in_window(term: str, duration: str,
+                                      threshold: float | None = None,
+                                      comparator: str | None = None) -> str:
+        """Count observations matching a clinical term in a time window.
 
-@tool
-def get_observation_trend(term: str, duration: str) -> str:
-    """Compute the rate of change of an observation over time.
+        Args:
+            term: Clinical term (e.g., "systolic blood pressure")
+            duration: ISO 8601 duration (e.g., "P3M" for 3 months)
+            threshold: Optional numeric threshold
+            comparator: Optional comparator: "ge", "gt", "le", "lt", "eq"
+        """
+        resolution = resolve_concept_in_bundle(term, inventory, "observation", llm_client=llm_client)
+        if not resolution.resolved:
+            return json.dumps({"found": False, "note": f"Could not resolve '{term}' to an observation code"})
 
-    Args:
-        term: Clinical term (e.g., "eGFR")
-        duration: Time window (e.g., "P1Y" for 1 year)
+        code_token = resolution.entries[0].code_token
+        result = observation_count(index, code_token, duration, reference_date, threshold, comparator)
+        return json.dumps({"found": result.found, "value": result.value,
+                          "provenance": result.provenance,
+                          "insufficient_data": result.insufficient_data})
 
-    Returns slope normalized per year. Negative = declining.
-    """
-    inventory = _INVENTORY_HOLDER.get("inventory")
-    index = _INDEX_HOLDER.get("index")
-    ref_date = _REF_DATE_HOLDER.get("date", date.today())
-    llm = _LLM_HOLDER.get("llm")
-    if not index or not inventory:
-        return json.dumps({"error": "No temporal index available"})
+    @tool
+    def get_observation_trend(term: str, duration: str) -> str:
+        """Compute the rate of change of an observation over time.
 
-    resolution = resolve_concept_in_bundle(term, inventory, "observation", llm_client=llm)
-    if not resolution.resolved:
-        return json.dumps({"found": False, "note": f"Could not resolve '{term}'"})
+        Args:
+            term: Clinical term (e.g., "eGFR")
+            duration: Time window (e.g., "P1Y" for 1 year)
 
-    code_token = resolution.entries[0].code_token
-    result = rate_of_change(index, code_token, duration, ref_date)
-    return json.dumps({"found": result.found, "value": result.value,
-                      "provenance": result.provenance,
-                      "insufficient_data": result.insufficient_data})
+        Returns slope normalized per year. Negative = declining.
+        """
+        resolution = resolve_concept_in_bundle(term, inventory, "observation", llm_client=llm_client)
+        if not resolution.resolved:
+            return json.dumps({"found": False, "note": f"Could not resolve '{term}'"})
 
+        code_token = resolution.entries[0].code_token
+        result = rate_of_change(index, code_token, duration, reference_date)
+        return json.dumps({"found": result.found, "value": result.value,
+                          "provenance": result.provenance,
+                          "insufficient_data": result.insufficient_data})
 
-_ALL_TOOLS = [
-    check_condition, check_medication, lookup_observation,
-    check_allergy, get_patient_age, find_code, verify_code,
-    count_observations_in_window, get_observation_trend,
-]
+    return [
+        check_condition, check_medication, lookup_observation,
+        check_allergy, get_patient_age, find_code, verify_code,
+        count_observations_in_window, get_observation_trend,
+    ]
 
 
 @mlflow.trace(name="qa_agent_answer")
@@ -352,12 +309,8 @@ def agent_answer(
 ) -> dict:
     """Run the ReAct QA agent to answer a clinical question."""
     inventory = build_bundle_inventory(bundle)
-
-    _BUNDLE_HOLDER["bundle"] = bundle
-    _INVENTORY_HOLDER["inventory"] = inventory
-    _INDEX_HOLDER["index"] = build_temporal_index(bundle)
-    _REF_DATE_HOLDER["date"] = reference_date
-    _LLM_HOLDER["llm"] = llm_client
+    index = build_temporal_index(bundle)
+    tools = _build_tools(bundle, inventory, index, reference_date, llm_client)
 
     condensed = serialize_ips(bundle)
     inventory_text = inventory.render_for_llm()
@@ -378,7 +331,7 @@ def agent_answer(
     try:
         agent = create_react_agent(
             llm_client,
-            _ALL_TOOLS,
+            tools,
             prompt=SystemMessage(content=_AGENT_SYSTEM_PROMPT),
         )
 
@@ -396,12 +349,6 @@ def agent_answer(
         logger.warning("QA agent failed: %s", exc)
         return {"answer": None, "provenance": [], "insufficient_data": True,
                 "error": str(exc), "tool_ledger": []}
-    finally:
-        _BUNDLE_HOLDER.clear()
-        _INVENTORY_HOLDER.clear()
-        _INDEX_HOLDER.clear()
-        _REF_DATE_HOLDER.clear()
-        _LLM_HOLDER.clear()
 
 
 def _extract_tool_ledger(messages: list) -> list[dict]:
@@ -435,7 +382,6 @@ def _parse_agent_response(message: Any) -> dict:
     """Parse the agent's final message into a structured answer."""
     content = message.content if hasattr(message, "content") else str(message)
     if isinstance(content, list):
-        # Responses API returns typed content blocks; join the text blocks
         content = "".join(
             block.get("text", "") for block in content
             if isinstance(block, dict) and block.get("type") == "text"

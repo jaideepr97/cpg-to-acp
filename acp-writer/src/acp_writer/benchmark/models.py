@@ -4,18 +4,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-
-@dataclass
-class QAAnswer:
-    """Answer returned by a QABackend."""
-
-    value: Any
-    kind: str
-    provenance: list[str] = field(default_factory=list)
-    insufficient_data: bool = False
-    error: str | None = None
-    answered_by: str | None = None
-    resolution_basis: str | None = None
+from acp_writer.tools.qa_result import QAAnswer  # noqa: F401 — re-exported
 
 
 @dataclass

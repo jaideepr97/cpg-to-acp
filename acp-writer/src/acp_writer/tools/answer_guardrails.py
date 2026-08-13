@@ -16,7 +16,7 @@ from typing import Any
 
 import mlflow
 
-from acp_writer.benchmark.models import QAAnswer
+from acp_writer.tools.qa_result import QAAnswer
 from acp_writer.tools.bundle_inventory import BundleInventory, InventoryEntry
 from acp_writer.tools.ips_extractor import _get_resources_with_entry, _resource_ref, _normalize_display
 

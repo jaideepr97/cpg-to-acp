@@ -188,8 +188,8 @@ _BOOLEAN_PREFIXES = [
 _OBSERVATION_PREFIXES = [
     "what is the patients most recent ",
     "what is the patients ", "what is the patient's most recent ",
-    "what is the patient's ", "patients ",
-    "most recent ", "latest ", "current ",
+    "what is the patient's ", "what is the ",
+    "patients ", "most recent ", "latest ", "current ",
 ]
 
 

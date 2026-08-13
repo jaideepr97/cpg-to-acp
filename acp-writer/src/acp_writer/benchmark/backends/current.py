@@ -9,7 +9,6 @@ from datetime import date
 from typing import Any
 
 from acp_writer.benchmark.models import QAAnswer
-from acp_writer.nodes.dmn_executor import KNOWN_VARIABLE_MAP
 from acp_writer.tools.bundle_inventory import build_bundle_inventory
 from acp_writer.tools.concept_resolution import resolve_concept_in_bundle
 from acp_writer.tools.ips_extractor import (
@@ -302,20 +301,10 @@ class CurrentImplementationBackend:
     def _try_variable_map(
         self, question: str, bundle: dict, reference_date: date,
     ) -> QAAnswer:
-        """Resolve a question using the concept resolver, falling back to KNOWN_VARIABLE_MAP."""
+        """Resolve a question using the concept resolver."""
         resolved = resolve_concept(question)
         if resolved:
             return self._execute_resolved(resolved, bundle, reference_date)
-
-        key = re.sub(r"([a-z])([A-Z])", r"\1 \2", question).lower().strip()
-        for map_key, (system, code, extract_type) in KNOWN_VARIABLE_MAP.items():
-            if map_key in key:
-                if extract_type == "observation":
-                    return self._extract_observation(bundle, system, code)
-                elif extract_type == "condition":
-                    return self._extract_condition(bundle, system, code)
-                elif extract_type == "medication":
-                    return self._extract_medication(bundle, system, code)
 
         return QAAnswer(
             value=None,

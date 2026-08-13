@@ -64,9 +64,6 @@ class LLMAssistedBackend(CurrentImplementationBackend):
                 base_url=base_url,
                 model=model,
                 api_key=api_key,
-                # Reasoning models (gpt-5.6+) require the Responses API for
-                # tool calling with reasoning enabled; chat completions would
-                # force reasoning_effort='none'.
                 use_responses_api=True,
                 max_retries=3,
                 request_timeout=60,
