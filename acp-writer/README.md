@@ -9,7 +9,7 @@ Two-phase LangGraph pipeline:
 **Phase 1 — Clinical Reasoning:**
 1. **Condition Scanner** — Extract patient conditions, medications, allergies from IPS (deterministic)
 2. **Guideline Resolver** — Match conditions to registered CPGs and DMN models
-3. **DMN Executor** — Evaluate decision models with layered patient data extraction (see [Clinical Data QA](../docs/clinical-data-qa.md))
+3. **DMN Executor** — Evaluate decision models with concept-resolution pipeline for patient data extraction (see [Clinical Data QA](../docs/clinical-data-qa.md)). Uses an LLM (via MaaS/LiteLLM) as the final resolution fallback for open-vocabulary clinical terms; degrades gracefully to deterministic-only extraction when the LLM is unavailable
 4. **Recommendation Retriever** — Search vector store for applicable recommendations
 5. **Plan Composer** — LLM maps decisions + recommendations → Planning Brief
 6. **Brief Reviewer** — Adversarial LLM review (clinical pharmacist persona, max 2 loops)
