@@ -3,6 +3,12 @@
 One choke point, every path, fail-closed. Verification lives at the
 QAAnswer boundary — no answer leaves the backend unverified.
 Refusal is decided by code, never by the agent.
+
+Each answer class has a different evidence contract:
+- numeric_retrieval: value-consistency, concept-consistency, conflict, provenance
+- boolean_presence: provenance, conflict
+- boolean_absence: ledger-backed absence check, conflict
+- composite_reasoning: provenance (multi-resource), conflict
 """
 
 import logging
@@ -17,34 +23,102 @@ from acp_writer.tools.ips_extractor import _get_resources_with_entry, _resource_
 logger = logging.getLogger(__name__)
 
 
+def classify_answer(
+    answer: QAAnswer,
+    tool_ledger: list[dict] | None = None,
+    question_intent: str | None = None,
+) -> str:
+    """Classify the answer for guardrail dispatch.
+
+    question_intent (boolean/numeric/open) overrides type inference
+    so that a boolean-intent question with a numeric answer is classified
+    under the boolean contract, not numeric_retrieval.
+
+    Returns one of: numeric_retrieval, boolean_presence, boolean_absence,
+    composite_reasoning, insufficient.
+    """
+    if answer.insufficient_data:
+        return "insufficient"
+
+    if question_intent == "boolean" or isinstance(answer.value, bool):
+        if tool_ledger:
+            relevant = [
+                e for e in tool_ledger
+                if e.get("type") in ("check_condition", "check_medication", "check_allergy", "lookup_observation")
+            ]
+            if relevant:
+                all_misses = all(e.get("definitive_miss", False) for e in relevant)
+                if all_misses:
+                    return "boolean_absence"
+                if any(e.get("found", False) for e in relevant):
+                    return "boolean_presence"
+
+        if isinstance(answer.value, bool) and answer.value is False and not answer.provenance:
+            return "boolean_absence"
+
+        if answer.provenance and len(answer.provenance) > 2:
+            return "composite_reasoning"
+
+        return "boolean_presence"
+
+    if isinstance(answer.value, (int, float)):
+        return "numeric_retrieval"
+
+    return "composite_reasoning"
+
+
 @mlflow.trace(name="guardrail_verify_answer")
 def verify_answer(
     answer: QAAnswer,
     question: str,
     bundle: dict,
     inventory: BundleInventory,
+    tool_ledger: list[dict] | None = None,
+    question_intent: str | None = None,
 ) -> QAAnswer:
-    """Run all guardrails on a QAAnswer. Returns the verified (possibly downgraded) answer.
+    """Run guardrails appropriate to the answer class.
 
     Called on EVERY answer path — resolver, query-plan, and agent.
+    Dispatches guardrails by answer-type verification contract.
+    question_intent overrides the classifier's type inference when provided.
     """
     if answer.insufficient_data:
         return answer
 
-    result = _check_provenance_required(answer)
-    if result.insufficient_data:
-        return result
+    answer_class = classify_answer(answer, tool_ledger, question_intent)
+    answer.resolution_basis = f"verification_class:{answer_class}"
 
-    result = _check_value_consistency(result, bundle)
-    if result.insufficient_data:
-        return result
+    if answer_class == "numeric_retrieval":
+        result = _check_provenance_required(answer)
+        if result.insufficient_data:
+            return result
+        result = _check_value_consistency(result, bundle)
+        if result.insufficient_data:
+            return result
+        result = _check_concept_consistency(result, question, inventory)
+        if result.insufficient_data:
+            return result
+        return _check_conflict(result, bundle, inventory)
 
-    result = _check_concept_consistency(result, question, inventory)
-    if result.insufficient_data:
-        return result
+    if answer_class == "boolean_presence":
+        result = _check_provenance_required(answer)
+        if result.insufficient_data:
+            return result
+        return _check_conflict(result, bundle, inventory)
 
-    result = _check_conflict(result, bundle, inventory)
-    return result
+    if answer_class == "boolean_absence":
+        result = _check_absence_with_ledger(answer, tool_ledger, question, inventory)
+        if result.insufficient_data:
+            return result
+        return _check_conflict(result, bundle, inventory)
+
+    if answer_class == "composite_reasoning":
+        result = _check_provenance_required(answer)
+        if result.insufficient_data:
+            return result
+        return _check_conflict(result, bundle, inventory)
+
+    return answer
 
 
 def _downgrade(answer: QAAnswer, guardrail: str, reason: str) -> QAAnswer:
@@ -67,15 +141,19 @@ def _check_provenance_required(answer: QAAnswer) -> QAAnswer:
     """Non-insufficient_data answers require provenance; else downgrade."""
     if answer.value is not None and not answer.provenance:
         return _downgrade(answer, "provenance_required", "answer without provenance")
-    logger.debug("Guardrail [provenance_required]: passed (provenance present)")
+    logger.debug("Guardrail [provenance_required]: passed")
     return answer
 
 
 @mlflow.trace(name="guardrail_value_consistency")
 def _check_value_consistency(answer: QAAnswer, bundle: dict) -> QAAnswer:
-    """Numeric answers must match a value in a cited resource. Fail closed."""
-    if not isinstance(answer.value, (int, float)):
-        logger.debug("Guardrail [value_consistency]: skipped (non-numeric answer)")
+    """Numeric answers must match a value in a cited resource. Fail closed.
+
+    Only applies to numeric_retrieval class (booleans excluded by dispatch
+    and by the isinstance guard below for direct-call safety).
+    """
+    if isinstance(answer.value, bool) or not isinstance(answer.value, (int, float)):
+        logger.debug("Guardrail [value_consistency]: skipped (non-numeric)")
         return answer
 
     if not answer.provenance:
@@ -107,14 +185,13 @@ def _value_in_resource(value: float, ref: str, bundle: dict) -> bool:
             continue
         resource_found = True
 
-        for val_field in ["valueQuantity"]:
-            v = resource.get(val_field)
-            if isinstance(v, dict) and v.get("value") is not None:
-                try:
-                    if abs(float(v["value"]) - value) < 0.01:
-                        return True
-                except (ValueError, TypeError):
-                    pass
+        vq = resource.get("valueQuantity")
+        if isinstance(vq, dict) and vq.get("value") is not None:
+            try:
+                if abs(float(vq["value"]) - value) < 0.01:
+                    return True
+            except (ValueError, TypeError):
+                pass
 
         vs = resource.get("valueString")
         if vs is not None:
@@ -125,17 +202,16 @@ def _value_in_resource(value: float, ref: str, bundle: dict) -> bool:
                 pass
 
         for component in resource.get("component", []):
-            vq = component.get("valueQuantity")
-            if vq and vq.get("value") is not None:
+            cvq = component.get("valueQuantity")
+            if cvq and cvq.get("value") is not None:
                 try:
-                    if abs(float(vq["value"]) - value) < 0.01:
+                    if abs(float(cvq["value"]) - value) < 0.01:
                         return True
                 except (ValueError, TypeError):
                     pass
 
     if not resource_found:
-        logger.debug("Guardrail [value_consistency]: resource %s not found in bundle — fail closed", ref)
-        return False
+        logger.debug("Guardrail [value_consistency]: resource %s not found — fail closed", ref)
 
     return False
 
@@ -148,15 +224,12 @@ def _check_concept_consistency(
 ) -> QAAnswer:
     """Verify cited resource matches the question's concept.
 
-    Uses terminology cross-check (independent of the resolution pipeline)
-    to avoid circular validation.
+    Only applies to numeric_retrieval class (its original purpose:
+    hemoglobin vs HbA1c). Uses terminology cross-check independent
+    of the resolution pipeline.
     """
     if not answer.provenance:
         logger.debug("Guardrail [concept_consistency]: skipped (no provenance)")
-        return answer
-
-    if not isinstance(answer.value, (int, float)):
-        logger.debug("Guardrail [concept_consistency]: skipped (non-numeric answer)")
         return answer
 
     cited_entries = [
@@ -165,7 +238,7 @@ def _check_concept_consistency(
     ]
 
     if not cited_entries:
-        logger.debug("Guardrail [concept_consistency]: skipped (no cited observations in inventory)")
+        logger.debug("Guardrail [concept_consistency]: skipped (no cited observations)")
         return answer
 
     term_candidates = _get_terminology_candidates(question_term)
@@ -179,10 +252,8 @@ def _check_concept_consistency(
         for entry in cited_entries:
             norm_display = _normalize_display(entry.display) if entry.display else ""
             if norm_term and norm_display and (norm_term in norm_display or norm_display in norm_term):
-                logger.debug("Guardrail [concept_consistency]: passed (display match: %s ~ %s)",
-                            question_term, entry.display)
+                logger.debug("Guardrail [concept_consistency]: passed (display match)")
                 return answer
-        logger.debug("Guardrail [concept_consistency]: no terminology candidates and no display match — fail closed")
         return _downgrade(
             answer, "concept_consistency",
             f"cannot verify '{question_term}' matches cited resources (no terminology candidates)",
@@ -201,11 +272,7 @@ def _check_concept_consistency(
 
 
 def _get_terminology_candidates(term: str) -> set[str] | None:
-    """Get candidate code tokens for a term via terminology lookup.
-
-    Returns a set of system|code tokens, empty set if no candidates found,
-    or None if terminology services are unavailable.
-    """
+    """Get candidate code tokens for a term via terminology lookup."""
     try:
         from acp_writer.tools.terminology_lookup import find_candidates
         from acp_writer.tools.concept_resolution import (
@@ -235,16 +302,127 @@ def _get_terminology_candidates(term: str) -> set[str] | None:
     return candidates
 
 
+@mlflow.trace(name="guardrail_absence_ledger")
+def _check_absence_with_ledger(
+    answer: QAAnswer,
+    tool_ledger: list[dict] | None,
+    question: str | None = None,
+    inventory: BundleInventory | None = None,
+) -> QAAnswer:
+    """Validate absence answers against the tool-call ledger.
+
+    A boolean absence answer is valid ONLY if:
+    - The ledger records a definitive_miss for the concept, OR
+    - On-demand pipeline resolution (D3) produces a definitive miss.
+
+    A bare answer without evidence is downgraded (fail closed).
+    """
+    if tool_ledger is None:
+        tool_ledger = []
+
+    relevant = [
+        e for e in tool_ledger
+        if e.get("type") in ("check_condition", "check_medication", "check_allergy", "lookup_observation")
+    ]
+
+    has_definitive_miss = any(e.get("definitive_miss", False) for e in relevant)
+    has_found = any(e.get("found", False) for e in relevant)
+
+    if has_found and answer.value is False:
+        logger.debug("Guardrail [absence_ledger]: ledger shows concept FOUND but answer is False — downgrade")
+        return _downgrade(
+            answer, "absence_ledger",
+            "answer claims absence but tool ledger shows concept was found",
+        )
+
+    if has_definitive_miss:
+        logger.debug("Guardrail [absence_ledger]: definitive_miss confirmed — absence valid")
+        return answer
+
+    if not relevant and isinstance(answer.value, bool) and answer.value is False and not answer.provenance:
+        if question and inventory:
+            on_demand = _on_demand_absence_check(question, inventory)
+            if on_demand == "definitive_miss":
+                logger.debug("Guardrail [absence_ledger]: on-demand pipeline confirms absence")
+                answer.resolution_basis = "negative_evidence:on_demand_pipeline"
+                return answer
+            if on_demand == "present":
+                return _downgrade(
+                    answer, "absence_contradicted",
+                    "on-demand pipeline found the concept present in the bundle",
+                )
+            return _downgrade(
+                answer, "absence_ledger",
+                "on-demand pipeline unresolved — fail closed",
+            )
+
+        logger.debug("Guardrail [absence_ledger]: no ledger, no pipeline — downgrade")
+        return _downgrade(
+            answer, "absence_ledger",
+            "absence answer without ledger evidence (no tool calls recorded)",
+        )
+
+    if not has_definitive_miss and isinstance(answer.value, bool) and answer.value is False and not answer.provenance:
+        logger.debug("Guardrail [absence_ledger]: no definitive_miss — downgrade")
+        return _downgrade(
+            answer, "absence_ledger",
+            "absence answer without definitive_miss in ledger",
+        )
+
+    logger.debug("Guardrail [absence_ledger]: passed")
+    return answer
+
+
+def _on_demand_absence_check(question: str, inventory: BundleInventory) -> str:
+    """Run the concept-resolution pipeline on demand for absence verification.
+
+    Returns: "definitive_miss", "present", or "unresolved".
+    """
+    try:
+        from acp_writer.tools.concept_resolution import resolve_concept_in_bundle
+    except ImportError:
+        return "unresolved"
+
+    concept = _extract_asked_concept(question)
+    if not concept:
+        return "unresolved"
+
+    for resource_kind in ["condition", "medication", "observation", "allergy"]:
+        result = resolve_concept_in_bundle(concept, inventory, resource_kind, llm_client=None)
+        if result.resolved:
+            logger.debug("On-demand absence: concept '%s' found as %s", concept, resource_kind)
+            return "present"
+        if result.definitive_miss:
+            continue
+
+    logger.debug("On-demand absence: concept '%s' not found (deterministic-only)", concept)
+    return "definitive_miss"
+
+
+def _extract_asked_concept(question: str) -> str:
+    """Extract the clinical concept from a question (simple heuristic)."""
+    import re
+    q = question.strip().rstrip("?").strip()
+    for prefix in [
+        r"^(?:is|are|does|do|has|have|should|was|were|can|could|would|will)\s+(?:the\s+)?patient(?:'s?)?\s+(?:on\s+|have\s+|missing\s+|lacking\s+|currently\s+on\s+)?",
+        r"^(?:is|are|does|do)\s+(?:there\s+)?(?:any\s+)?",
+    ]:
+        m = re.match(prefix, q, re.IGNORECASE)
+        if m:
+            return q[m.end():].strip()
+    return q
+
+
 @mlflow.trace(name="guardrail_conflict_enforcement")
 def _check_conflict(
     answer: QAAnswer,
     bundle: dict,
     inventory: BundleInventory,
 ) -> QAAnswer:
-    """Downgrade answers based on conflicting data (same concept, different values).
+    """Downgrade answers based on conflicting data.
 
-    Checks all observations sharing a code with any cited observation,
-    not just those in provenance. Fires on any path — resolver, plan, or agent.
+    Applies to ALL answer classes. Checks all observations sharing a code
+    with any cited observation for conflicting values.
     """
     if not answer.provenance:
         logger.debug("Guardrail [conflict]: skipped (no provenance)")
@@ -283,7 +461,7 @@ def _check_conflict(
                     f"{cited.fhir_reference}={cited_val} vs {sib.fhir_reference}={sib_val}",
                 )
 
-    logger.debug("Guardrail [conflict]: passed (no conflicting values)")
+    logger.debug("Guardrail [conflict]: passed")
     return answer
 
 
@@ -326,12 +504,6 @@ def check_definitive_miss(
     if not tool_ledger:
         return answer
 
-    all_misses = all(
-        entry.get("definitive_miss", False)
-        for entry in tool_ledger
-        if entry.get("type") in ("check_condition", "check_medication", "check_allergy", "lookup_observation")
-    )
-
     relevant_calls = [
         entry for entry in tool_ledger
         if entry.get("type") in ("check_condition", "check_medication", "check_allergy", "lookup_observation")
@@ -339,6 +511,8 @@ def check_definitive_miss(
 
     if not relevant_calls:
         return answer
+
+    all_misses = all(entry.get("definitive_miss", False) for entry in relevant_calls)
 
     if all_misses and answer.value is True:
         logger.info(

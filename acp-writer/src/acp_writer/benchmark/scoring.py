@@ -1,7 +1,10 @@
-"""Scoring logic for clinical QA benchmark.
+"""Scoring logic for clinical QA benchmark (v2).
 
 Pure functions — no side effects, no I/O. Takes a BenchmarkCase and QAAnswer,
 returns a CaseScore.
+
+v2 (2026-08-13): boolean comparisons require actual boolean type — numeric
+values no longer coerce to True/False via Python truthiness.
 """
 
 from typing import Any
@@ -75,7 +78,9 @@ def _compare_values(
         return False
 
     if kind == "boolean":
-        return bool(actual) == bool(expected)
+        if not isinstance(actual, bool):
+            return False
+        return actual == bool(expected)
 
     if kind == "code":
         return str(actual) == str(expected)

@@ -348,6 +348,7 @@ def agent_answer(
     reference_date: date,
     llm_client: Any,
     max_iterations: int = 10,
+    extra_context: str | None = None,
 ) -> dict:
     """Run the ReAct QA agent to answer a clinical question."""
     inventory = build_bundle_inventory(bundle)
@@ -361,6 +362,19 @@ def agent_answer(
     condensed = serialize_ips(bundle)
     inventory_text = inventory.render_for_llm()
 
+    context_parts = [
+        f"Patient summary:\n{condensed}",
+        f"Bundle inventory:\n{inventory_text}",
+        f"Reference date: {reference_date.isoformat()}",
+    ]
+    if extra_context:
+        context_parts.append(f"Context from prior retrieval: {extra_context}")
+    context_parts.append(
+        f"Question: {question}\n\n"
+        f"Use the tools to answer. Respond with JSON containing "
+        f"answer, provenance, insufficient_data, and reasoning."
+    )
+
     try:
         agent = create_react_agent(
             llm_client,
@@ -369,14 +383,7 @@ def agent_answer(
         )
 
         result = agent.invoke(
-            {"messages": [HumanMessage(content=(
-                f"Patient summary:\n{condensed}\n\n"
-                f"Bundle inventory:\n{inventory_text}\n\n"
-                f"Reference date: {reference_date.isoformat()}\n\n"
-                f"Question: {question}\n\n"
-                f"Use the tools to answer. Respond with JSON containing "
-                f"answer, provenance, insufficient_data, and reasoning."
-            ))]},
+            {"messages": [HumanMessage(content="\n\n".join(context_parts))]},
             {"recursion_limit": max_iterations * 2},
         )
 
