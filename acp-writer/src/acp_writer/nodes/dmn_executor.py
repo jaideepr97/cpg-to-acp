@@ -20,7 +20,6 @@ from acp_writer.tools.ips_extractor import (
     extract_observation,
     extract_observation_concept,
     extract_patient_age,
-    extract_procedure,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,6 +30,15 @@ RXNORM = "http://www.nlm.nih.gov/research/umls/rxnorm"
 
 _CONDITION_SYSTEMS = {SNOMED, "http://hl7.org/fhir/sid/icd-10-cm"}
 _MEDICATION_SYSTEMS = {RXNORM}
+
+_INACTIVE_CONDITION_STATUSES = {"resolved", "inactive", "remission"}
+_INACTIVE_MEDICATION_STATUSES = {"cancelled", "entered-in-error", "stopped"}
+_INACTIVE_ALLERGY_STATUSES = {"resolved", "inactive"}
+
+
+def _filter_active_entries(entries: list, inactive_statuses: set) -> list:
+    """Filter inventory entries to those with active (or absent) status."""
+    return [e for e in entries if (e.status or "active") not in inactive_statuses]
 
 
 def _infer_resource_kind(var_name: str, var_type: str) -> str:
@@ -140,13 +148,31 @@ def _extract_via_pipeline(
         return None, None, audit
 
     if resource_kind == "condition":
-        return True, entry.fhir_reference, audit
+        active = _filter_active_entries(
+            resolution.entries, _INACTIVE_CONDITION_STATUSES,
+        )
+        if active:
+            return True, active[0].fhir_reference, audit
+        audit["note"] = f"matched but inactive: {entry.fhir_reference} ({entry.status})"
+        return None, None, audit
 
     if resource_kind == "medication":
-        return True, entry.fhir_reference, audit
+        active = _filter_active_entries(
+            resolution.entries, _INACTIVE_MEDICATION_STATUSES,
+        )
+        if active:
+            return True, active[0].fhir_reference, audit
+        audit["note"] = f"matched but inactive: {entry.fhir_reference} ({entry.status})"
+        return None, None, audit
 
     if resource_kind == "allergy":
-        return True, entry.fhir_reference, audit
+        active = _filter_active_entries(
+            resolution.entries, _INACTIVE_ALLERGY_STATUSES,
+        )
+        if active:
+            return True, active[0].fhir_reference, audit
+        audit["note"] = f"matched but inactive: {entry.fhir_reference} ({entry.status})"
+        return None, None, audit
 
     return None, None, audit
 

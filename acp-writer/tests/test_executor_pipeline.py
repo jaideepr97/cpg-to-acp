@@ -107,7 +107,7 @@ class TestPipelineWiredInExecutor:
         assert value is None
         assert audit.get("degraded") is True
 
-    def test_degraded_mode_llm_exception(self):
+    def test_degraded_mode_pipeline_exception(self):
         """When pipeline raises, resolution degrades gracefully."""
         bundle = _load("messy-data-01.json")
         inventory = build_bundle_inventory(bundle)
@@ -121,6 +121,80 @@ class TestPipelineWiredInExecutor:
 
         assert value is None
         assert audit.get("degraded") is True
+
+
+class TestF1LLMFailureNotFabricatedFalse:
+    """F1: LLM call failure must NOT become a definitive_miss False."""
+
+    def test_llm_raises_boolean_returns_none_not_false(self):
+        """LLM client raises → boolean variable gets None (degraded), NOT False."""
+        bundle = _load("messy-data-01.json")
+        inventory = build_bundle_inventory(bundle)
+
+        mock_llm = MagicMock()
+        mock_llm.with_structured_output.side_effect = Exception("MaaS timeout")
+
+        with patch("acp_writer.tools.terminology_lookup.find_candidates", return_value=[]):
+            value, ref, audit = _extract_input_value(
+                bundle, "Has Rheumatoid Arthritis", "boolean", {},
+                inventory=inventory, llm_client=mock_llm,
+            )
+
+        assert value is None, "LLM failure must NOT produce False"
+        assert audit.get("degraded") is True
+
+    def test_llm_succeeds_empty_match_returns_false(self):
+        """LLM succeeds with no match → definitive miss → False (correct behavior)."""
+        bundle = _load("messy-data-01.json")
+        inventory = build_bundle_inventory(bundle)
+
+        mock_llm = MagicMock()
+        from pydantic import BaseModel, Field
+        class MockMatch(BaseModel):
+            matched_references: list[str] = Field(default_factory=list)
+            reasoning: str = ""
+        mock_structured = MagicMock()
+        mock_structured.invoke.return_value = MockMatch()
+        mock_llm.with_structured_output.return_value = mock_structured
+
+        with patch("acp_writer.tools.terminology_lookup.find_candidates", return_value=[]):
+            value, ref, audit = _extract_input_value(
+                bundle, "Has Rheumatoid Arthritis", "boolean", {},
+                inventory=inventory, llm_client=mock_llm,
+            )
+
+        assert value is False
+        assert audit.get("match_basis") == "definitive_miss"
+
+
+class TestF2StatusFiltering:
+    """F2: resolved/inactive conditions and stopped meds don't count as present."""
+
+    def test_resolved_condition_not_present(self):
+        """Resolved stroke should NOT return True for 'Has Stroke'."""
+        bundle = _load("clinical-reasoning-01.json")
+        inventory = build_bundle_inventory(bundle)
+
+        value, ref, audit = _extract_input_value(
+            bundle, "Has Stroke", "boolean", {},
+            inventory=inventory,
+        )
+
+        assert value is not True, "Resolved condition must not count as present"
+        if audit.get("note"):
+            assert "resolved" in audit["note"].lower() or "inactive" in audit["note"].lower()
+
+    def test_active_condition_returns_true(self):
+        """Active hypertension should return True."""
+        bundle = _load("clinical-reasoning-01.json")
+        inventory = build_bundle_inventory(bundle)
+
+        value, ref, audit = _extract_input_value(
+            bundle, "Has Hypertension", "boolean", {},
+            inventory=inventory,
+        )
+
+        assert value is True
 
     def test_prior_dmn_results_still_first(self):
         """Chained DMN results take priority over everything."""

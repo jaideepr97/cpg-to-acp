@@ -87,15 +87,24 @@ def _build_tools(
         result = resolve_concept_in_bundle(term, inventory, "condition", llm_client=llm_client)
 
         if result.resolved:
-            entry = result.entries[0]
+            active = [e for e in result.entries
+                      if (e.status or "active") not in ("resolved", "inactive", "remission")]
+            if active:
+                entry = active[0]
+                return json.dumps({
+                    "found": True,
+                    "display": entry.display,
+                    "code": entry.code_token,
+                    "reference": entry.fhir_reference,
+                    "status": entry.status,
+                    "match_basis": result.match_basis,
+                    "steps_run": result.steps_run,
+                })
+            inactive_entry = result.entries[0]
             return json.dumps({
-                "found": True,
-                "display": entry.display,
-                "code": entry.code_token,
-                "reference": entry.fhir_reference,
-                "status": entry.status,
+                "found": False,
+                "note": f"Found {inactive_entry.display} but status={inactive_entry.status} (not active)",
                 "match_basis": result.match_basis,
-                "steps_run": result.steps_run,
             })
 
         conditions = inventory.conditions()
@@ -121,14 +130,23 @@ def _build_tools(
         result = resolve_concept_in_bundle(term, inventory, "medication", llm_client=llm_client)
 
         if result.resolved:
-            entry = result.entries[0]
+            active = [e for e in result.entries
+                      if (e.status or "active") not in ("cancelled", "entered-in-error", "stopped")]
+            if active:
+                entry = active[0]
+                return json.dumps({
+                    "found": True,
+                    "display": entry.display or entry.text,
+                    "code": entry.code_token if entry.system else "free-text",
+                    "reference": entry.fhir_reference,
+                    "match_basis": result.match_basis,
+                    "steps_run": result.steps_run,
+                })
+            inactive_entry = result.entries[0]
             return json.dumps({
-                "found": True,
-                "display": entry.display or entry.text,
-                "code": entry.code_token if entry.system else "free-text",
-                "reference": entry.fhir_reference,
+                "found": False,
+                "note": f"Found {inactive_entry.display or inactive_entry.text} but status={inactive_entry.status} (not active)",
                 "match_basis": result.match_basis,
-                "steps_run": result.steps_run,
             })
 
         meds = inventory.medications()

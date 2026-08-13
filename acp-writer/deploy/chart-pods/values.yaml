@@ -22,7 +22,8 @@ pods:
     tag: phase3
     port: 8080
     env:
-      litellmUrl: http://maas-model-gpt-5-6-backend:443/v1
+      # Bare origin — get_llm() appends /v1 automatically
+      litellmUrl: http://maas-model-gpt-5-6-backend:443
       llmModel: gpt-5-6
     resources:
       requests:

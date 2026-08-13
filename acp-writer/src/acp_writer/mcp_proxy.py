@@ -11,8 +11,6 @@ import base64
 import json
 import logging
 import os
-import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
 
 import mlflow
 import requests
@@ -22,7 +20,6 @@ from mcp.server.transport_security import TransportSecuritySettings
 from cpg_contracts import (
     CPGMetadata,
     DecisionModelSummary,
-    DecisionVariable,
     Recommendation,
     RecommendationBundle,
     RecommendationSearchRequest,
@@ -35,7 +32,6 @@ logger = logging.getLogger(__name__)
 
 KOGITO_URL = os.environ.get("KOGITO_URL", "http://localhost:8081")
 FHIR_SERVER_URL = os.environ.get("FHIR_SERVER_URL", "http://acp-fhir-server:8080")
-DMN_NS = "https://www.omg.org/spec/DMN/20191111/MODEL/"
 
 _embedding_provider = FakeEmbeddingProvider(dimensions=8)
 _vector_store = InMemoryVectorStore(_embedding_provider)

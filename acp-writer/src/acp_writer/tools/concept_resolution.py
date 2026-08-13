@@ -192,6 +192,12 @@ def resolve_concept_in_bundle(
     if llm_client is not None:
         steps.append("llm_inventory")
         matches = _llm_inventory_match(term, inv_entries, resource_kind, llm_client)
+        if matches is None:
+            steps.append("llm_inventory:failed")
+            return ResolutionResult(
+                resolved=False, unresolved=True,
+                codes_tried=codes_tried, steps_run=steps,
+            )
         if matches:
             _log_learned_mapping(term, matches, "llm_inventory")
             return ResolutionResult(
@@ -254,7 +260,7 @@ def _llm_inventory_match(
 
     except Exception as exc:
         logger.warning("LLM inventory match failed: %s", exc)
-        return []
+        return None
 
 
 def _log_learned_mapping(
