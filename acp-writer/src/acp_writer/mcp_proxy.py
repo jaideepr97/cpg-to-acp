@@ -50,7 +50,6 @@ mcp = FastMCP(
 def _parse_dmn_metadata(dmn_xml: str) -> DecisionModelSummary:
     from acp_writer.api import _parse_dmn_metadata as _parse
     return _parse(dmn_xml)
-    )
 
 
 @mcp.tool()
