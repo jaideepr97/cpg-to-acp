@@ -398,6 +398,12 @@ def agent_answer(
 def _parse_agent_response(message: Any) -> dict:
     """Parse the agent's final message into a structured answer."""
     content = message.content if hasattr(message, "content") else str(message)
+    if isinstance(content, list):
+        # Responses API returns typed content blocks; join the text blocks
+        content = "".join(
+            block.get("text", "") for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+        )
     content = content.strip()
 
     if "INSUFFICIENT_DATA" in content.upper():
