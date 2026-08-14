@@ -54,6 +54,27 @@ spec:
               value: {{ $pod.env.bffHost | quote }}
             {{- end }}
             {{- end }}
+            {{- if $pod.secrets }}
+            {{- if $pod.secrets.llm }}
+            - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: llm-credentials
+                  key: LLM_API_KEY
+            {{- end }}
+            {{- if $pod.secrets.minio }}
+            - name: ARTIFACT_STORE_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: ARTIFACT_STORE_ACCESS_KEY
+            - name: ARTIFACT_STORE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: ARTIFACT_STORE_SECRET_KEY
+            {{- end }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /health

@@ -1,0 +1,40 @@
+    server {
+        listen 8080;
+        server_name acp-patient-data acp-patient-data.${NAMESPACE}.svc.cluster.local;
+        location / {
+            proxy_set_header Host sb-patient-data--http.openshell.localhost;
+            proxy_pass http://openshell-http:8080;
+        }
+    }
+    server {
+        listen 8080;
+        server_name acp-llm-reasoning acp-llm-reasoning.${NAMESPACE}.svc.cluster.local;
+        location / {
+            proxy_set_header Host sb-llm-reasoning--http.openshell.localhost;
+            proxy_pass http://openshell-http:8080;
+        }
+    }
+    server {
+        listen 8080;
+        server_name acp-decision-engine acp-decision-engine.${NAMESPACE}.svc.cluster.local;
+        location / {
+            proxy_set_header Host sb-decision-engine--http.openshell.localhost;
+            proxy_pass http://openshell-http:8080;
+        }
+    }
+    server {
+        listen 8080;
+        server_name acp-fhir-generation acp-fhir-generation.${NAMESPACE}.svc.cluster.local;
+        location / {
+            proxy_set_header Host sb-fhir-generation--http.openshell.localhost;
+            proxy_pass http://openshell-http:8080;
+        }
+    }
+    server {
+        listen 8080;
+        server_name acp-fhir-server acp-fhir-server.${NAMESPACE}.svc.cluster.local;
+        location / {
+            proxy_set_header Host sb-fhir-server--http.openshell.localhost;
+            proxy_pass http://openshell-http:8080;
+        }
+    }

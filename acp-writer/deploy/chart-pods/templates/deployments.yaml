@@ -53,13 +53,44 @@ spec:
             - name: FHIR_SERVER_URL
               value: {{ $pod.env.fhirServerUrl | quote }}
             {{- end }}
-            {{- if $pod.env.fhirClientId }}
-            - name: FHIR_CLIENT_ID
-              value: {{ $pod.env.fhirClientId | quote }}
+            {{- if $pod.env.decisionEngineUrl }}
+            - name: DECISION_ENGINE_URL
+              value: {{ $pod.env.decisionEngineUrl | quote }}
             {{- end }}
-            {{- if $pod.env.fhirClientSecret }}
+            {{- end }}
+            {{- if $pod.secrets }}
+            {{- if $pod.secrets.llm }}
+            - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: llm-credentials
+                  key: LLM_API_KEY
+            {{- end }}
+            {{- if $pod.secrets.minio }}
+            - name: ARTIFACT_STORE_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: ARTIFACT_STORE_ACCESS_KEY
+            - name: ARTIFACT_STORE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: ARTIFACT_STORE_SECRET_KEY
+            {{- end }}
+            {{- if $pod.secrets.fhir }}
+            - name: FHIR_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: fhir-client-credentials
+                  key: FHIR_CLIENT_ID
+                  optional: true
             - name: FHIR_CLIENT_SECRET
-              value: {{ $pod.env.fhirClientSecret | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: fhir-client-credentials
+                  key: FHIR_CLIENT_SECRET
+                  optional: true
             {{- end }}
             {{- end }}
           readinessProbe:

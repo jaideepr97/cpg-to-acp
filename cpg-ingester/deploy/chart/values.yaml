@@ -1,30 +1,37 @@
 image:
   registry: image-registry.openshift-image-registry.svc:5000
-  namespace: sschifma-cpg-to-acp
+  # Namespace is overridden by deploy scripts (--set image.namespace=...)
+  namespace: default
 
 pods:
   ingestion:
     enabled: true
     image: cpg-ingester-ingestion
-    tag: phase3
+    tag: latest
     port: 8080
+    secrets:
+      minio: true
     resources:
+      # Docling models loaded at runtime — OOMs below 3Gi (deployment-log evidence)
       requests:
         cpu: 500m
-        memory: 2Gi
+        memory: 3Gi
       limits:
         cpu: "2"
-        memory: 3Gi
+        memory: 4Gi
 
   llm-analysis:
     enabled: true
     image: cpg-ingester-llm
-    tag: phase3
+    tag: latest
     port: 8080
     env:
-      # Bare origin — get_llm() appends /v1 automatically
-      litellmUrl: http://maas-model-gpt-5-6-backend:443
-      llmModel: gpt-5-6
+      # Bare origin — get_llm() appends /v1. Deploy scripts override this.
+      litellmUrl: http://localhost:4000
+      llmModel: default
+    secrets:
+      llm: true
+      minio: true
     resources:
       requests:
         cpu: 500m
@@ -36,8 +43,10 @@ pods:
   assembly:
     enabled: true
     image: cpg-ingester-assembly
-    tag: phase3
+    tag: latest
     port: 8080
+    secrets:
+      minio: true
     resources:
       requests:
         cpu: 50m
@@ -49,10 +58,15 @@ pods:
   delivery:
     enabled: true
     image: cpg-ingester-delivery
-    tag: phase3
+    tag: latest
     port: 8080
     env:
-      acpWriterUrl: http://cpg-acp-writer-acp-writer:8082
+      # Delivery deploys DMN models via POST /api/v1/decisions/models.
+      # In pods+OpenShell mode, this endpoint is on the decision-engine service
+      # (routed through openshell-router to sb-decision-engine).
+      acpWriterUrl: http://acp-decision-engine:8080
+    secrets:
+      minio: true
     resources:
       requests:
         cpu: 50m
@@ -64,8 +78,10 @@ pods:
   bff:
     enabled: true
     image: cpg-ingester-bff
-    tag: phase4
+    tag: latest
     port: 8080
+    secrets:
+      minio: true
     resources:
       requests:
         cpu: 100m
@@ -77,7 +93,7 @@ pods:
   ui:
     enabled: true
     image: cpg-ingester-ui
-    tag: phase4
+    tag: latest
     port: 8080
     route: true
     env:
@@ -91,4 +107,5 @@ pods:
         memory: 256Mi
 
 mlflow:
-  trackingUri: https://mlflow-redhat-ods-applications.apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com
+  # Overridden by deploy scripts from cluster.env MLFLOW_TRACKING_URI
+  trackingUri: ""
