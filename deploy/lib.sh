@@ -271,9 +271,9 @@ start_builds_parallel() {
     done
 
     local total=${#build_names[@]}
-    log "  Waiting for $total builds (polling every 30s, timeout 10m)..."
+    log "  Waiting for $total builds (polling every 30s, timeout 20m)..."
     local start_time=$SECONDS
-    local timeout=600
+    local timeout=1200
 
     while true; do
         local completed=0
