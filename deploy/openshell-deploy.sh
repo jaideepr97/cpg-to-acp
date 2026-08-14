@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Portability: macOS ships bash 3.2 (no `declare -A`), so this script is often
+# run under zsh. zsh does NOT word-split unquoted variables the way bash does,
+# which silently breaks `for x in $list` and `-- $command`. Enable sh-style
+# splitting when running under zsh so both shells behave identically.
+[ -n "${ZSH_VERSION:-}" ] && setopt SH_WORD_SPLIT
+
 REGISTRY="image-registry.openshift-image-registry.svc:5000"
 NAMESPACE="sschifma-cpg-to-acp"
 IMAGE_TAG="${IMAGE_TAG:-phase3}"
@@ -15,12 +21,16 @@ MINIO_SECRET="${MINIO_SECRET:?Set MINIO_SECRET environment variable}"
 
 declare -A SANDBOX_PIDS
 
+# Killing the CLI attach processes is safe: the sandbox supervisor (PID 1
+# in each pod) keeps the command running and the gateway route alive after
+# the CLI disconnects (verified on-cluster 2026-08-14).
 cleanup() {
-    echo ""
-    echo "Sandbox attach processes running in background (PIDs: ${(v)SANDBOX_PIDS:-$SANDBOX_PIDS})."
-    echo "These maintain the command channel — do NOT kill them."
-    echo "To tear down: deploy/openshell-deploy.sh teardown"
+    echo "Cleaning up CLI attach processes (sandboxes keep running)..."
+    for pid in "${SANDBOX_PIDS[@]}"; do
+        kill "$pid" 2>/dev/null || true
+    done
 }
+trap cleanup EXIT
 
 create_sandbox() {
     local name="$1"
@@ -43,7 +53,9 @@ create_sandbox() {
         args+=(--env "$e")
     done
 
-    openshell sandbox create "${args[@]}" -- $command &
+    # `sh -c "$command"` passes the command as ONE quoted string — immune to
+    # the bash/zsh word-splitting difference that broke `-- $command`.
+    openshell sandbox create "${args[@]}" -- sh -c "$command" &
     SANDBOX_PIDS[$name]=$!
 
     echo "  Waiting for pod..."
@@ -219,7 +231,7 @@ deploy_sandboxes() {
         "uvicorn acp_writer.services.decision_engine:app --host 0.0.0.0 --port 8080" \
         "${common_env[@]}" \
         "PYTHONPATH=/app/src" \
-        "KOGITO_URL=http://cpg-decision-svc-decision-service:8081"
+        "KOGITO_URL=http://cpg-decision-svc-decision-service.${NAMESPACE}.svc.cluster.local:8081"
 
     # acp-writer: FHIR Generation
     create_sandbox "sb-fhir-generation" "acp-writer-fhir-gen" "acp-writer-fhir-gen.yaml" \
