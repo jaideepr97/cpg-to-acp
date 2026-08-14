@@ -86,8 +86,9 @@ log "Installing decision-service chart (timeout 120s)..."
 helm_start=$SECONDS
 helm upgrade --install cpg-decision-svc "$SCRIPT_DIR/../decision-service/deploy/chart" \
     -n "$NAMESPACE" \
+    --set image.namespace="$NAMESPACE" \
     --set image.tag="$IMAGE_TAG" \
-    --wait --timeout 120s || { log "ERROR: decision-service helm install failed"; exit 1; }
+    --wait --timeout 300s || { log "ERROR: decision-service helm install failed"; exit 1; }
 log "  decision-service installed ($(( SECONDS - helm_start ))s)"
 
 # acp-writer pod-split chart

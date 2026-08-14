@@ -1,8 +1,9 @@
 image:
   registry: image-registry.openshift-image-registry.svc:5000
-  namespace: sschifma-cpg-to-acp
+  # Namespace is overridden by deploy scripts (--set image.namespace=...)
+  namespace: default
   name: decision-service
-  tag: phase2
+  tag: latest
 
 replicas: 1
 
