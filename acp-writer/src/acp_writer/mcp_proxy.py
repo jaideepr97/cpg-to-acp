@@ -11,8 +11,6 @@ import base64
 import json
 import logging
 import os
-import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
 
 import mlflow
 import requests
@@ -22,7 +20,6 @@ from mcp.server.transport_security import TransportSecuritySettings
 from cpg_contracts import (
     CPGMetadata,
     DecisionModelSummary,
-    DecisionVariable,
     Recommendation,
     RecommendationBundle,
     RecommendationSearchRequest,
@@ -35,7 +32,6 @@ logger = logging.getLogger(__name__)
 
 KOGITO_URL = os.environ.get("KOGITO_URL", "http://localhost:8081")
 FHIR_SERVER_URL = os.environ.get("FHIR_SERVER_URL", "http://acp-fhir-server:8080")
-DMN_NS = "https://www.omg.org/spec/DMN/20191111/MODEL/"
 
 _embedding_provider = FakeEmbeddingProvider(dimensions=8)
 _vector_store = InMemoryVectorStore(_embedding_provider)
@@ -52,42 +48,8 @@ mcp = FastMCP(
 
 
 def _parse_dmn_metadata(dmn_xml: str) -> DecisionModelSummary:
-    root = ET.fromstring(dmn_xml)
-    model_name = root.get("name", "unknown")
-    model_id = model_name.lower().replace(" ", "-")
-
-    from acp_writer.api import _extract_codes, _extract_description
-
-    inputs = []
-    for input_data in root.findall(f"{{{DMN_NS}}}inputData"):
-        var = input_data.find(f"{{{DMN_NS}}}variable")
-        if var is not None:
-            codes = _extract_codes(input_data)
-            desc = _extract_description(input_data)
-            inputs.append(DecisionVariable(
-                name=var.get("name", ""),
-                type=var.get("typeRef", "string"),
-                codes=codes or None,
-                description=desc,
-            ))
-
-    outputs = []
-    for decision in root.findall(f"{{{DMN_NS}}}decision"):
-        dt = decision.find(f"{{{DMN_NS}}}decisionTable")
-        if dt is not None:
-            for output in dt.findall(f"{{{DMN_NS}}}output"):
-                outputs.append(DecisionVariable(
-                    name=output.get("name", ""),
-                    type=output.get("typeRef", "string"),
-                ))
-
-    return DecisionModelSummary(
-        id=model_id,
-        name=model_name,
-        inputs=inputs,
-        outputs=outputs,
-        deployed_at=datetime.now(timezone.utc),
-    )
+    from acp_writer.api import _parse_dmn_metadata as _parse
+    return _parse(dmn_xml)
 
 
 @mcp.tool()

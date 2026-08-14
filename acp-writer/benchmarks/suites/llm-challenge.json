@@ -1,0 +1,1004 @@
+[
+  {
+    "id": "llmc-messy-ok-001",
+    "category": "messy_data_answerable",
+    "level": 3,
+    "question": "Does the patient have a thyroid disorder?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-messy-ok-002",
+    "category": "messy_data_answerable",
+    "level": 3,
+    "question": "What is the patient's TSH level?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 5.8
+    }
+  },
+  {
+    "id": "llmc-messy-ok-003",
+    "category": "messy_data_answerable",
+    "level": 3,
+    "question": "Is the patient on thyroid replacement medication?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-messy-ok-004",
+    "category": "messy_data_answerable",
+    "level": 3,
+    "question": "What is the patient's fasting glucose in mg/dL?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 142
+    }
+  },
+  {
+    "id": "llmc-messy-ok-005",
+    "category": "messy_data_answerable",
+    "level": 3,
+    "question": "Is the patient's TSH within the normal range (0.4-4.0 mIU/L)?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "llmc-messy-ok-006",
+    "category": "messy_data_answerable",
+    "level": 3,
+    "question": "Does the patient have acid reflux?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-messy-ok-007",
+    "category": "messy_data_answerable",
+    "level": 3,
+    "question": "Is the patient on an acid-suppressing medication?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-messy-ok-008",
+    "category": "messy_data_answerable",
+    "level": 3,
+    "question": "What is the patient's BMI?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 31.2
+    }
+  },
+  {
+    "id": "llmc-messy-ok-009",
+    "category": "messy_data_answerable",
+    "level": 3,
+    "question": "Is the patient obese based on their BMI?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-messy-ok-010",
+    "category": "messy_data_answerable",
+    "level": 3,
+    "question": "Is the patient on a cholesterol-lowering medication?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-messy-ok-011",
+    "category": "messy_data_answerable",
+    "level": 3,
+    "question": "What is the patient's most recent LDL cholesterol?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "number",
+      "value": 132
+    }
+  },
+  {
+    "id": "llmc-messy-ok-012",
+    "category": "messy_data_answerable",
+    "level": 3,
+    "question": "Does the patient have kidney disease?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "llmc-messy-ok-013",
+    "category": "messy_data_answerable",
+    "level": 3,
+    "question": "Is the patient on any medication for blood pressure?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-messy-ok-014",
+    "category": "messy_data_answerable",
+    "level": 3,
+    "question": "How many active conditions does the patient have?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 4
+    }
+  },
+  {
+    "id": "llmc-messy-ok-015",
+    "category": "messy_data_answerable",
+    "level": 3,
+    "question": "Is the patient allergic to any antibiotics?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-messy-fail-001",
+    "category": "messy_data_graceful_fail",
+    "level": 3,
+    "question": "What is the patient's definitive potassium level?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-messy-fail-002",
+    "category": "messy_data_graceful_fail",
+    "level": 3,
+    "question": "When was the patient's BMI last measured?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-messy-fail-003",
+    "category": "messy_data_graceful_fail",
+    "level": 3,
+    "question": "What is the patient's urine protein in mg/dL?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-messy-fail-004",
+    "category": "messy_data_graceful_fail",
+    "level": 4,
+    "question": "What was the patient's TSH level 6 months ago?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-messy-fail-005",
+    "category": "messy_data_graceful_fail",
+    "level": 3,
+    "question": "What is the patient's vitamin D level?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-messy-fail-006",
+    "category": "messy_data_graceful_fail",
+    "level": 3,
+    "question": "What is the patient's triglyceride level?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-messy-fail-007",
+    "category": "messy_data_graceful_fail",
+    "level": 3,
+    "question": "Has the patient had a recent eye exam?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-messy-fail-008",
+    "category": "messy_data_graceful_fail",
+    "level": 3,
+    "question": "What is the patient's ferritin level?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-messy-fail-009",
+    "category": "messy_data_graceful_fail",
+    "level": 3,
+    "question": "Does the patient have a family history of heart disease?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-messy-fail-010",
+    "category": "messy_data_graceful_fail",
+    "level": 3,
+    "question": "What is the patient's hemoglobin level?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-clin-001",
+    "category": "clinical_knowledge",
+    "level": 3,
+    "question": "Is the patient on a proton pump inhibitor?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-clin-002",
+    "category": "clinical_knowledge",
+    "level": 3,
+    "question": "Is the patient's blood pressure at target for a diabetic patient (below 130/80)?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-clin-003",
+    "category": "clinical_knowledge",
+    "level": 4,
+    "question": "Does this patient have any contraindication to NSAID use?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-clin-004",
+    "category": "clinical_knowledge",
+    "level": 4,
+    "question": "How many classes of antihypertensive medication is the patient on?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 3
+    }
+  },
+  {
+    "id": "llmc-clin-005",
+    "category": "clinical_knowledge",
+    "level": 4,
+    "question": "Is the patient's LDL cholesterol at goal for secondary prevention (below 70 mg/dL)?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-clin-006",
+    "category": "clinical_knowledge",
+    "level": 3,
+    "question": "Is the patient on an anticoagulant?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-clin-007",
+    "category": "clinical_knowledge",
+    "level": 3,
+    "question": "Is the patient on a diuretic?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-clin-008",
+    "category": "clinical_knowledge",
+    "level": 3,
+    "question": "Does the patient have a history of stroke?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-clin-009",
+    "category": "clinical_knowledge",
+    "level": 4,
+    "question": "Is the patient's heart rate well-controlled?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-clin-010",
+    "category": "clinical_knowledge",
+    "level": 3,
+    "question": "Is the patient on an ACE inhibitor?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "llmc-clin-011",
+    "category": "clinical_knowledge",
+    "level": 4,
+    "question": "Does the patient have systolic heart failure?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-clin-012",
+    "category": "clinical_knowledge",
+    "level": 3,
+    "question": "Is the patient's HbA1c at the standard target of below 7%?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "llmc-clin-013",
+    "category": "clinical_knowledge",
+    "level": 3,
+    "question": "Is the patient on any beta-blocker?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-clin-014",
+    "category": "clinical_knowledge",
+    "level": 3,
+    "question": "Is the patient's oxygen saturation normal?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-clin-015",
+    "category": "clinical_knowledge",
+    "level": 3,
+    "question": "Is the patient on statin therapy?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-spec-001",
+    "category": "specialist_knowledge",
+    "level": 5,
+    "question": "What is the patient's CHA₂DS₂-VASc score?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "count",
+      "value": 6
+    }
+  },
+  {
+    "id": "llmc-spec-002",
+    "category": "specialist_knowledge",
+    "level": 5,
+    "question": "Is the patient on all four pillars of guideline-directed medical therapy for HFrEF?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "llmc-spec-003",
+    "category": "specialist_knowledge",
+    "level": 5,
+    "question": "Is the patient at risk for hyperkalemia based on their current regimen?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-spec-004",
+    "category": "specialist_knowledge",
+    "level": 5,
+    "question": "Is the patient's metformin dose appropriate for their eGFR?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-spec-005",
+    "category": "specialist_knowledge",
+    "level": 5,
+    "question": "What is the patient's KDIGO CKD risk category based on eGFR and albuminuria?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-spec-006",
+    "category": "specialist_knowledge",
+    "level": 4,
+    "question": "Is the patient's ejection fraction classified as severely reduced?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-spec-007",
+    "category": "specialist_knowledge",
+    "level": 5,
+    "question": "Should the patient be on a mineralocorticoid receptor antagonist?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-spec-008",
+    "category": "specialist_knowledge",
+    "level": 5,
+    "question": "Is the patient's anticoagulation dose appropriate for their renal function?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-spec-009",
+    "category": "specialist_knowledge",
+    "level": 4,
+    "question": "Is the patient's BNP level consistent with decompensated heart failure?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-spec-010",
+    "category": "specialist_knowledge",
+    "level": 5,
+    "question": "What NYHA functional class best describes this patient?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-spec-011",
+    "category": "specialist_knowledge",
+    "level": 5,
+    "question": "Is the patient on appropriate secondary stroke prevention therapy?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-spec-012",
+    "category": "specialist_knowledge",
+    "level": 5,
+    "question": "Should the patient's potassium supplement be discontinued?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-spec-013",
+    "category": "specialist_knowledge",
+    "level": 4,
+    "question": "Is the patient on a neprilysin inhibitor?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-spec-014",
+    "category": "specialist_knowledge",
+    "level": 4,
+    "question": "Is the patient on an SGLT-2 inhibitor?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-spec-015",
+    "category": "specialist_knowledge",
+    "level": 4,
+    "question": "What is the patient's approximate GFR category?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": "G3b"
+    }
+  },
+  {
+    "id": "llmc-chain-001",
+    "category": "reasoning_chains",
+    "level": 5,
+    "question": "Should this patient's anticoagulation be continued?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-chain-002",
+    "category": "reasoning_chains",
+    "level": 6,
+    "question": "What is the highest-priority clinical concern for this patient right now?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "code",
+      "value": "hyperkalemia"
+    }
+  },
+  {
+    "id": "llmc-chain-003",
+    "category": "reasoning_chains",
+    "level": 5,
+    "question": "Is the patient a candidate for additional heart failure therapy?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-chain-004",
+    "category": "reasoning_chains",
+    "level": 5,
+    "question": "Should the patient's potassium supplement be stopped and potassium rechecked?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-chain-005",
+    "category": "reasoning_chains",
+    "level": 5,
+    "question": "Is the patient's current metformin dose the maximum recommended for their kidney function?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-chain-006",
+    "category": "reasoning_chains",
+    "level": 5,
+    "question": "Given the patient's conditions, is their statin intensity appropriate?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-chain-007",
+    "category": "reasoning_chains",
+    "level": 5,
+    "question": "Does the patient need a medication adjustment based on their current lab values?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-chain-008",
+    "category": "reasoning_chains",
+    "level": 5,
+    "question": "Is the patient's blood pressure adequately controlled for their heart failure?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-chain-009",
+    "category": "reasoning_chains",
+    "level": 5,
+    "question": "Is the patient's diabetes management complicated by their kidney disease?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-chain-010",
+    "category": "reasoning_chains",
+    "level": 6,
+    "question": "Should the patient be referred to a heart failure specialist?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-chain-011",
+    "category": "reasoning_chains",
+    "level": 5,
+    "question": "Is the patient's weight a concern for their heart failure management?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-chain-012",
+    "category": "reasoning_chains",
+    "level": 5,
+    "question": "Are there any drug-drug interactions in the patient's medication list?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "llmc-chain-013",
+    "category": "reasoning_chains",
+    "level": 5,
+    "question": "Is the patient's thyroid function likely contributing to their other conditions?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-chain-014",
+    "category": "reasoning_chains",
+    "level": 5,
+    "question": "Should the patient's levothyroxine dose be adjusted?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-chain-015",
+    "category": "reasoning_chains",
+    "level": 5,
+    "question": "Considering the patient's HbA1c trend and comorbidities, is their diabetes therapy adequate?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "llmc-neg-001",
+    "category": "negation_absence",
+    "level": 5,
+    "question": "Is the patient missing any of the four pillars of HFrEF therapy?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-neg-002",
+    "category": "negation_absence",
+    "level": 5,
+    "question": "Is the patient on any medication without a clear indication from their conditions?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-neg-003",
+    "category": "negation_absence",
+    "level": 4,
+    "question": "Is the patient missing any recommended monitoring labs?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-neg-004",
+    "category": "negation_absence",
+    "level": 4,
+    "question": "Has the patient had an echocardiogram in the last year?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-neg-005",
+    "category": "negation_absence",
+    "level": 5,
+    "question": "Is there any untreated condition in the patient's problem list?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "llmc-neg-006",
+    "category": "negation_absence",
+    "level": 5,
+    "question": "Is the patient missing antiplatelet therapy?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "llmc-neg-007",
+    "category": "negation_absence",
+    "level": 4,
+    "question": "Does the patient lack any recommended vaccinations?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-neg-008",
+    "category": "negation_absence",
+    "level": 5,
+    "question": "Is the patient on any medication that should be avoided with their allergy?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "llmc-neg-009",
+    "category": "negation_absence",
+    "level": 4,
+    "question": "Is the patient missing any diabetes screening tests?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-neg-010",
+    "category": "negation_absence",
+    "level": 4,
+    "question": "Does the patient have any condition that is worsening based on available data?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-neg-011",
+    "category": "negation_absence",
+    "level": 5,
+    "question": "Is the patient missing iron studies that should be checked for HFrEF?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  },
+  {
+    "id": "llmc-neg-012",
+    "category": "negation_absence",
+    "level": 4,
+    "question": "Is the patient on any duplicate therapy?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "llmc-neg-013",
+    "category": "negation_absence",
+    "level": 4,
+    "question": "Are there any gaps in the patient's preventive care?",
+    "bundle": "bundles/messy-data-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "insufficient_data"
+    }
+  },
+  {
+    "id": "llmc-neg-014",
+    "category": "negation_absence",
+    "level": 5,
+    "question": "Is the patient missing renal protective therapy?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": false
+    }
+  },
+  {
+    "id": "llmc-neg-015",
+    "category": "negation_absence",
+    "level": 6,
+    "question": "Should the patient have an aldosterone level checked before starting an MRA?",
+    "bundle": "bundles/clinical-reasoning-01.json",
+    "reference_date": "2026-06-01",
+    "expected": {
+      "kind": "boolean",
+      "value": true
+    }
+  }
+]

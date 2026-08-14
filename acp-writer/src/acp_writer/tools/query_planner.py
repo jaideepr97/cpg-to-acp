@@ -1,62 +1,58 @@
 """LLM-assisted query plan synthesis for clinical QA.
 
-Translates natural language questions into structured query plans
-over the extraction and temporal primitives. Plans are validated
-against a JSON schema before execution.
+Uses structured output to generate validated query plans directly
+from the LLM — no JSON parsing or manual validation needed.
 """
 
-import json
 import logging
 from datetime import date
+from enum import Enum
 from typing import Any
 
 import mlflow
+from pydantic import BaseModel, Field
 
 from acp_writer.tools.ips_serializer import serialize_ips
 
 logger = logging.getLogger(__name__)
 
-QUERY_PLAN_SCHEMA = {
-    "type": "object",
-    "required": ["function", "params"],
-    "properties": {
-        "function": {
-            "type": "string",
-            "enum": [
-                "latest_value",
-                "has_condition",
-                "has_medication",
-                "has_allergy",
-                "has_procedure",
-                "has_family_history",
-                "patient_age",
-                "compute_bmi",
-                "observation_count",
-                "observations_in_window",
-                "consecutive_above",
-                "rate_of_change",
-                "cross_resource_temporal",
-                "trend_declining",
-            ],
-        },
-        "params": {
-            "type": "object",
-            "properties": {
-                "code": {"type": "string", "description": "system|code token, e.g. http://loinc.org|8480-6"},
-                "duration": {"type": "string", "description": "ISO 8601 duration, e.g. P3M"},
-                "threshold": {"type": "number"},
-                "comparator": {"type": "string", "enum": ["ge", "gt", "le", "lt", "eq"]},
-                "anchor_code": {"type": "string"},
-                "target_code": {"type": "string"},
-                "window": {"type": "string"},
-                "target_date": {"type": "string"},
-            },
-        },
-    },
-}
+
+class QueryFunction(str, Enum):
+    latest_value = "latest_value"
+    has_condition = "has_condition"
+    has_medication = "has_medication"
+    has_allergy = "has_allergy"
+    has_procedure = "has_procedure"
+    has_family_history = "has_family_history"
+    patient_age = "patient_age"
+    compute_bmi = "compute_bmi"
+    observation_count = "observation_count"
+    observations_in_window = "observations_in_window"
+    consecutive_above = "consecutive_above"
+    rate_of_change = "rate_of_change"
+    cross_resource_temporal = "cross_resource_temporal"
+    trend_declining = "trend_declining"
+
+
+class QueryParams(BaseModel):
+    code: str | None = Field(None, description="system|code token, e.g. http://loinc.org|8480-6")
+    duration: str | None = Field(None, description="ISO 8601 duration, e.g. P3M")
+    threshold: float | None = None
+    comparator: str | None = Field(None, description="ge, gt, le, lt, or eq")
+    anchor_code: str | None = None
+    target_code: str | None = None
+    window: str | None = None
+    target_date: str | None = None
+
+
+class QueryPlan(BaseModel):
+    """A structured query plan for extracting clinical data from a FHIR IPS bundle."""
+    function: QueryFunction = Field(description="The extraction function to call")
+    params: QueryParams = Field(default_factory=QueryParams, description="Parameters for the function")
+
 
 SYSTEM_PROMPT = """You are a clinical data query planner. Given a clinical question about a patient,
-generate a JSON query plan that specifies which extraction function to call and with what parameters.
+select the appropriate extraction function and parameters.
 
 Available functions:
 - latest_value: Get the most recent observation value. Params: code (system|code token)
@@ -83,32 +79,30 @@ Common code tokens:
 - Potassium: http://loinc.org|2823-3
 - Fasting glucose: http://loinc.org|1558-6
 - LDL: http://loinc.org|2089-1
+- BNP: http://loinc.org|30934-4
+- Ejection fraction: http://loinc.org|10230-1
+- Heart rate: http://loinc.org|8867-4
+- TSH: http://loinc.org|3016-3
 - Hypertension: http://snomed.info/sct|59621000
 - Type 2 diabetes: http://snomed.info/sct|44054006
 - CKD: http://snomed.info/sct|709044004
+- Heart failure: http://snomed.info/sct|84114007
+- Atrial fibrillation: http://snomed.info/sct|49436004
 
-Duration format: P followed by number and unit (Y=years, M=months, W=weeks, D=days). E.g. P3M = 3 months.
-
-Respond with ONLY a valid JSON object. No markdown, no explanation."""
+Duration format: P followed by number and unit (Y=years, M=months, W=weeks, D=days)."""
 
 
 def validate_plan(plan: dict) -> list[str]:
-    """Validate a query plan against the schema. Returns a list of errors."""
+    """Validate a query plan dict. Returns list of errors (empty = valid)."""
     errors = []
-
     if not isinstance(plan, dict):
-        return ["Plan must be a JSON object"]
-
+        return ["Plan must be a dict"]
+    if "parameters" in plan and "params" not in plan:
+        plan["params"] = plan.pop("parameters")
     if "function" not in plan:
-        errors.append("Missing required field: function")
-    elif plan["function"] not in QUERY_PLAN_SCHEMA["properties"]["function"]["enum"]:
-        errors.append(f"Unknown function: {plan['function']}")
-
+        errors.append("Missing function")
     if "params" not in plan:
-        errors.append("Missing required field: params")
-    elif not isinstance(plan["params"], dict):
-        errors.append("params must be an object")
-
+        errors.append("Missing params")
     return errors
 
 
@@ -118,40 +112,28 @@ def generate_query_plan(
     condensed_ips: str,
     reference_date: date,
     llm_client: Any,
+    inventory_text: str | None = None,
 ) -> dict | None:
-    """Use an LLM to generate a query plan from a natural language question.
-
-    Returns the validated plan dict, or None if generation/validation fails.
-    """
-    user_prompt = (
-        f"Patient data (condensed):\n{condensed_ips}\n\n"
-        f"Reference date: {reference_date.isoformat()}\n\n"
-        f"Question: {question}\n\n"
-        f"Generate a JSON query plan to answer this question."
-    )
+    """Use structured output to generate a validated query plan."""
+    parts = [f"Patient data (condensed):\n{condensed_ips}"]
+    if inventory_text:
+        parts.append(f"\nBundle code inventory (use these codes in your plan):\n{inventory_text}")
+    parts.append(f"\nReference date: {reference_date.isoformat()}")
+    parts.append(f"\nQuestion: {question}")
+    parts.append("\nSelect the function and parameters to answer this question. Use codes from the inventory above when available.")
+    user_prompt = "\n".join(parts)
 
     try:
-        response = llm_client.invoke([
+        structured_llm = llm_client.with_structured_output(QueryPlan)
+        plan: QueryPlan = structured_llm.invoke([
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
         ])
 
-        content = response.content if hasattr(response, "content") else str(response)
-        content = content.strip()
-        if content.startswith("```"):
-            content = content.split("\n", 1)[1] if "\n" in content else content[3:]
-            if content.endswith("```"):
-                content = content[:-3]
-            content = content.strip()
-
-        plan = json.loads(content)
-    except (json.JSONDecodeError, Exception) as exc:
-        logger.warning("Failed to parse LLM query plan: %s", exc)
+        return {
+            "function": plan.function.value,
+            "params": {k: v for k, v in plan.params.model_dump().items() if v is not None},
+        }
+    except Exception as exc:
+        logger.warning("Structured query plan generation failed: %s", exc)
         return None
-
-    errors = validate_plan(plan)
-    if errors:
-        logger.warning("Query plan validation failed: %s", errors)
-        return None
-
-    return plan

@@ -12,6 +12,7 @@ from acp_writer.nodes.dmn_executor import (
     _extract_input_value,
     dmn_executor,
 )
+from acp_writer.tools.bundle_inventory import build_bundle_inventory
 from acp_writer.store.embedding import FakeEmbeddingProvider
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -46,20 +47,24 @@ def reset_stores():
 class TestExtractInputValue:
     def test_systolic_bp_from_ips(self):
         bundle = _load_bundle("patient-bundle-medication.json")
-        value, ref = _extract_input_value(bundle, "Systolic BP", "number", {})
+        inventory = build_bundle_inventory(bundle)
+        value, ref, _ = _extract_input_value(bundle, "Systolic BP", "number", {}, inventory=inventory)
         assert value == 142
         assert ref is not None
-        assert ref.startswith("Observation/")
 
     def test_has_diabetes_from_ips(self):
         bundle = _load_bundle("patient-bundle-medication.json")
-        value, ref = _extract_input_value(bundle, "Has Diabetes", "boolean", {})
+        inventory = build_bundle_inventory(bundle)
+        value, ref, _ = _extract_input_value(bundle, "Has Diabetes", "boolean", {}, inventory=inventory)
         assert value is True
 
-    def test_has_diabetes_absent(self):
+    def test_has_diabetes_absent_degraded(self):
+        """Without LLM, absent concept is unresolved (missing input), not False."""
         bundle = _load_bundle("patient-bundle-lifestyle.json")
-        value, ref = _extract_input_value(bundle, "Has Diabetes", "boolean", {})
-        assert value is False
+        inventory = build_bundle_inventory(bundle)
+        value, ref, audit = _extract_input_value(bundle, "Has Diabetes", "boolean", {}, inventory=inventory)
+        assert value is None
+        assert audit.get("degraded") is True
 
     def test_from_prior_results(self):
         prior = {
@@ -70,62 +75,69 @@ class TestExtractInputValue:
                 }
             }
         }
-        value, ref = _extract_input_value({}, "Treatment Action", "string", prior)
+        value, ref, audit = _extract_input_value({}, "Treatment Action", "string", prior)
         assert value == "Start medication"
         assert ref is None
+        assert audit.get("match_basis") == "prior_dmn"
 
     def test_unknown_variable(self):
-        value, ref = _extract_input_value({"entry": []}, "Unknown Variable", "string", {})
+        bundle = {"entry": []}
+        inventory = build_bundle_inventory(bundle)
+        value, ref, _ = _extract_input_value(bundle, "Unknown Variable", "string", {}, inventory=inventory)
         assert value is None
 
     def test_extract_via_codes_observation(self):
         bundle = _load_bundle("patient-bundle-medication.json")
         codes = [f"{LOINC}|8480-6"]
-        value, ref = _extract_input_value(
-            bundle, "SBP Reading", "number", {}, codes=codes
+        value, ref, audit = _extract_input_value(
+            bundle, "SBP Reading", "number", {}, codes=codes,
         )
         assert value == 142
+        assert audit.get("match_basis") == "decision_variable_codes"
 
     def test_extract_via_codes_condition(self):
         bundle = _load_bundle("patient-bundle-medication.json")
         codes = [f"{SNOMED}|44054006"]
-        value, ref = _extract_input_value(
-            bundle, "Diabetes Present", "boolean", {}, codes=codes
+        value, ref, audit = _extract_input_value(
+            bundle, "Diabetes Present", "boolean", {}, codes=codes,
         )
         assert value is True
 
-    def test_codes_take_priority_over_map(self):
-        """When codes are provided, they are used even if the name matches the map."""
+    def test_codes_take_priority_over_pipeline(self):
+        """When codes are provided, they are used even if the name resolves differently."""
         bundle = _load_bundle("patient-bundle-medication.json")
         codes = [f"{LOINC}|8462-4"]
-        value, ref = _extract_input_value(
-            bundle, "Systolic BP", "number", {}, codes=codes
+        value, ref, audit = _extract_input_value(
+            bundle, "Systolic BP", "number", {}, codes=codes,
         )
         assert value == 92
+        assert audit.get("match_basis") == "decision_variable_codes"
 
-    def test_codes_none_falls_back_to_map(self):
+    def test_codes_none_falls_back_to_pipeline(self):
         bundle = _load_bundle("patient-bundle-medication.json")
-        value, ref = _extract_input_value(
-            bundle, "Systolic BP", "number", {}, codes=None
+        inventory = build_bundle_inventory(bundle)
+        value, ref, _ = _extract_input_value(
+            bundle, "Systolic BP", "number", {}, codes=None, inventory=inventory,
         )
         assert value == 142
 
     def test_concept_resolver_hba1c(self):
-        """Concept resolver resolves 'HbA1c Value' without codes or map entry."""
+        """Concept resolver resolves 'HbA1c Value' without codes."""
         bundle = _load_bundle("patient-bundle-medication.json")
-        # HbA1c is NOT in KNOWN_VARIABLE_MAP but IS in concept_resolver
-        value, ref = _extract_input_value(bundle, "HbA1c Value", "number", {})
-        # patient-bundle-medication doesn't have HbA1c, so value should be None
+        inventory = build_bundle_inventory(bundle)
+        value, ref, _ = _extract_input_value(bundle, "HbA1c Value", "number", {}, inventory=inventory)
         assert value is None
 
     def test_concept_resolver_condition(self):
         """Concept resolver resolves 'hypertension' to a condition check."""
         bundle = _load_bundle("patient-bundle-medication.json")
-        value, ref = _extract_input_value(bundle, "Has Hypertension", "boolean", {})
+        inventory = build_bundle_inventory(bundle)
+        value, ref, _ = _extract_input_value(bundle, "Has Hypertension", "boolean", {}, inventory=inventory)
         assert value is True
 
     def test_concept_resolver_drug_class(self):
-        """Concept resolver handles drug class queries."""
+        """Concept resolver handles drug class queries when coded with RxNorm."""
+        RXNORM = "http://www.nlm.nih.gov/research/umls/rxnorm"
         bundle = {
             "entry": [{
                 "resource": {
@@ -133,15 +145,15 @@ class TestExtractInputValue:
                     "id": "mr1",
                     "status": "active",
                     "medicationCodeableConcept": {
-                        "coding": [{"system": SNOMED, "code": "314076", "display": "Lisinopril"}],
+                        "coding": [{"system": RXNORM, "code": "314076", "display": "Lisinopril"}],
                     },
                 },
             }],
         }
-        # Lisinopril is NOT coded with RxNorm here, so drug class won't match
-        # But this tests that the resolver path doesn't crash
-        value, ref = _extract_input_value(bundle, "Current ACE Inhibitor", "boolean", {})
-        assert value is not None  # Either True (found) or False (not found)
+        inventory = build_bundle_inventory(bundle)
+        value, ref, audit = _extract_input_value(bundle, "Current ACE Inhibitor", "boolean", {}, inventory=inventory)
+        assert value is True
+        assert audit.get("match_basis") == "cache"
 
 
 class TestDMNExecutor:
@@ -190,6 +202,7 @@ class TestDMNExecutor:
         assert len(audit["fhir_references"]) > 0
         assert "timestamp" in audit
         assert "error" not in audit
+        assert "input_resolution" in audit
 
     @patch("acp_writer.api._evaluate_jit")
     def test_chained_evaluation(self, mock_jit):

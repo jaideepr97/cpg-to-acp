@@ -1,7 +1,8 @@
-"""DMN Executor — evaluate applicable DMN models with targeted IPS extraction.
+"""DMN Executor — resolve inputs via concept pipeline, evaluate via client.
 
-Executes models in topological order, using IPS Extractor tool
-for on-demand data extraction. Records full audit trail.
+The resolution loop interleaves with evaluation: chained DMN models'
+outputs feed later models' inputs. The evaluation client abstracts
+in-process (monolith) vs HTTP (decision-engine pod) execution.
 """
 
 import logging
@@ -12,14 +13,18 @@ from typing import Any
 import mlflow
 
 from acp_writer.state import CarePlanComposerState
-from acp_writer.tools.concept_resolver import resolve as resolve_concept
+from acp_writer.tools.dmn_evaluation import (
+    DmnEvaluationClient,
+    ModelNotDeployed,
+    get_evaluation_client,
+)
 from acp_writer.tools.ips_extractor import (
     extract_allergy,
     extract_condition,
     extract_medication,
     extract_observation,
+    extract_observation_concept,
     extract_patient_age,
-    extract_procedure,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,31 +33,45 @@ LOINC = "http://loinc.org"
 SNOMED = "http://snomed.info/sct"
 RXNORM = "http://www.nlm.nih.gov/research/umls/rxnorm"
 
-KNOWN_VARIABLE_MAP: dict[str, tuple[str, str, str]] = {
-    "systolic bp": (LOINC, "8480-6", "observation"),
-    "diastolic bp": (LOINC, "8462-4", "observation"),
-    "has diabetes": (SNOMED, "44054006", "condition"),
-    "has kidney disease": (SNOMED, "709044004", "condition"),
-    "has chronic kidney disease": (SNOMED, "709044004", "condition"),
-    "has ckd": (SNOMED, "709044004", "condition"),
-}
-
 _CONDITION_SYSTEMS = {SNOMED, "http://hl7.org/fhir/sid/icd-10-cm"}
 _MEDICATION_SYSTEMS = {RXNORM}
 
+_INACTIVE_CONDITION_STATUSES = {"resolved", "inactive", "remission"}
+_INACTIVE_MEDICATION_STATUSES = {"cancelled", "entered-in-error", "stopped"}
+_INACTIVE_ALLERGY_STATUSES = {"resolved", "inactive"}
+
+
+def _filter_active_entries(entries: list, inactive_statuses: set) -> list:
+    """Filter inventory entries to those with active (or absent) status."""
+    return [e for e in entries if (e.status or "active") not in inactive_statuses]
+
+
+def _infer_resource_kind(var_name: str, var_type: str) -> str:
+    """Infer FHIR resource kind from DMN variable name and type."""
+    from acp_writer.tools.concept_resolver import resolve as resolve_concept
+    resolved = resolve_concept(var_name)
+    if resolved and resolved.action in ("extract_medication", "extract_drug_class"):
+        return "medication"
+    if resolved and resolved.action == "extract_allergy":
+        return "allergy"
+    if resolved and resolved.action == "extract_observation":
+        return "observation"
+
+    key = var_name.lower()
+    if var_type.lower() == "boolean":
+        if any(kw in key for kw in ("medication", "drug", "med ", "on ")):
+            return "medication"
+        if any(kw in key for kw in ("allergy", "allergic")):
+            return "allergy"
+        return "condition"
+    return "observation"
+
 
 def _try_extract_by_code(
-    ips_bundle: dict,
-    system: str,
-    code: str,
-    var_type: str,
+    ips_bundle: dict, system: str, code: str, var_type: str,
 ) -> tuple[Any, str | None]:
-    """Try extracting a value from the IPS using a system|code pair.
-
-    Infers the resource type from the terminology system and variable type.
-    """
-    key_lower = var_type.lower() if var_type else ""
-    is_boolean = key_lower == "boolean"
+    """Try extracting a value from the IPS using a system|code pair."""
+    is_boolean = var_type.lower() == "boolean" if var_type else False
 
     if is_boolean and system in _CONDITION_SYSTEMS:
         result = extract_condition(ips_bundle, system, code)
@@ -74,97 +93,97 @@ def _try_extract_by_code(
     return None, None
 
 
-def _execute_resolved(ips_bundle: dict, resolved: Any, reference_date=None) -> tuple[Any, str | None]:
-    """Execute an extraction based on a ResolvedConcept."""
-    if resolved.action == "extract_observation":
-        result = extract_observation(ips_bundle, resolved.system, resolved.code)
-        if result.found:
-            return result.value, result.fhir_reference
-        return None, None
+@mlflow.trace(name="dmn_extract_via_pipeline")
+def _extract_via_pipeline(
+    ips_bundle: dict, var_name: str, var_type: str,
+    inventory: Any, llm_client: Any, reference_date: str | None = None,
+) -> tuple[Any, str | None, dict]:
+    """Extract a DMN input value using the concept-resolution pipeline."""
+    from acp_writer.tools.concept_resolution import resolve_concept_in_bundle
 
-    if resolved.action == "extract_condition":
-        all_codes = resolved.codes or [f"{resolved.system}|{resolved.code}"]
-        for code_token in all_codes:
-            if "|" not in code_token:
-                continue
-            sys, cd = code_token.rsplit("|", 1)
-            result = extract_condition(ips_bundle, sys, cd)
-            if result.found:
-                return True, result.fhir_reference
-        return False, None
+    resource_kind = _infer_resource_kind(var_name, var_type)
+    audit = {"match_basis": None, "steps_run": [], "degraded": False}
 
-    if resolved.action == "extract_medication":
-        result = extract_medication(ips_bundle, resolved.system, resolved.code)
-        return result.found, result.fhir_reference
+    try:
+        resolution = resolve_concept_in_bundle(
+            var_name, inventory, resource_kind, llm_client=llm_client,
+        )
+    except Exception as exc:
+        logger.warning("Pipeline resolution failed for '%s': %s", var_name, exc)
+        audit["degraded"] = True
+        audit["error"] = str(exc)
+        return None, None, audit
 
-    if resolved.action == "extract_allergy":
-        result = extract_allergy(ips_bundle, resolved.system, resolved.code)
-        return result.found, result.fhir_reference
+    audit["match_basis"] = resolution.match_basis
+    audit["steps_run"] = resolution.steps_run
 
-    if resolved.action == "extract_drug_class":
-        for code_token in (resolved.codes or []):
-            if "|" not in code_token:
-                continue
-            sys, cd = code_token.rsplit("|", 1)
-            result = extract_medication(ips_bundle, sys, cd)
-            if result.found:
-                return True, result.fhir_reference
-        return False, None
+    if not resolution.resolved:
+        if resolution.definitive_miss and var_type.lower() == "boolean":
+            audit["match_basis"] = "definitive_miss"
+            return False, None, audit
+        if resolution.unresolved:
+            audit["degraded"] = True
+        return None, None, audit
 
-    if resolved.action == "compute_age" and reference_date:
-        from datetime import date
-        if isinstance(reference_date, str):
-            reference_date = date.fromisoformat(reference_date)
-        result = extract_patient_age(ips_bundle, reference_date)
-        if result.found:
-            return result.value, result.fhir_reference
-        return None, None
+    entry = resolution.entries[0]
 
-    if resolved.action == "compute_bmi":
-        w = extract_observation(ips_bundle, LOINC, "29463-7")
-        h = extract_observation(ips_bundle, LOINC, "8302-2")
-        if w.found and h.found:
-            try:
-                bmi = round(float(w.value) / (float(h.value) / 100) ** 2, 1)
-                return bmi, w.fhir_reference
-            except (ValueError, TypeError, ZeroDivisionError):
-                pass
-        return None, None
+    if resource_kind == "observation":
+        code_tokens = [entry.code_token] if entry.system else None
+        display_terms = [entry.display] if (entry.display and not code_tokens) else None
+        obs_result = extract_observation_concept(
+            ips_bundle, code_tokens=code_tokens, display_terms=display_terms,
+        )
+        if obs_result.found:
+            return obs_result.value, obs_result.fhir_reference, audit
+        return None, None, audit
 
-    return None, None
+    if resource_kind == "condition":
+        active = _filter_active_entries(resolution.entries, _INACTIVE_CONDITION_STATUSES)
+        if active:
+            return True, active[0].fhir_reference, audit
+        audit["note"] = f"matched but inactive: {entry.fhir_reference} ({entry.status})"
+        return None, None, audit
+
+    if resource_kind == "medication":
+        active = _filter_active_entries(resolution.entries, _INACTIVE_MEDICATION_STATUSES)
+        if active:
+            return True, active[0].fhir_reference, audit
+        audit["note"] = f"matched but inactive: {entry.fhir_reference} ({entry.status})"
+        return None, None, audit
+
+    if resource_kind == "allergy":
+        active = _filter_active_entries(resolution.entries, _INACTIVE_ALLERGY_STATUSES)
+        if active:
+            return True, active[0].fhir_reference, audit
+        audit["note"] = f"matched but inactive: {entry.fhir_reference} ({entry.status})"
+        return None, None, audit
+
+    return None, None, audit
 
 
+@mlflow.trace(name="dmn_resolve_input")
 def _extract_input_value(
-    ips_bundle: dict,
-    var_name: str,
-    var_type: str,
+    ips_bundle: dict, var_name: str, var_type: str,
     prior_results: dict[str, dict],
     codes: list[str] | None = None,
     reference_date: str | None = None,
-) -> tuple[Any, str | None]:
-    """Extract a DMN input value from the IPS or prior DMN results.
-
-    Layered resolution (priority chain):
-    1. Prior DMN results (chained decisions)
-    2. DecisionVariable.codes (when provided by cpg-ingester)
-    3. Concept resolver (deterministic clinical term → FHIR code mapping)
-    4. KNOWN_VARIABLE_MAP (legacy hardcoded fallback)
-
-    Returns (value, fhir_reference) tuple.
-    """
+    inventory: Any = None, llm_client: Any = None,
+) -> tuple[Any, str | None, dict]:
+    """Extract a DMN input value — prior results, codes, then pipeline."""
     key = re.sub(r"([a-z])([A-Z])", r"\1 \2", var_name).lower().strip()
+    audit: dict[str, Any] = {}
 
     for model_output in prior_results.values():
         for decision_name, decision_val in model_output.items():
             if isinstance(decision_val, dict):
                 for field_name, field_val in decision_val.items():
                     if field_name.lower() == key:
-                        return field_val, None
+                        return field_val, None, {"match_basis": "prior_dmn"}
                     composite = f"{decision_name} {field_name}".lower()
                     if composite == key or field_name.lower() in key:
-                        return field_val, None
+                        return field_val, None, {"match_basis": "prior_dmn"}
             elif decision_name.lower() == key:
-                return decision_val, None
+                return decision_val, None, {"match_basis": "prior_dmn"}
 
     if codes:
         for code_token in codes:
@@ -172,37 +191,69 @@ def _extract_input_value(
                 system, code = code_token.rsplit("|", 1)
                 value, ref = _try_extract_by_code(ips_bundle, system, code, var_type)
                 if value is not None:
-                    return value, ref
+                    return value, ref, {"match_basis": "decision_variable_codes"}
 
-    resolved = resolve_concept(var_name)
-    if resolved:
-        value, ref = _execute_resolved(ips_bundle, resolved, reference_date)
+    if inventory is not None:
+        value, ref, audit = _extract_via_pipeline(
+            ips_bundle, var_name, var_type, inventory, llm_client, reference_date,
+        )
         if value is not None:
-            return value, ref
-
-    mapping = KNOWN_VARIABLE_MAP.get(key)
-    if mapping:
-        system, code, extract_type = mapping
-        if extract_type == "observation":
-            result = extract_observation(ips_bundle, system, code)
-            if result.found:
-                return result.value, result.fhir_reference
-        elif extract_type == "condition":
-            result = extract_condition(ips_bundle, system, code)
-            return result.found, result.fhir_reference
-        elif extract_type == "medication":
-            result = extract_medication(ips_bundle, system, code)
-            return result.found, result.fhir_reference
+            return value, ref, audit
+        if audit.get("match_basis") == "definitive_miss":
+            return False, None, audit
 
     logger.warning("Could not extract value for DMN input: %s (type: %s)", var_name, var_type)
-    return None, None
+    return None, None, {"match_basis": None, "degraded": audit.get("degraded", False)}
+
+
+@mlflow.trace(name="dmn_resolve_inputs")
+def resolve_inputs(
+    expected_inputs: list[dict],
+    ips_bundle: dict,
+    inventory: Any,
+    prior_results: dict[str, dict],
+    llm_client: Any = None,
+    reference_date: str | None = None,
+) -> tuple[dict[str, Any], list[str], dict[str, dict]]:
+    """Resolve all inputs for one DMN model.
+
+    Returns (inputs_dict, fhir_refs, input_audit).
+    """
+    inputs: dict[str, Any] = {}
+    fhir_refs: list[str] = []
+    input_audit: dict[str, dict] = {}
+
+    for var in expected_inputs:
+        value, ref, var_audit = _extract_input_value(
+            ips_bundle, var["name"], var.get("type", "string"), prior_results,
+            codes=var.get("codes"),
+            reference_date=reference_date,
+            inventory=inventory,
+            llm_client=llm_client,
+        )
+        if value is not None:
+            inputs[var["name"]] = value
+        if ref:
+            fhir_refs.append(ref)
+        input_audit[var["name"]] = var_audit
+
+    missing = [v["name"] for v in expected_inputs if v["name"] not in inputs]
+    if missing:
+        logger.warning("DMN model missing inputs: %s", missing)
+
+    return inputs, fhir_refs, input_audit
 
 
 @mlflow.trace(name="dmn_executor")
 def dmn_executor(state: CarePlanComposerState) -> dict:
-    """Execute applicable DMN models in topological order."""
+    """Execute applicable DMN models in topological order.
+
+    The resolution loop interleaves with evaluation: each model's
+    inputs are resolved (concept pipeline + LLM), then evaluated
+    (via the evaluation client), before the next model starts.
+    Chained outputs feed later inputs.
+    """
     logger.info("── DMN Executor ──")
-    from acp_writer.api import _dynamic_models, _evaluate_jit
 
     ips_bundle = state.get("ips_bundle", {})
     applicable_models = state.get("applicable_dmn_models", [])
@@ -211,6 +262,18 @@ def dmn_executor(state: CarePlanComposerState) -> dict:
     if not applicable_models:
         logger.info("No applicable DMN models — skipping execution")
         return {"dmn_results": []}
+
+    from acp_writer.tools.bundle_inventory import build_bundle_inventory
+    inventory = build_bundle_inventory(ips_bundle)
+
+    llm_client = None
+    try:
+        from cpg_contracts import get_llm
+        llm_client = get_llm(state)
+    except Exception as exc:
+        logger.warning("LLM client unavailable for DMN extraction — degraded mode: %s", exc)
+
+    evaluation_client = get_evaluation_client(state)
 
     model_map = {m["id"]: m for m in applicable_models}
     prior_results: dict[str, dict] = {}
@@ -223,49 +286,24 @@ def dmn_executor(state: CarePlanComposerState) -> dict:
     else:
         execution_order = [m["id"] for m in applicable_models]
 
+    today = datetime.now(timezone.utc).date().isoformat()
+
     for model_id in execution_order:
         model_info = model_map.get(model_id)
         if not model_info:
             continue
 
-        deployed = _dynamic_models.get(model_id)
-        if not deployed:
-            logger.warning("Model %s not deployed — skipping", model_id)
-            audit_trail.append({
-                "model_id": model_id,
-                "model_name": model_info.get("name", model_id),
-                "inputs": {},
-                "outputs": {},
-                "fhir_references": [],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "error": "Model not deployed",
-            })
-            continue
-
-        inputs: dict[str, Any] = {}
-        fhir_refs: list[str] = []
-
-        today = datetime.now(timezone.utc).date().isoformat()
-        expected_inputs = model_info.get("inputs", [])
-        for var in expected_inputs:
-            value, ref = _extract_input_value(
-                ips_bundle, var["name"], var.get("type", "string"), prior_results,
-                codes=var.get("codes"),
-                reference_date=today,
-            )
-            if value is not None:
-                inputs[var["name"]] = value
-            if ref:
-                fhir_refs.append(ref)
-
-        missing = [v["name"] for v in expected_inputs if v["name"] not in inputs]
-        if missing:
-            logger.warning("DMN model %s missing inputs: %s", model_info.get("name"), missing)
+        inputs, fhir_refs, input_audit = resolve_inputs(
+            model_info.get("inputs", []),
+            ips_bundle, inventory, prior_results,
+            llm_client=llm_client,
+            reference_date=today,
+        )
 
         logger.info("Evaluating DMN model: %s with inputs: %s", model_info.get("name"), inputs)
 
         try:
-            result = _evaluate_jit(deployed["dmn_xml"], inputs)
+            result = evaluation_client.evaluate(model_id, inputs)
             prior_results[model_id] = result
 
             audit_trail.append({
@@ -274,9 +312,23 @@ def dmn_executor(state: CarePlanComposerState) -> dict:
                 "inputs": inputs,
                 "outputs": result,
                 "fhir_references": fhir_refs,
+                "input_resolution": input_audit,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             })
             logger.info("DMN result for %s: %s", model_info.get("name"), result)
+
+        except ModelNotDeployed:
+            logger.warning("Model %s not deployed — skipping", model_id)
+            audit_trail.append({
+                "model_id": model_id,
+                "model_name": model_info.get("name", model_id),
+                "inputs": inputs,
+                "outputs": {},
+                "fhir_references": fhir_refs,
+                "input_resolution": input_audit,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "error": "Model not deployed",
+            })
 
         except Exception as e:
             logger.error("DMN evaluation failed for %s: %s", model_id, e)
@@ -286,6 +338,7 @@ def dmn_executor(state: CarePlanComposerState) -> dict:
                 "inputs": inputs,
                 "outputs": {},
                 "fhir_references": fhir_refs,
+                "input_resolution": input_audit,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "error": str(e),
             })

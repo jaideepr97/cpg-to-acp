@@ -1,24 +1,21 @@
-"""Decision Engine pod service — DMN Executor proxy to Kogito.
+"""Decision Engine pod service — thin Kogito wrapper.
 
-Also handles DMN model management (deploy, list) since the model
-registry lives in this pod's process.
-Consumes: ips_bundle_ref (fetches patient bundle from artifact store).
+Model management (deploy, list) and DMN evaluation with pre-resolved inputs.
+The DMN engine is an implementation detail behind the /api/v1/evaluate contract;
+swapping Kogito for another evaluator should not affect callers.
 
-Security profile: Kogito runtime access only.
+Security profile: Kogito runtime + MinIO only (no LLM, no MaaS).
 """
 
 import logging
 
 from fastapi import FastAPI, HTTPException, Request
 
-from cpg_contracts import get_phi_store, resolve_ref
-from acp_writer.api import _dynamic_models, _parse_dmn_metadata
-from acp_writer.nodes.dmn_executor import dmn_executor
+from acp_writer.api import _dynamic_models, _parse_dmn_metadata, _evaluate_jit
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="acp-writer-decision-engine", version="0.1.0")
-_phi_store = get_phi_store()
+app = FastAPI(title="acp-writer-decision-engine", version="0.2.0")
 
 
 @app.get("/health")
@@ -26,7 +23,7 @@ def health():
     return {"status": "UP", "service": "decision-engine"}
 
 
-# --- DMN model management (used by cpg-ingester Delivery) ---
+# --- DMN model management ---
 
 
 @app.post("/api/v1/decisions/models", status_code=201)
@@ -43,14 +40,53 @@ def list_decision_models():
     return [m["summary"].model_dump(mode="json") for m in _dynamic_models.values()]
 
 
-# --- Pipeline execution ---
+# --- DMN evaluation (thin: pre-resolved inputs only) ---
+
+
+@app.post("/api/v1/evaluate")
+async def evaluate(request: Request):
+    """Evaluate a DMN model with pre-resolved inputs.
+
+    No bundle, no concept resolution, no LLM — pure evaluate-and-return.
+    The caller (LLM-reasoning pod) handles input resolution.
+    """
+    data = await request.json()
+    model_id = data.get("model_id")
+    inputs = data.get("inputs", {})
+
+    if not model_id:
+        raise HTTPException(status_code=400, detail="model_id is required")
+
+    deployed = _dynamic_models.get(model_id)
+    if not deployed:
+        raise HTTPException(status_code=404, detail=f"Model {model_id} not deployed")
+
+    try:
+        outputs = _evaluate_jit(deployed["dmn_xml"], inputs)
+        return {"outputs": outputs}
+    except Exception as exc:
+        logger.error("DMN evaluation failed for %s: %s", model_id, exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+# --- Deprecated: bundle-accepting execution (transition period) ---
 
 
 @app.post("/api/v1/execute")
-async def execute(request: Request):
-    """Execute DMN models against patient data."""
+async def execute_deprecated(request: Request):
+    """Execute DMN models against patient data.
+
+    DEPRECATED: use /api/v1/evaluate with pre-resolved inputs instead.
+    This endpoint receives the full patient bundle and runs resolution
+    locally. It exists for backward compatibility during the transition
+    to the LLM-reasoning pod hosting the resolution loop.
+    """
+    from cpg_contracts import get_phi_store, resolve_ref
+    from acp_writer.nodes.dmn_executor import dmn_executor
+
     data = await request.json()
-    ips_bundle = resolve_ref(data, "ips_bundle", _phi_store)
+    phi_store = get_phi_store()
+    ips_bundle = resolve_ref(data, "ips_bundle", phi_store)
     state = {
         "ips_bundle": ips_bundle,
         "applicable_dmn_models": data.get("applicable_dmn_models", []),

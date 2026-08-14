@@ -4,7 +4,7 @@
 
 ## Problem
 
-The `acp-writer` DMN executor had a hardcoded 6-entry variable map (`KNOWN_VARIABLE_MAP`) for extracting patient data from FHIR IPS bundles. Any DMN model with input variables outside those 6 entries (systolic BP, diastolic BP, has diabetes, has kidney disease) failed to extract data. No temporal reasoning, no computed values, no drug class resolution.
+The `acp-writer` DMN executor had a hardcoded 6-entry variable map (`KNOWN_VARIABLE_MAP`) for extracting patient data from FHIR IPS bundles. Beyond those 6 entries (systolic BP, diastolic BP, has diabetes, has kidney disease), variable resolution failed — though chained-decision inputs from prior DMN results already resolved correctly. No temporal reasoning, no computed values, no drug class resolution.
 
 ## Research Landscape (2025-2026)
 
@@ -36,7 +36,7 @@ Full research details in `working/qa-clinical-data-research.md` (not committed �
 
 ### 1. Deterministic first, LLM fallback
 
-The concept resolver handles 98% of smoke suite questions (47/50) without any LLM calls. The LLM-assisted backend only fires 3 times and doesn't solve the one remaining case. Deterministic extraction is faster, cheaper, auditable, and reproducible.
+The concept resolver handles 49/50 smoke suite questions (98%) without any LLM calls — 47 via the concept resolver directly, 2 via structured_intent routing. The LLM-assisted backend fires only 3 times and doesn't solve the one remaining case (UACR albuminuria category). Deterministic extraction is faster, cheaper, auditable, and reproducible. Note: the review found and fixed an inverted boolean (Fix 1) that had prevented the LLM agent fallback from being reached.
 
 ### 2. No CQL (decision 2026-08-10)
 
@@ -44,7 +44,7 @@ DMN is the sole clinical logic formalism in this project. Temporal extraction us
 
 ### 3. Graph traversal does not add value at IPS scale
 
-A NetworkX graph-backed backend was built as a full implementation — not a spike. It projects IPS resources into a directed graph with 6 edge types (indication, during_encounter, has_result, has_member, derived_from, based_on) and implements graph traversal using `G.predecessors()`, `G.successors()`, etc.
+A NetworkX graph-backed backend was built as a full implementation — not a spike. It projects IPS resources into a directed graph with 6 forward edge types (indication, during_encounter, has_result, has_member, derived_from, based_on) plus their reverse edges and the subject/has_resource pair (12 relation labels total). It implements graph traversal using `G.predecessors()`, `G.successors()`, etc.
 
 **Standard suite results (200 questions, 13 categories):**
 
@@ -92,4 +92,7 @@ The concept resolver is a fallback for when codes aren't provided. The ideal pat
 | Drug class coverage (50% on standard suite) | Low | Expand the curated drug class map. Evolvable concept map (GitHub #88). |
 | Concept bridging gaps (80% on standard suite) | Low | Add terms to concept resolver as they're encountered. |
 | UACR/CKD staging classification | Low | Add clinical threshold classifiers for staging logic. |
+| Duration-based reclassification | Medium | "Acute (<4wk) → chronic (≥12wk)" — not yet implemented as a temporal primitive. |
+| Temporal primitives not in production executor | Medium | Blocked on GitHub #86 (temporal extraction metadata from cpg-ingester). The executor is ready to consume it but the wiring is not done. |
+| LLM-assisted query plan → agent fallback | Low | Fixed in review (inverted boolean prevented agent from firing when query plan returned insufficient_data). |
 | Duration-based reclassification | Medium | "Acute (<4wk) → chronic (≥12wk)" — not yet implemented as a temporal primitive. |

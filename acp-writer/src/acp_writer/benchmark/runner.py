@@ -105,6 +105,72 @@ def run_suite(
     return _aggregate(suite_name, backend.name, test_cases, case_scores)
 
 
+def run_suite_instrumented(
+    suite_name: str,
+    backend: QABackend,
+    dump_path: Path | None = None,
+    numeric_tolerance: float = 0.0,
+) -> SuiteResult:
+    """Run suite with per-case instrumented dump for investigation.
+
+    Instrumentation added for hallucination investigation (2026-08-13).
+    Saves per-case JSON with answered_by, resolution_basis, and full answer.
+    """
+    test_cases = load_suite(suite_name)
+    bundle_cache: dict[str, dict] = {}
+    case_scores: list[CaseScore] = []
+    case_details: list[dict] = []
+
+    for tc in test_cases:
+        if tc.bundle not in bundle_cache:
+            bundle_cache[tc.bundle] = load_bundle(tc.bundle)
+
+        bundle = bundle_cache[tc.bundle]
+        try:
+            answer = backend.answer(
+                question=tc.question,
+                bundle=bundle,
+                reference_date=tc.reference_date,
+                structured_intent=tc.structured_intent,
+            )
+        except Exception as exc:
+            from acp_writer.benchmark.models import QAAnswer
+            answer = QAAnswer(
+                value=None, kind="insufficient_data",
+                insufficient_data=True, error=f"Backend exception: {exc}",
+            )
+
+        cs = score_case(tc, answer, numeric_tolerance)
+        case_scores.append(cs)
+
+        case_details.append({
+            "id": tc.id,
+            "category": tc.category,
+            "level": tc.level,
+            "question": tc.question,
+            "expected": tc.expected,
+            "actual_value": answer.value,
+            "actual_kind": answer.kind,
+            "correct": cs.correct,
+            "hallucination": cs.hallucination,
+            "provenance_correct": cs.provenance_correct,
+            "provenance": answer.provenance,
+            "insufficient_data": answer.insufficient_data,
+            "error": answer.error,
+            "answered_by": answer.answered_by,
+            "resolution_basis": answer.resolution_basis,
+        })
+
+    if dump_path:
+        dump_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(dump_path, "w") as f:
+            for detail in case_details:
+                f.write(json.dumps(detail, default=str) + "\n")
+        logger.info("Instrumented dump written to %s", dump_path)
+
+    return _aggregate(suite_name, backend.name, test_cases, case_scores)
+
+
 def _aggregate(
     suite_name: str,
     backend_name: str,
