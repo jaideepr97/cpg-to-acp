@@ -6,22 +6,46 @@ These are plain OMG DMN 1.4 — no proprietary extensions.
 DMN_TEMPLATE = """\
 <?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
-             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
              xmlns:feel="https://www.omg.org/spec/DMN/20191111/FEEL/"
-             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
              id="definitions_{id}"
              name="{name}"
              namespace="https://www.omg.org/spec/DMN/20191111/MODEL/">
 
-  <!-- inputData elements go here -->
+  <inputData id="input_systolic" name="Systolic BP">
+    <variable id="var_systolic" name="Systolic BP" typeRef="number"/>
+  </inputData>
+  <inputData id="input_age" name="Patient Age">
+    <variable id="var_age" name="Patient Age" typeRef="number"/>
+  </inputData>
 
   <decision id="decision_{id}" name="{name}">
     <variable id="var_decision_{id}" name="{name}" typeRef="string"/>
-    <!-- informationRequirement elements linking to inputData -->
+    <informationRequirement id="ir_systolic">
+      <requiredInput href="#input_systolic"/>
+    </informationRequirement>
+    <informationRequirement id="ir_age">
+      <requiredInput href="#input_age"/>
+    </informationRequirement>
     <decisionTable id="dt_{id}" hitPolicy="{hit_policy}" preferredOrientation="Rule-as-Row">
-      <!-- input columns -->
-      <!-- output columns -->
-      <!-- rules -->
+      <input id="inp_1">
+        <inputExpression id="ie_1" typeRef="number"><text>Systolic BP</text></inputExpression>
+      </input>
+      <input id="inp_2">
+        <inputExpression id="ie_2" typeRef="number"><text>Patient Age</text></inputExpression>
+      </input>
+      <output id="out_1" name="Recommendation" typeRef="string"/>
+      <rule id="rule_1">
+        <description>High BP in older adults</description>
+        <inputEntry id="ie1_1"><text>&gt;= 150</text></inputEntry>
+        <inputEntry id="ie1_2"><text>&gt;= 60</text></inputEntry>
+        <outputEntry id="oe1_1"><text>"Initiate treatment"</text></outputEntry>
+      </rule>
+      <rule id="rule_2">
+        <description>High BP in younger adults</description>
+        <inputEntry id="ie2_1"><text>&gt;= 140</text></inputEntry>
+        <inputEntry id="ie2_2"><text>&lt; 60</text></inputEntry>
+        <outputEntry id="oe2_1"><text>"Initiate treatment"</text></outputEntry>
+      </rule>
     </decisionTable>
   </decision>
 

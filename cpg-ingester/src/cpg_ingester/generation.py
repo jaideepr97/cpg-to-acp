@@ -20,7 +20,7 @@ from cpg_ingester.state import CPGIngesterState, DMNPipelineState, RecPipelineSt
 
 logger = logging.getLogger(__name__)
 
-MAX_DMN_REVIEWS = 2
+MAX_DMN_REVIEWS = 3
 
 
 def _extract_section_text(markdown: str, section_map: list, section_id: str) -> str:
@@ -214,12 +214,16 @@ def generate_all(state: dict) -> dict:
                 "source_pages": source_text or item.get("source_pages", ""),
                 **shared,
             })
-            if result.get("dmn_xml") and not result.get("escalated"):
-                dmn_results.append({
+            if result.get("dmn_xml"):
+                entry = {
                     "dmn_xml": result["dmn_xml"],
                     "item": item,
                     "decision_model_summary": result.get("decision_model_summary", {}),
-                })
+                }
+                if result.get("escalated"):
+                    entry["escalated"] = True
+                    entry["escalation_errors"] = result.get("syntax_errors") or result.get("semantic_discrepancies") or []
+                dmn_results.append(entry)
         except Exception as e:
             logger.error("DMN generation failed for '%s': %s", item.get("name"), e)
 
@@ -242,7 +246,11 @@ def generate_all(state: dict) -> dict:
                 **shared,
             })
             recs = result.get("recommendations", [])
-            if recs and not result.get("escalated"):
+            if recs:
+                if result.get("escalated"):
+                    for rec in recs:
+                        if isinstance(rec, dict):
+                            rec["escalated"] = True
                 all_recs.extend(recs)
         except Exception as e:
             logger.error("Rec extraction failed for section '%s': %s", section, e)
