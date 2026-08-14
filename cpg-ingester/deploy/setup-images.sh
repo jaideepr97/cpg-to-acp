@@ -56,6 +56,12 @@ create_bc() {
     local containerfile="$2"
     local cpu_limit="${3:-1}"
     local mem_limit="${4:-2Gi}"
+    local context_dir="${5:-}"
+
+    local context_yaml=""
+    if [ -n "$context_dir" ]; then
+        context_yaml="    contextDir: $context_dir"
+    fi
 
     oc apply -f - <<EOF
 apiVersion: build.openshift.io/v1
@@ -69,6 +75,7 @@ spec:
     git:
       uri: $GIT_REPO
       ref: $GIT_BRANCH
+${context_yaml}
   strategy:
     type: Docker
     dockerStrategy:
@@ -84,7 +91,7 @@ spec:
   failedBuildsHistoryLimit: 3
   successfulBuildsHistoryLimit: 3
 EOF
-    log "  $name → $containerfile → $name:$IMAGE_TAG (${cpu_limit} CPU / ${mem_limit})"
+    log "  $name → $containerfile${context_dir:+ (context: $context_dir)} → $name:$IMAGE_TAG (${cpu_limit} CPU / ${mem_limit})"
 }
 
 log "Creating BuildConfigs..."
@@ -94,6 +101,6 @@ create_bc "cpg-ingester-llm"       "cpg-ingester/deploy/pods/Containerfile.llm-a
 create_bc "cpg-ingester-assembly"  "cpg-ingester/deploy/pods/Containerfile.assembly"
 create_bc "cpg-ingester-delivery"  "cpg-ingester/deploy/pods/Containerfile.delivery"
 create_bc "cpg-ingester-bff"       "cpg-ingester/deploy/pods/Containerfile.bff"
-create_bc "cpg-ingester-ui"        "cpg-ingester/ui/Containerfile"
+create_bc "cpg-ingester-ui"        "Containerfile" "1" "2Gi" "cpg-ingester/ui"
 
 log_step "cpg-ingester image setup complete"
