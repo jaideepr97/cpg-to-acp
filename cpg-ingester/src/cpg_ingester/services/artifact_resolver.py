@@ -10,6 +10,8 @@ from typing import Any
 
 from cpg_contracts.artifact_store import ArtifactStore
 
+from cpg_ingester.artifact_id import make_artifact_id
+
 logger = logging.getLogger(__name__)
 
 _ANALYSIS_FIELDS = {
@@ -76,6 +78,24 @@ def enrich_run_detail(
         for src_key, dest_key in _GENERATE_FIELDS.items():
             if src_key in gen:
                 detail[dest_key] = gen[src_key]
+
+    # --- Artifact IDs (deterministic, computed from cpg_id + name + section) ---
+    cpg_id = (detail.get("metadata") or {}).get("cpg_id", "")
+    if cpg_id:
+        for d in detail.get("decisions", []):
+            if isinstance(d, dict) and "item" in d:
+                d["artifact_id"] = make_artifact_id(
+                    cpg_id, "dmn",
+                    d["item"].get("name", ""),
+                    d["item"].get("section", ""),
+                )
+        for r in detail.get("recommendations", []):
+            if isinstance(r, dict):
+                r["artifact_id"] = make_artifact_id(
+                    cpg_id, "rec",
+                    r.get("title", ""),
+                    r.get("section", ""),
+                )
 
     # --- Assembly ---
     assembly_raw = wd.get("assemblyResult") or {}

@@ -9,6 +9,7 @@ import logging
 
 import mlflow
 
+from cpg_ingester.artifact_id import make_artifact_id
 from cpg_ingester.output import write_artifact
 
 logger = logging.getLogger(__name__)
@@ -58,28 +59,36 @@ def delivery(state: dict) -> dict:
         if not dmn_xml:
             continue
         name = dmn.get("item", {}).get("name", "unknown") if isinstance(dmn, dict) else "unknown"
+        section = dmn.get("item", {}).get("section", "") if isinstance(dmn, dict) else ""
+        artifact_id = make_artifact_id(cpg_id, "dmn", name, section)
         try:
             ref = store.put_raw(
                 f"{base_key}/dmn/{name}.dmn",
                 dmn_xml.encode("utf-8"),
                 "application/xml",
             )
-            artifacts.append({"type": "dmn", "ref": ref, "name": name})
-            logger.info("Published DMN model: %s", ref)
+            artifacts.append({"type": "dmn", "ref": ref, "name": name, "artifact_id": artifact_id})
+            logger.info("Published DMN model: %s (%s)", ref, artifact_id)
         except Exception as e:
             errors.append(f"Failed to publish DMN '{name}': {e}")
             logger.error("Failed to publish DMN '%s': %s", name, e)
 
     if recommendation_results:
+        recs_list = recommendation_results if isinstance(recommendation_results, list) else []
+        for rec in recs_list:
+            if isinstance(rec, dict) and "artifact_id" not in rec:
+                rec_name = rec.get("title", "")
+                rec_section = rec.get("section", "")
+                rec["artifact_id"] = make_artifact_id(cpg_id, "rec", rec_name, rec_section)
         bundle = {
             "contract_version": cpg_metadata.get("contract_version", "1.0"),
             "source_cpg": cpg_id,
-            "recommendations": recommendation_results if isinstance(recommendation_results, list) else [],
+            "recommendations": recs_list,
         }
         try:
             ref = store.put(f"{base_key}/recommendations.json", bundle)
-            artifacts.append({"type": "recommendations", "ref": ref, "count": len(bundle["recommendations"])})
-            logger.info("Published %d recommendations: %s", len(bundle["recommendations"]), ref)
+            artifacts.append({"type": "recommendations", "ref": ref, "count": len(recs_list)})
+            logger.info("Published %d recommendations: %s", len(recs_list), ref)
         except Exception as e:
             errors.append(f"Failed to publish recommendations: {e}")
             logger.error("Failed to publish recommendations: %s", e)

@@ -3,6 +3,8 @@
 from datetime import datetime, timezone
 from typing import Any
 
+from cpg_ingester.artifact_id import make_artifact_id
+
 SECTION_MAP = [
     {"heading": "1. Introduction", "page_start": 1, "page_end": 5, "classification": "background"},
     {"heading": "2. Methodology", "page_start": 6, "page_end": 12, "classification": "methods"},
@@ -23,8 +25,11 @@ METADATA: dict[str, Any] = {
     "scope": "Management of high blood pressure in adults",
 }
 
+_CPG_ID = METADATA["cpg_id"]
+
 DECISIONS = [
     {
+        "artifact_id": make_artifact_id(_CPG_ID, "dmn", "Blood Pressure Treatment Threshold", "3. Blood Pressure Thresholds"),
         "dmn_xml": '<?xml version="1.0" encoding="UTF-8"?>\n<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/">\n  <decision id="bp-threshold" name="Blood Pressure Treatment Threshold">\n    <!-- simplified for mock -->\n  </decision>\n</definitions>',
         "item": {
             "name": "Blood Pressure Treatment Threshold",
@@ -49,6 +54,7 @@ DECISIONS = [
         },
     },
     {
+        "artifact_id": make_artifact_id(_CPG_ID, "dmn", "Monitoring Frequency", "6. Monitoring and Follow-up"),
         "dmn_xml": '<?xml version="1.0" encoding="UTF-8"?>\n<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/">\n  <decision id="monitoring-freq" name="Monitoring Frequency">\n    <!-- simplified for mock -->\n  </decision>\n</definitions>',
         "item": {
             "name": "Monitoring Frequency",
@@ -74,6 +80,7 @@ DECISIONS = [
 
 RECOMMENDATIONS = [
     {
+        "artifact_id": make_artifact_id(_CPG_ID, "rec", "First-line pharmacological therapy with ACE inhibitor or ARB", "4. Pharmacological Treatment"),
         "id": "rec-001",
         "source_cpg": "SYN-HTN-2026-001",
         "title": "First-line pharmacological therapy with ACE inhibitor or ARB",
@@ -98,6 +105,7 @@ RECOMMENDATIONS = [
         },
     },
     {
+        "artifact_id": make_artifact_id(_CPG_ID, "rec", "Lifestyle modifications for all hypertensive patients", "5. Lifestyle Modifications"),
         "id": "rec-002",
         "source_cpg": "SYN-HTN-2026-001",
         "title": "Lifestyle modifications for all hypertensive patients",
@@ -113,6 +121,7 @@ RECOMMENDATIONS = [
         "rationale": "Lifestyle changes can reduce systolic BP by 5-10 mmHg and may reduce the need for pharmacological intervention.",
     },
     {
+        "artifact_id": make_artifact_id(_CPG_ID, "rec", "Combination therapy for stage 2 hypertension", "4. Pharmacological Treatment"),
         "id": "rec-003",
         "source_cpg": "SYN-HTN-2026-001",
         "title": "Combination therapy for stage 2 hypertension",
@@ -157,8 +166,8 @@ DELIVERY_STATUS: dict[str, Any] = {
     "artifact_location": "cpg-artifacts:published/SYN-HTN-2026-001",
     "artifacts": [
         {"type": "metadata", "ref": "cpg-artifacts:published/SYN-HTN-2026-001/metadata.json", "cpg_id": "SYN-HTN-2026-001"},
-        {"type": "dmn", "ref": "cpg-artifacts:published/SYN-HTN-2026-001/dmn/Blood Pressure Treatment Threshold.dmn", "name": "Blood Pressure Treatment Threshold"},
-        {"type": "dmn", "ref": "cpg-artifacts:published/SYN-HTN-2026-001/dmn/Monitoring Frequency.dmn", "name": "Monitoring Frequency"},
+        {"type": "dmn", "ref": "cpg-artifacts:published/SYN-HTN-2026-001/dmn/Blood Pressure Treatment Threshold.dmn", "name": "Blood Pressure Treatment Threshold", "artifact_id": make_artifact_id(_CPG_ID, "dmn", "Blood Pressure Treatment Threshold", "3. Blood Pressure Thresholds")},
+        {"type": "dmn", "ref": "cpg-artifacts:published/SYN-HTN-2026-001/dmn/Monitoring Frequency.dmn", "name": "Monitoring Frequency", "artifact_id": make_artifact_id(_CPG_ID, "dmn", "Monitoring Frequency", "6. Monitoring and Follow-up")},
         {"type": "recommendations", "ref": "cpg-artifacts:published/SYN-HTN-2026-001/recommendations.json", "count": 3},
     ],
     "errors": [],

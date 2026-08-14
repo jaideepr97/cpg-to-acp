@@ -47,6 +47,7 @@ export interface DecisionVariable {
 }
 
 export interface DecisionResult {
+  artifact_id?: string;
   dmn_xml: string;
   item: {
     name: string;
@@ -65,6 +66,7 @@ export interface DecisionResult {
 }
 
 export interface RecommendationResult {
+  artifact_id?: string;
   id: string;
   source_cpg: string;
   title: string;
@@ -110,6 +112,7 @@ export interface EscalatedItem {
 export interface PublishedArtifact {
   type: 'metadata' | 'dmn' | 'recommendations' | 'assembly_report' | 'escalated_items';
   ref: string;
+  artifact_id?: string;
   name?: string;
   cpg_id?: string;
   count?: number;

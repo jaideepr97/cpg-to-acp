@@ -15,6 +15,7 @@
     "@patternfly/react-table": "^6.0.0",
     "@tanstack/react-query": "^5.0.0",
     "dmn-js": "^17.10.1",
+    "mermaid": "^11.16.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router": "^7.0.0"
