@@ -1,12 +1,20 @@
-FROM node:22-alpine AS build
-WORKDIR /app
+FROM registry.access.redhat.com/ubi9/nodejs-22 AS build
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/templates/default.conf.template
+FROM registry.access.redhat.com/ubi9/nginx-124
+# Copy built app to UBI nginx static content location
+COPY --from=build /opt/app-root/src/dist /opt/app-root/src
+# Install location blocks as a template in the default server (envsubst processes ${BFF_HOST} at startup)
+COPY nginx.conf /opt/app-root/etc/nginx.default.d/app.conf.template
+# Startup script: envsubst the template then start nginx
+# UBI nginx's run script processes scripts from /opt/app-root/src/nginx-start/
+RUN mkdir -p /opt/app-root/src/nginx-start && \
+    printf '#!/bin/bash\nenvsubst "\\$BFF_HOST" < /opt/app-root/etc/nginx.default.d/app.conf.template > /opt/app-root/etc/nginx.default.d/app.conf\n' \
+    > /opt/app-root/src/nginx-start/50-envsubst.sh && \
+    chmod +x /opt/app-root/src/nginx-start/50-envsubst.sh
 ENV BFF_HOST=cpg-ingester-bff:8080
 EXPOSE 8080
+CMD ["/usr/libexec/s2i/run"]
