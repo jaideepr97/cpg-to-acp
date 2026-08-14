@@ -75,6 +75,8 @@ spec:
 
       - name: Parse
         type: callback
+        timeouts:
+          eventTimeout: PT10M
         action:
           functionRef:
             refName: parsepdfasync
@@ -93,6 +95,8 @@ spec:
 
       - name: Analyze
         type: callback
+        timeouts:
+          eventTimeout: PT30M
         action:
           functionRef:
             refName: analyzeasync
@@ -119,6 +123,8 @@ spec:
 
       - name: DrainStaleAnalysis
         type: callback
+        timeouts:
+          eventTimeout: PT30M
         action:
           functionRef:
             refName: notifymanifetreview
@@ -134,6 +140,8 @@ spec:
 
       - name: ReviewManifest
         type: callback
+        timeouts:
+          eventTimeout: PT24H
         action:
           functionRef:
             refName: notifymanifetreview
@@ -171,6 +179,8 @@ spec:
 
       - name: Generate
         type: callback
+        timeouts:
+          eventTimeout: PT1H
         action:
           functionRef:
             refName: generateasync
@@ -197,6 +207,8 @@ spec:
 
       - name: DrainStaleGenerate
         type: callback
+        timeouts:
+          eventTimeout: PT1H
         action:
           functionRef:
             refName: notifyartifactreview
@@ -212,6 +224,8 @@ spec:
 
       - name: ReviewArtifacts
         type: callback
+        timeouts:
+          eventTimeout: PT24H
         action:
           functionRef:
             refName: notifyartifactreview
