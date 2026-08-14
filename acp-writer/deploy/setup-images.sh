@@ -69,6 +69,12 @@ create_bc() {
     local containerfile="$2"
     local cpu_limit="${3:-1}"
     local mem_limit="${4:-2Gi}"
+    local context_dir="${5:-}"
+
+    local context_yaml=""
+    if [ -n "$context_dir" ]; then
+        context_yaml="    contextDir: $context_dir"
+    fi
 
     oc apply -f - <<EOF
 apiVersion: build.openshift.io/v1
@@ -82,6 +88,7 @@ spec:
     git:
       uri: $GIT_REPO
       ref: $GIT_BRANCH
+${context_yaml}
   strategy:
     type: Docker
     dockerStrategy:
@@ -97,7 +104,7 @@ spec:
   failedBuildsHistoryLimit: 3
   successfulBuildsHistoryLimit: 3
 EOF
-    log "  $name → $containerfile → $name:$IMAGE_TAG (${cpu_limit} CPU / ${mem_limit})"
+    log "  $name → $containerfile${context_dir:+ (context: $context_dir)} → $name:$IMAGE_TAG (${cpu_limit} CPU / ${mem_limit})"
 }
 
 log "Creating BuildConfigs..."
@@ -108,7 +115,7 @@ create_bc "acp-writer-fhir-gen"     "acp-writer/deploy/pods/Containerfile.fhir-g
 create_bc "acp-writer-fhir-srv"     "acp-writer/deploy/pods/Containerfile.fhir-server"
 create_bc "acp-writer-ui"           "acp-writer/deploy/pods/Containerfile.ui"
 create_bc "acp-writer-mcp"          "acp-writer/deploy/pods/Containerfile.mcp"
-create_bc "decision-service"        "acp-writer/decision-service/deploy/Containerfile" "2" "4Gi"
+create_bc "decision-service"        "deploy/Containerfile" "2" "4Gi" "acp-writer/decision-service"
 
 log_step "acp-writer image setup complete"
 log "To build: oc start-build <name> -n $NAMESPACE"
