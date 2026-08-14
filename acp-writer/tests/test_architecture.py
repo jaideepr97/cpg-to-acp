@@ -37,3 +37,25 @@ def test_no_benchmark_imports_from_production():
     assert not violations, (
         "Production code imports from benchmark:\n" + "\n".join(violations)
     )
+
+
+def test_decision_engine_service_does_not_import_langchain():
+    """The decision-engine service must not pull langchain_openai.
+
+    This enforces the thin-wrapper property: the decision pod has no
+    LLM dependency. Resolution lives in the LLM-reasoning pod.
+    """
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, "-c",
+         "import acp_writer.services.decision_engine; "
+         "import sys; "
+         "assert 'langchain_openai' not in sys.modules, "
+         "'decision_engine imports langchain_openai'"],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, (
+        f"decision_engine service imports langchain_openai:\n{result.stderr}"
+    )

@@ -43,7 +43,7 @@ spec:
         operation: rest:post:http://acp-llm-reasoning:8080/api/v1/resolve
       - name: executedmn
         type: custom
-        operation: rest:post:http://acp-decision-engine:8080/api/v1/execute
+        operation: rest:post:http://acp-llm-reasoning:8080/api/v1/execute-dmn
       - name: retrieverecommendations
         type: custom
         operation: rest:post:http://acp-llm-reasoning:8080/api/v1/retrieve

@@ -3,6 +3,7 @@ set -euo pipefail
 
 REGISTRY="image-registry.openshift-image-registry.svc:5000"
 NAMESPACE="sschifma-cpg-to-acp"
+IMAGE_TAG="${IMAGE_TAG:-phase3}"
 POLICY_DIR="$(cd "$(dirname "$0")/openshell-policies" && pwd)"
 MLFLOW_URI="https://mlflow-redhat-ods-applications.apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com"
 LITELLM_URL="http://maas-default-gateway-openshift-default.openshift-ingress.svc.cluster.local:80/gpt-5-6"
@@ -15,12 +16,11 @@ MINIO_SECRET="${MINIO_SECRET:?Set MINIO_SECRET environment variable}"
 declare -A SANDBOX_PIDS
 
 cleanup() {
-    echo "Cleaning up background processes..."
-    for pid in "${SANDBOX_PIDS[@]}"; do
-        kill "$pid" 2>/dev/null || true
-    done
+    echo ""
+    echo "Sandbox attach processes running in background (PIDs: ${(v)SANDBOX_PIDS:-$SANDBOX_PIDS})."
+    echo "These maintain the command channel — do NOT kill them."
+    echo "To tear down: deploy/openshell-deploy.sh teardown"
 }
-trap cleanup EXIT
 
 create_sandbox() {
     local name="$1"
@@ -36,7 +36,7 @@ create_sandbox() {
 
     local args=(
         --name "$name"
-        --from "${REGISTRY}/${NAMESPACE}/${image}:phase3"
+        --from "${REGISTRY}/${NAMESPACE}/${image}:${IMAGE_TAG}"
         --policy "${POLICY_DIR}/${policy}"
     )
     for e in "${env_args[@]}"; do
@@ -48,9 +48,9 @@ create_sandbox() {
 
     echo "  Waiting for pod..."
     for i in $(seq 1 90); do
-        local status
-        status=$(oc get pod "$name" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
-        if [ "$status" = "Running" ]; then
+        local pod_phase
+        pod_phase=$(oc get pod "$name" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        if [ "$pod_phase" = "Running" ]; then
             local ready
             ready=$(oc get pod "$name" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null || echo "false")
             if [ "$ready" = "true" ]; then
@@ -200,7 +200,7 @@ deploy_sandboxes() {
         "${common_env[@]}" \
         "PYTHONPATH=/app/src"
 
-    # acp-writer: LLM Reasoning
+    # acp-writer: LLM Reasoning (hosts DMN input resolution + evaluation loop)
     create_sandbox "sb-llm-reasoning" "acp-writer-llm" "acp-writer-llm.yaml" \
         "acp-writer-llm-reasoning" "acp" \
         "uvicorn acp_writer.services.llm_reasoning:app --host 0.0.0.0 --port 8080" \
@@ -208,9 +208,12 @@ deploy_sandboxes() {
         "PYTHONPATH=/app/src" \
         "LITELLM_URL=${LITELLM_URL}" \
         "LLM_MODEL=${LLM_MODEL}" \
-        "LLM_API_KEY=${LLM_API_KEY}"
+        "LLM_API_KEY=${LLM_API_KEY}" \
+        "DECISION_ENGINE_URL=http://acp-decision-engine:8080"
 
-    # acp-writer: Decision Engine
+    # acp-writer: Decision Engine (thin Kogito wrapper — deliberately NO LLM credentials)
+    # DMN input resolution runs in the LLM-reasoning pod; this pod only evaluates
+    # pre-resolved inputs. Do not add LITELLM_URL/LLM_API_KEY here.
     create_sandbox "sb-decision-engine" "acp-writer-decision" "acp-writer-decision.yaml" \
         "acp-writer-decision-engine" "acp" \
         "uvicorn acp_writer.services.decision_engine:app --host 0.0.0.0 --port 8080" \

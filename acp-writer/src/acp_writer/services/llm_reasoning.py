@@ -79,6 +79,38 @@ async def search_knowledge(request: Request):
     return result.model_dump(mode="json")
 
 
+# --- DMN execution (resolution + evaluation loop) ---
+
+
+@app.post("/api/v1/execute-dmn")
+async def execute_dmn(request: Request):
+    """Execute DMN models with concept-resolution pipeline.
+
+    Resolves DMN inputs using the concept pipeline (cache → terminology
+    → display text → LLM inventory match), then evaluates each model
+    via the decision-engine service. Chained models' outputs feed
+    later models' inputs.
+    """
+    data = await request.json()
+    ips_bundle = resolve_ref(data, "ips_bundle", _phi_store)
+    state = {
+        "ips_bundle": ips_bundle,
+        "applicable_dmn_models": data.get("applicable_dmn_models", []),
+        "dmn_dependency_graph": data.get("dmn_dependency_graph", []),
+        "litellm_url": LITELLM_URL,
+        "llm_model": LLM_MODEL,
+        "llm_api_key": LLM_API_KEY,
+    }
+
+    import os
+    decision_url = os.environ.get("DECISION_ENGINE_URL", "http://acp-decision-engine:8080")
+    state["decision_engine_url"] = decision_url
+
+    from acp_writer.nodes.dmn_executor import dmn_executor
+    result = dmn_executor(state)
+    return {"dmn_results": result.get("dmn_results", [])}
+
+
 # --- Pipeline execution endpoints ---
 
 
