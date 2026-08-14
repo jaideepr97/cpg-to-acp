@@ -189,25 +189,34 @@ render_templates_dir() {
 # --- Pod lifecycle helpers ---
 
 wait_for_pod_ready() {
-    # Wait for a pod to reach Running + Ready state.
+    # Wait for a pod to reach Running + Ready state, with periodic status.
     # Usage: wait_for_pod_ready <pod-name> [timeout-seconds]
     local pod_name="$1"
     local timeout="${2:-90}"
+    local last_phase=""
 
     for i in $(seq 1 "$timeout"); do
         local phase
-        phase=$(oc get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        phase=$(oc get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
         if [ "$phase" = "Running" ]; then
             local ready
             ready=$(oc get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null || echo "false")
             if [ "$ready" = "true" ]; then
+                log "  $pod_name ready after ${i}s"
                 return 0
             fi
+        fi
+        # Log phase changes and periodic heartbeat
+        if [ "$phase" != "$last_phase" ]; then
+            log "  $pod_name: $phase (${i}s)"
+            last_phase="$phase"
+        elif [ $((i % 15)) -eq 0 ]; then
+            log "  $pod_name: still $phase (${i}s)"
         fi
         sleep 1
     done
 
-    echo "ERROR: Pod $pod_name not ready after ${timeout}s (phase: ${phase:-unknown})"
+    log "ERROR: Pod $pod_name not ready after ${timeout}s (phase: ${last_phase:-unknown})"
     return 1
 }
 
@@ -244,7 +253,7 @@ start_build_and_wait() {
 }
 
 start_builds_parallel() {
-    # Start multiple builds in parallel, then wait for all.
+    # Start multiple builds in parallel, then poll with progress every 30s.
     # Usage: start_builds_parallel bc1 bc2 bc3 ...
     local build_names=()
     local failed=0
@@ -253,27 +262,68 @@ start_builds_parallel() {
         local build_name
         build_name=$(oc start-build "$bc" -n "$NAMESPACE" -o name 2>/dev/null || echo "")
         if [ -n "$build_name" ]; then
-            echo "  Started: $build_name"
+            log "  Started: $build_name"
             build_names+=("$build_name")
         else
-            echo "  ERROR: Failed to start build for $bc"
+            log "  ERROR: Failed to start build for $bc"
             failed=$((failed + 1))
         fi
     done
 
-    echo "  Waiting for ${#build_names[@]} builds..."
+    local total=${#build_names[@]}
+    log "  Waiting for $total builds (polling every 30s, timeout 10m)..."
+    local start_time=$SECONDS
+    local timeout=600
+
+    while true; do
+        local completed=0
+        local running=0
+        local pending=0
+        local build_failed=0
+
+        for build_name in "${build_names[@]}"; do
+            local phase
+            phase=$(oc get "$build_name" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+            case "$phase" in
+                Complete) completed=$((completed + 1));;
+                Failed|Error|Cancelled) build_failed=$((build_failed + 1));;
+                Running) running=$((running + 1));;
+                *) pending=$((pending + 1));;
+            esac
+        done
+
+        local elapsed=$(( SECONDS - start_time ))
+        log "  [${elapsed}s] Builds: $completed/$total complete, $running running, $pending pending, $build_failed failed"
+
+        if [ $((completed + build_failed)) -ge $total ]; then
+            break
+        fi
+
+        if [ $elapsed -ge $timeout ]; then
+            log "  ERROR: Build timeout after ${timeout}s"
+            break
+        fi
+
+        sleep 30
+    done
+
+    # Report results
     for build_name in "${build_names[@]}"; do
-        if ! oc wait "$build_name" -n "$NAMESPACE" --for=jsonpath='{.status.phase}'=Complete --timeout=600s 2>/dev/null; then
-            echo "  FAILED: $build_name"
-            oc logs "$build_name" -n "$NAMESPACE" --tail=20 2>/dev/null || true
-            failed=$((failed + 1))
+        local phase
+        phase=$(oc get "$build_name" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+        local duration
+        duration=$(oc get "$build_name" -n "$NAMESPACE" -o jsonpath='{.status.duration}' 2>/dev/null || echo "?")
+        if [ "$phase" = "Complete" ]; then
+            log "  ✓ $build_name ($phase, ${duration})"
         else
-            echo "  Complete: $build_name"
+            log "  ✗ $build_name ($phase)"
+            oc logs "$build_name" -n "$NAMESPACE" --tail=10 2>/dev/null || true
+            failed=$((failed + 1))
         fi
     done
 
     if [ $failed -gt 0 ]; then
-        echo "  $failed build(s) failed"
+        log "  $failed build(s) failed"
         return 1
     fi
     return 0

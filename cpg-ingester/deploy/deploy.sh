@@ -67,6 +67,8 @@ fi
 # --- Helm ---
 
 log_step "Deploying Helm chart"
+log "Installing cpg-ingester chart (timeout 120s)..."
+local helm_start=$SECONDS
 helm upgrade --install cpg-ing "$SCRIPT_DIR/chart" \
     -n "$NAMESPACE" \
     --set image.namespace="$NAMESPACE" \
@@ -80,6 +82,7 @@ helm upgrade --install cpg-ing "$SCRIPT_DIR/chart" \
     --set pods.bff.tag="$IMAGE_TAG" \
     --set pods.ui.tag="$IMAGE_TAG" \
     --wait --timeout 120s || { log "ERROR: cpg-ingester helm install failed"; exit 1; }
+log "  cpg-ingester installed ($(( SECONDS - helm_start ))s)"
 
 # --- SonataFlow ---
 

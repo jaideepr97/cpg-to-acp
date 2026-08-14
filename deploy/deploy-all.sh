@@ -50,6 +50,7 @@ done
 load_config "$CONFIG_PATH"
 preflight
 
+DEPLOY_START=$SECONDS
 log_step "Deploying all CPG-to-ACP components (namespace=$NAMESPACE)"
 
 # Step 1: Namespace infrastructure
@@ -60,15 +61,17 @@ log_step "Setting up namespace infrastructure"
 for component in mock-EHR acp-writer cpg-ingester; do
     script="$REPO_ROOT/$component/deploy/deploy.sh"
     if [ -f "$script" ]; then
+        component_start=$SECONDS
         log_step "Deploying $component"
         "$script" "${PASS_THROUGH_ARGS[@]}" || {
-            log "ERROR: $component deployment failed. Later components not deployed."
+            log "ERROR: $component deployment failed after $(( SECONDS - component_start ))s. Later components not deployed."
             log "  Fix and re-run: $component/deploy/deploy.sh ${PASS_THROUGH_ARGS[*]}"
             exit 1
         }
+        log "$component deployed in $(( SECONDS - component_start ))s"
     else
         log "WARNING: $script not found — skipping $component"
     fi
 done
 
-log_step "All components deployed successfully"
+log_step "All components deployed successfully (total: $(( SECONDS - DEPLOY_START ))s)"

@@ -82,14 +82,17 @@ fi
 log_step "Deploying Helm charts"
 
 # Decision service
-log "Installing decision-service chart..."
+log "Installing decision-service chart (timeout 120s)..."
+local helm_start=$SECONDS
 helm upgrade --install cpg-decision-svc "$SCRIPT_DIR/../decision-service/deploy/chart" \
     -n "$NAMESPACE" \
     --set image.tag="$IMAGE_TAG" \
     --wait --timeout 120s || { log "ERROR: decision-service helm install failed"; exit 1; }
+log "  decision-service installed ($(( SECONDS - helm_start ))s)"
 
 # acp-writer pod-split chart
-log "Installing acp-writer chart..."
+log "Installing acp-writer chart (timeout 120s)..."
+helm_start=$SECONDS
 helm upgrade --install acp "$SCRIPT_DIR/chart-pods" \
     -n "$NAMESPACE" \
     --set image.namespace="$NAMESPACE" \
@@ -105,6 +108,7 @@ helm upgrade --install acp "$SCRIPT_DIR/chart-pods" \
     --set pods.fhir-server.tag="$IMAGE_TAG" \
     --set pods.ui.tag="$IMAGE_TAG" \
     --wait --timeout 120s || { log "ERROR: acp-writer helm install failed"; exit 1; }
+log "  acp-writer installed ($(( SECONDS - helm_start ))s)"
 
 # --- Step 3: Apply SonataFlow workflow ---
 
