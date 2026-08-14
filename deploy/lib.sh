@@ -25,6 +25,9 @@ load_config() {
     # Compute derived values
     export LLM_BASE_URL="${MAAS_GATEWAY_URL}/${MAAS_ROUTE_SEGMENT}"
     export IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD 2>/dev/null || echo 'latest')}"
+    # Extract MLflow hostname for use in OpenShell policy templates
+    export MLFLOW_HOST
+    MLFLOW_HOST=$(echo "${MLFLOW_TRACKING_URI:-}" | sed 's|https\?://||' | sed 's|/.*||')
 }
 
 # --- Preflight validation ---
@@ -62,7 +65,7 @@ preflight() {
         fi
     done
 
-    for tool in oc helm envsubst; do
+    for tool in oc helm envsubst python3; do
         if ! command -v "$tool" &>/dev/null; then
             echo "ERROR: Required tool '$tool' not found on PATH."
             errors=$((errors + 1))
@@ -133,6 +136,22 @@ read_secret() {
         echo "ERROR: Could not read key '$key' from secret '$secret_name' in namespace '$NAMESPACE'" >&2
         exit 1
     fi
+
+    printf '%s' "$value"
+}
+
+read_secret_optional() {
+    # Like read_secret but returns empty string if the secret or key is absent.
+    # Use for credentials that may legitimately not exist (e.g. FHIR client in dev mode).
+    #
+    # SECURITY: same rules as read_secret — NEVER echo, log, or tee.
+    local secret_name="$1"
+    local key="$2"
+
+    { set +x; } 2>/dev/null
+
+    local value
+    value=$(oc get secret "$secret_name" -n "$NAMESPACE" -o jsonpath="{.data.$key}" 2>/dev/null | base64 -d 2>/dev/null || echo "")
 
     printf '%s' "$value"
 }
@@ -272,30 +291,48 @@ prune_builds() {
 
 prune_image_tags() {
     # Keep the last N SHA tags on an ImageStream, delete older ones.
+    # Sorted by creation timestamp (newest first). Never deletes the current IMAGE_TAG.
     # Usage: prune_image_tags <imagestream> [keep-count]
     local is_name="$1"
     local keep="${2:-5}"
 
-    local tags
-    tags=$(oc get is "$is_name" -n "$NAMESPACE" -o jsonpath='{.status.tags[*].tag}' 2>/dev/null || echo "")
-
-    local sha_tags=()
-    for tag in $tags; do
+    # Get SHA tags sorted by creation timestamp (newest first)
+    local sorted_sha_tags
+    sorted_sha_tags=$(oc get is "$is_name" -n "$NAMESPACE" -o json 2>/dev/null | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    tags = []
+    for t in data.get('status', {}).get('tags', []):
+        name = t.get('tag', '')
         # SHA tags are 7-char hex
-        if echo "$tag" | grep -qE '^[0-9a-f]{7}$'; then
-            sha_tags+=("$tag")
-        fi
-    done
+        if len(name) == 7 and all(c in '0123456789abcdef' for c in name):
+            items = t.get('items', [])
+            created = items[0].get('created', '') if items else ''
+            tags.append((created, name))
+    # Sort by creation timestamp, newest first
+    tags.sort(reverse=True)
+    for _, name in tags:
+        print(name)
+except:
+    pass
+" 2>/dev/null || echo "")
 
-    if [ ${#sha_tags[@]} -le "$keep" ]; then
+    if [ -z "$sorted_sha_tags" ]; then
         return 0
     fi
 
-    # Sort by tag creation (newest first) and remove excess
-    local to_delete=("${sha_tags[@]:$keep}")
-    for tag in "${to_delete[@]}"; do
-        echo "  Pruning $is_name:$tag"
-        oc tag -d "$is_name:$tag" -n "$NAMESPACE" 2>/dev/null || true
+    local count=0
+    for tag in $sorted_sha_tags; do
+        count=$((count + 1))
+        # Never delete the currently-deployed tag
+        if [ "$tag" = "${IMAGE_TAG:-}" ]; then
+            continue
+        fi
+        if [ $count -gt "$keep" ]; then
+            echo "  Pruning $is_name:$tag"
+            oc tag -d "$is_name:$tag" -n "$NAMESPACE" 2>/dev/null || true
+        fi
     done
 }
 

@@ -1,13 +1,16 @@
 image:
   registry: image-registry.openshift-image-registry.svc:5000
-  namespace: sschifma-cpg-to-acp
+  # Namespace is overridden by deploy scripts (--set image.namespace=...)
+  namespace: default
 
 pods:
   patient-data:
     enabled: true
     image: acp-writer-patient-data
-    tag: phase3
+    tag: latest
     port: 8080
+    secrets:
+      minio: true
     resources:
       requests:
         cpu: 50m
@@ -19,12 +22,16 @@ pods:
   llm-reasoning:
     enabled: true
     image: acp-writer-llm
-    tag: phase3
+    tag: latest
     port: 8080
     env:
-      # Bare origin — get_llm() appends /v1 automatically
-      litellmUrl: http://maas-model-gpt-5-6-backend:443
-      llmModel: gpt-5-6
+      # Bare origin — get_llm() appends /v1. Deploy scripts override this.
+      litellmUrl: http://localhost:4000
+      llmModel: default
+      decisionEngineUrl: http://acp-decision-engine:8080
+    secrets:
+      llm: true
+      minio: true
     resources:
       requests:
         cpu: 500m
@@ -36,10 +43,12 @@ pods:
   decision-engine:
     enabled: true
     image: acp-writer-decision
-    tag: phase3
+    tag: latest
     port: 8080
     env:
       kogitoUrl: http://cpg-decision-svc-decision-service:8081
+    secrets:
+      minio: true
     resources:
       requests:
         cpu: 50m
@@ -51,8 +60,14 @@ pods:
   fhir-generation:
     enabled: true
     image: acp-writer-fhir-gen
-    tag: phase3
+    tag: latest
     port: 8080
+    env:
+      litellmUrl: http://localhost:4000
+      llmModel: default
+    secrets:
+      llm: true
+      minio: true
     resources:
       requests:
         cpu: 100m
@@ -68,8 +83,9 @@ pods:
     port: 8080
     env:
       fhirServerUrl: http://cpg-mock-ehr-medplum-server:8103/fhir/R4
-      fhirClientId: ""
-      fhirClientSecret: ""
+    secrets:
+      minio: true
+      fhir: true
     resources:
       requests:
         cpu: 50m
@@ -81,7 +97,7 @@ pods:
   ui:
     enabled: true
     image: acp-writer-ui
-    tag: phase3
+    tag: latest
     port: 8082
     route: true
     resources:
@@ -93,4 +109,5 @@ pods:
         memory: 256Mi
 
 mlflow:
-  trackingUri: https://mlflow-redhat-ods-applications.apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com
+  # Overridden by deploy scripts from cluster.env MLFLOW_TRACKING_URI
+  trackingUri: ""
