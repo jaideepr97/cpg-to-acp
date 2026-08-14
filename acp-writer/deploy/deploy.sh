@@ -83,7 +83,7 @@ log_step "Deploying Helm charts"
 
 # Decision service
 log "Installing decision-service chart (timeout 120s)..."
-local helm_start=$SECONDS
+helm_start=$SECONDS
 helm upgrade --install cpg-decision-svc "$SCRIPT_DIR/../decision-service/deploy/chart" \
     -n "$NAMESPACE" \
     --set image.tag="$IMAGE_TAG" \

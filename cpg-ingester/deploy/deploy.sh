@@ -68,7 +68,7 @@ fi
 
 log_step "Deploying Helm chart"
 log "Installing cpg-ingester chart (timeout 120s)..."
-local helm_start=$SECONDS
+helm_start=$SECONDS
 helm upgrade --install cpg-ing "$SCRIPT_DIR/chart" \
     -n "$NAMESPACE" \
     --set image.namespace="$NAMESPACE" \
