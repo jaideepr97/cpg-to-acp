@@ -51,8 +51,6 @@ pods:
     image: cpg-ingester-delivery
     tag: phase3
     port: 8080
-    env:
-      acpWriterUrl: http://cpg-acp-writer-acp-writer:8082
     resources:
       requests:
         cpu: 50m

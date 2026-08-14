@@ -16,7 +16,7 @@ spec:
           value: "http://cpg-ingester-llm-analysis:8080"
         - name: ASSEMBLY_URL
           value: "http://cpg-ingester-assembly:8080"
-        - name: DELIVERY_URL
+        - name: PUBLISH_URL
           value: "http://cpg-ingester-delivery:8080"
         - name: BFF_URL
           value: "http://cpg-ingester-bff:8080"
@@ -56,9 +56,13 @@ spec:
       - name: assemble
         type: custom
         operation: rest:post:http://cpg-ingester-assembly:8080/api/v1/assemble
-      - name: deliver
+      - name: publish
         type: custom
         operation: rest:post:http://cpg-ingester-delivery:8080/api/v1/deliver
+      # Downstream consumer notification (conditional — only if URL configured)
+      - name: notifyacpwriter
+        type: custom
+        operation: rest:post:http://acp-writer:8082/api/v1/notifications/artifacts-available
       # Review notification (BFF sets awaiting_review marker)
       - name: notifymanifetreview
         type: custom
@@ -256,19 +260,46 @@ spec:
               toStateData: "${ .assemblyResult }"
         transition: Deliver
 
-      # --- Phase 7: Delivery to acp-writer (sync — bounded REST, 10-30s) ---
+      # --- Phase 7: Publish artifacts to store (sync — MinIO writes, <5s) ---
 
       - name: Deliver
         type: operation
         actions:
-          - name: callDeliver
+          - name: callPublish
             functionRef:
-              refName: deliver
+              refName: publish
               arguments:
                 assembly_result_ref: "${ .assemblyResult.assembly_result_ref }"
             actionDataFilter:
               results: "${ . }"
               toStateData: "${ .deliveryResult }"
+        transition: CheckNotify
+
+      # --- Phase 8: Notify downstream consumers (conditional) ---
+
+      - name: CheckNotify
+        type: switch
+        dataConditions:
+          - name: acpWriterConfigured
+            condition: "${ .acpWriterUrl != null and .acpWriterUrl != \"\" }"
+            transition: NotifyConsumers
+        defaultCondition:
+          transition: Done
+
+      - name: NotifyConsumers
+        type: operation
+        actions:
+          - name: notifyAcpWriter
+            functionRef:
+              refName: notifyacpwriter
+              arguments:
+                cpg_id: "${ .deliveryResult.delivery_status.cpg_id }"
+                cpg_title: "${ .cpg_name }"
+                artifact_location: "${ .deliveryResult.delivery_status.artifact_location }"
+                artifacts: "${ .deliveryResult.delivery_status.artifacts }"
+            actionDataFilter:
+              results: "${ . }"
+              toStateData: "${ .notificationResult }"
         transition: Done
 
       - name: Done

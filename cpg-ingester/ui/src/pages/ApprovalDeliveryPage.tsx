@@ -3,6 +3,7 @@ import {
   Card,
   CardBody,
   CardTitle,
+  ClipboardCopy,
   Content,
   DescriptionList,
   DescriptionListDescription,
@@ -14,6 +15,14 @@ import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
 import type { ReviewFeedbackItem, RunDetail } from '../api/types';
 import { ReviewActionBar } from '../components/ReviewActionBar';
 import { useReviewGate } from '../hooks/useReviewGate';
+
+const ARTIFACT_TYPE_LABELS: Record<string, string> = {
+  metadata: 'Guidelines Metadata',
+  dmn: 'DMN Model',
+  recommendations: 'Recommendations',
+  assembly_report: 'Assembly Report',
+  escalated_items: 'Escalated Items',
+};
 
 interface ApprovalDeliveryPageProps {
   run: RunDetail;
@@ -27,65 +36,54 @@ export function ApprovalDeliveryPage({ run }: ApprovalDeliveryPageProps) {
     return (
       <div style={{ marginTop: 16 }}>
         <Card>
-          <CardTitle>Delivery Status</CardTitle>
+          <CardTitle>Published Artifacts</CardTitle>
           <CardBody>
-            <Label color={ds.delivered ? 'green' : 'red'} style={{ marginBottom: 16 }}>
-              {ds.delivered ? 'Delivered Successfully' : 'Delivery Failed'}
+            <Label color={ds.published ? 'green' : 'red'} style={{ marginBottom: 16 }}>
+              {ds.published ? 'Published Successfully' : 'Publishing Failed'}
             </Label>
             <DescriptionList isCompact isHorizontal>
               <DescriptionListGroup>
-                <DescriptionListTerm>Target</DescriptionListTerm>
-                <DescriptionListDescription>{ds.acp_writer_url}</DescriptionListDescription>
+                <DescriptionListTerm>CPG ID</DescriptionListTerm>
+                <DescriptionListDescription>{ds.cpg_id}</DescriptionListDescription>
               </DescriptionListGroup>
+              {ds.artifact_location && (
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Location</DescriptionListTerm>
+                  <DescriptionListDescription>
+                    <ClipboardCopy isReadOnly variant="inline-compact">
+                      {ds.artifact_location}
+                    </ClipboardCopy>
+                  </DescriptionListDescription>
+                </DescriptionListGroup>
+              )}
             </DescriptionList>
 
-            <Table aria-label="Delivery results" style={{ marginTop: 16 }}>
+            <Table aria-label="Published artifacts" style={{ marginTop: 16 }}>
               <Thead>
                 <Tr>
                   <Th>Artifact</Th>
-                  <Th>Status</Th>
                   <Th>Details</Th>
+                  <Th>Reference</Th>
                 </Tr>
               </Thead>
               <Tbody>
-                {ds.results?.metadata && (
-                  <Tr>
-                    <Td>Guidelines Metadata</Td>
-                    <Td>
-                      <Label color={ds.results.metadata.status < 300 ? 'green' : 'red'} isCompact>
-                        {ds.results.metadata.status}
-                      </Label>
-                    </Td>
-                    <Td>{ds.results.metadata.cpg_id}</Td>
-                  </Tr>
-                )}
-                {ds.results?.dmn_models?.map((model, i) => (
+                {ds.artifacts?.map((artifact, i) => (
                   <Tr key={i}>
-                    <Td>DMN Model</Td>
+                    <Td>{ARTIFACT_TYPE_LABELS[artifact.type] ?? artifact.type}</Td>
                     <Td>
-                      <Label color={model.status < 300 ? 'green' : 'red'} isCompact>
-                        {model.status}
-                      </Label>
+                      {artifact.name ?? ''}
+                      {artifact.cpg_id ?? ''}
+                      {artifact.count != null ? `${artifact.count} items` : ''}
                     </Td>
-                    <Td>{model.name}</Td>
+                    <Td>
+                      <code style={{ fontSize: '0.85em' }}>{artifact.ref}</code>
+                    </Td>
                   </Tr>
                 ))}
-                {ds.results?.recommendations && (
-                  <Tr>
-                    <Td>Recommendations</Td>
-                    <Td>
-                      <Label color={ds.results.recommendations.status < 300 ? 'green' : 'red'} isCompact>
-                        {ds.results.recommendations.status}
-                      </Label>
-                    </Td>
-                    <Td>{ds.results.recommendations.count} recommendations</Td>
-                  </Tr>
-                )}
-                {ds.results?.errors?.map((err, i) => (
+                {ds.errors?.map((err, i) => (
                   <Tr key={`err-${i}`}>
                     <Td>Error</Td>
-                    <Td><Label color="red" isCompact>Error</Label></Td>
-                    <Td>{err}</Td>
+                    <Td colSpan={2}><Label color="red" isCompact>Error</Label> {err}</Td>
                   </Tr>
                 ))}
               </Tbody>
@@ -101,7 +99,7 @@ export function ApprovalDeliveryPage({ run }: ApprovalDeliveryPageProps) {
   return (
     <div style={{ marginTop: 16 }}>
       <Card>
-        <CardTitle>Deliver to acp-writer</CardTitle>
+        <CardTitle>Publish Artifacts</CardTitle>
         <CardBody>
           {run.metadata && (
             <DescriptionList isCompact isHorizontal style={{ marginBottom: 16 }}>
@@ -118,7 +116,7 @@ export function ApprovalDeliveryPage({ run }: ApprovalDeliveryPageProps) {
             </DescriptionList>
           )}
 
-          <Content component="p">The following artifacts will be delivered:</Content>
+          <Content component="p">The following artifacts will be published to the artifact store:</Content>
           <ul>
             <li>Guidelines metadata</li>
             {run.decisions && <li>{run.decisions.length} DMN decision model(s)</li>}

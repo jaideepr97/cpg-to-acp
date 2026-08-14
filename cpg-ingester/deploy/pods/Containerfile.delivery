@@ -3,7 +3,7 @@ USER 0
 WORKDIR /app
 COPY shared/ /app/shared/
 RUN pip install --no-cache-dir /app/shared/
-RUN pip install --no-cache-dir boto3 mlflow requests fastapi uvicorn
+RUN pip install --no-cache-dir boto3 mlflow fastapi uvicorn
 COPY cpg-ingester/src/ /app/src/
 ENV PYTHONPATH=/app/src
 RUN chmod -R g=u /app

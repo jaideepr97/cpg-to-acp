@@ -1,11 +1,11 @@
-"""Delivery pod service — sends artifacts to acp-writer API.
+"""Delivery pod service — publishes artifacts to the artifact store.
 
-Consumes: assembly_result_ref. Delivers via the acp-writer API gateway.
-Security profile: acp-writer API access only.
+Consumes: assembly_result_ref. Publishes individual artifacts to
+well-known locations in MinIO/S3.
+Security profile: MinIO only — no external network.
 """
 
 import logging
-import os
 import tempfile
 from datetime import datetime, timezone
 
@@ -19,8 +19,6 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="cpg-ingester-delivery", version="0.1.0")
 _store = get_artifact_store()
 
-ACP_WRITER_URL = os.environ.get("ACP_WRITER_URL", "")
-
 
 @app.get("/health")
 def health():
@@ -29,7 +27,7 @@ def health():
 
 @app.post("/api/v1/deliver")
 async def deliver(request: Request):
-    """Deliver assembled artifacts to acp-writer."""
+    """Publish assembled artifacts to the artifact store."""
     data = await request.json()
 
     assembly_result = resolve_ref(data, "assembly_result", _store)
@@ -53,7 +51,7 @@ async def deliver(request: Request):
             "recommendation_results": recommendation_results,
             "escalated_items": escalated_items,
             "assembly_report": assembly_report,
-            "acp_writer_url": data.get("acp_writer_url") or ACP_WRITER_URL,
+            "artifact_store": _store,
             "output_dir": output_dir,
         }
 

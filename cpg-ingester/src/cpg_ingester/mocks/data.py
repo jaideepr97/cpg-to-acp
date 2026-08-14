@@ -152,17 +152,17 @@ ESCALATED_ITEMS = [
 ]
 
 DELIVERY_STATUS: dict[str, Any] = {
-    "delivered": True,
-    "acp_writer_url": "http://acp-writer:8082",
-    "results": {
-        "metadata": {"status": 201, "cpg_id": "SYN-HTN-2026-001"},
-        "dmn_models": [
-            {"status": 201, "name": "Blood Pressure Treatment Threshold"},
-            {"status": 201, "name": "Monitoring Frequency"},
-        ],
-        "recommendations": {"status": 201, "count": 3},
-        "errors": [],
-    },
+    "published": True,
+    "cpg_id": "SYN-HTN-2026-001",
+    "artifact_location": "cpg-artifacts:published/SYN-HTN-2026-001",
+    "artifacts": [
+        {"type": "metadata", "ref": "cpg-artifacts:published/SYN-HTN-2026-001/metadata.json", "cpg_id": "SYN-HTN-2026-001"},
+        {"type": "dmn", "ref": "cpg-artifacts:published/SYN-HTN-2026-001/dmn/Blood Pressure Treatment Threshold.dmn", "name": "Blood Pressure Treatment Threshold"},
+        {"type": "dmn", "ref": "cpg-artifacts:published/SYN-HTN-2026-001/dmn/Monitoring Frequency.dmn", "name": "Monitoring Frequency"},
+        {"type": "recommendations", "ref": "cpg-artifacts:published/SYN-HTN-2026-001/recommendations.json", "count": 3},
+    ],
+    "errors": [],
+    "escalated_items_count": 1,
 }
 
 

@@ -88,13 +88,19 @@ def enrich_run_detail(
             resolved = _fetch_ref(store, ref)
             if resolved:
                 assembly = resolved
-        if "report" in assembly:
+        if "assembly_report" in assembly:
+            detail["assemblyReport"] = assembly["assembly_report"]
+        elif "report" in assembly:
             detail["assemblyReport"] = assembly["report"]
 
     # --- Delivery (always inline, no ref) ---
-    delivery = wd.get("deliveryResult") or {}
-    if delivery:
-        detail["deliveryStatus"] = delivery.get("delivery_status", delivery)
+    delivery_raw = wd.get("deliveryResult") or {}
+    if delivery_raw:
+        ds = delivery_raw.get("delivery_status", delivery_raw)
+        # Normalize: support both old ("delivered") and new ("published") shapes
+        if "published" not in ds and "delivered" in ds:
+            ds["published"] = ds.pop("delivered")
+        detail["deliveryStatus"] = ds
 
     if errors:
         detail["errors"] = errors
