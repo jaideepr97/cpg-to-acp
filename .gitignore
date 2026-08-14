@@ -197,3 +197,8 @@ mlruns/
 .medplum/
 .vite/
 mock-EHR/deploy/.env
+
+# Deploy framework — secrets and rendered manifests
+deploy/config/*.env
+!deploy/config/*.env.template
+deploy/.rendered/
