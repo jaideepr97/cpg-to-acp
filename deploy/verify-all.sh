@@ -143,7 +143,7 @@ fi
 
 log_step "Orphan check"
 
-EXPECTED_PREFIXES="sb-|cpg-mock-ehr|cpg-decision-svc|acp-ui|cpg-ing-ui|cpg-ing-bff|minio|openshell|sonataflow|mcp-gateway|cpg-gateway|acpwriter|cpgingester|mock-ehr-mcp"
+EXPECTED_PREFIXES="sb-|cpg-mock-ehr|cpg-decision-svc|acp-ui|cpg-ingester-ui|cpg-ingester-bff|minio|openshell|sonataflow|mcp-gateway|cpg-gateway|acpwriter|cpgingester|mock-ehr-mcp"
 orphans=$(oc get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep -v -E "$EXPECTED_PREFIXES" | grep -v "Completed\|Error" | head -10)
 if [ -n "$orphans" ]; then
     echo "  ⚠ Unexpected pods found:"

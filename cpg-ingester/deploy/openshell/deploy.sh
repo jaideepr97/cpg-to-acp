@@ -94,7 +94,7 @@ deploy_sandboxes() {
         sleep 2
 
         wait_for_pod_ready "$name" 90 || true
-        label_pod "$name" "$k8s_name" "cpg-ing"
+        label_pod "$name" "$k8s_name" "cpg-ingester"
         openshell service expose "$name" 8080 http 2>/dev/null || true
         log "Done: $name"
     }

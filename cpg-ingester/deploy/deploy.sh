@@ -69,7 +69,7 @@ fi
 log_step "Deploying Helm chart"
 log "Installing cpg-ingester chart (timeout 120s)..."
 helm_start=$SECONDS
-helm upgrade --install cpg-ing "$SCRIPT_DIR/chart" \
+helm upgrade --install cpg-ingester "$SCRIPT_DIR/chart" \
     -n "$NAMESPACE" \
     --set image.namespace="$NAMESPACE" \
     --set mlflow.trackingUri="$MLFLOW_TRACKING_URI" \
@@ -94,7 +94,7 @@ oc apply -f "$SCRIPT_DIR/orchestrator/cpg-ingester-workflow.yaml" -n "$NAMESPACE
 
 if [ "$SKIP_OPENSHELL" = false ]; then
     log_step "Scaling down Helm pods for OpenShell"
-    for dep in cpg-ing-ingestion cpg-ing-llm-analysis cpg-ing-assembly cpg-ing-delivery; do
+    for dep in cpg-ingester-ingestion cpg-ingester-llm-analysis cpg-ingester-assembly cpg-ingester-delivery; do
         oc scale deployment "$dep" --replicas=0 -n "$NAMESPACE" 2>/dev/null || true
     done
     "$SCRIPT_DIR/openshell/deploy.sh" --config "$CONFIG_PATH" --tag "$IMAGE_TAG"

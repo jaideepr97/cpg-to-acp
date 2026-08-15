@@ -1,6 +1,6 @@
     server {
         listen 8080;
-        server_name cpg-ing-ingestion cpg-ing-ingestion.${NAMESPACE}.svc.cluster.local;
+        server_name cpg-ingester-ingestion cpg-ingester-ingestion.${NAMESPACE}.svc.cluster.local;
         location / {
             proxy_set_header Host sb-ingestion--http.openshell.localhost;
             proxy_pass http://openshell-http:8080;
@@ -8,7 +8,7 @@
     }
     server {
         listen 8080;
-        server_name cpg-ing-llm-analysis cpg-ing-llm-analysis.${NAMESPACE}.svc.cluster.local;
+        server_name cpg-ingester-llm-analysis cpg-ingester-llm-analysis.${NAMESPACE}.svc.cluster.local;
         location / {
             proxy_set_header Host sb-llm-analysis--http.openshell.localhost;
             proxy_pass http://openshell-http:8080;
@@ -16,7 +16,7 @@
     }
     server {
         listen 8080;
-        server_name cpg-ing-assembly cpg-ing-assembly.${NAMESPACE}.svc.cluster.local;
+        server_name cpg-ingester-assembly cpg-ingester-assembly.${NAMESPACE}.svc.cluster.local;
         location / {
             proxy_set_header Host sb-assembly--http.openshell.localhost;
             proxy_pass http://openshell-http:8080;
@@ -24,7 +24,7 @@
     }
     server {
         listen 8080;
-        server_name cpg-ing-delivery cpg-ing-delivery.${NAMESPACE}.svc.cluster.local;
+        server_name cpg-ingester-delivery cpg-ingester-delivery.${NAMESPACE}.svc.cluster.local;
         location / {
             proxy_set_header Host sb-delivery--http.openshell.localhost;
             proxy_pass http://openshell-http:8080;
