@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # cpg-ingester/deploy/verify.sh — Verify cpg-ingester deployment
+#
+# Checks pods, images, supervision, routed health, and BFF dependencies.
+# Retries sandbox checks for up to 90s to handle startup races.
+#
+# Usage:
+#   ./cpg-ingester/deploy/verify.sh [--config <path>] [--tag <sha>]
 
 set -euo pipefail
 
@@ -17,47 +23,25 @@ IMAGE_TAG=$(resolve_deploy_tag "cpg-ingester" "$TAG_OVERRIDE")
 
 log_step "Verifying cpg-ingester deployment (tag: ${IMAGE_TAG})"
 ERRORS=0
+
+# Sandbox checks with retry
 SANDBOXES=(sb-ingestion sb-llm-analysis sb-assembly sb-delivery)
+verify_sandboxes "$IMAGE_TAG" "${SANDBOXES[@]}" || ERRORS=$?
 
-for sb in "${SANDBOXES[@]}"; do
-    local_phase=$(oc get pod "$sb" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
-    if [ "$local_phase" != "Running" ]; then
-        echo "  ✗ $sb: not running ($local_phase)"
-        ERRORS=$((ERRORS + 1))
-        continue
-    fi
-
-    local_image=$(oc get pod "$sb" -n "$NAMESPACE" -o jsonpath='{.spec.containers[0].image}' 2>/dev/null)
-    if echo "$local_image" | grep -q ":${IMAGE_TAG}"; then
-        echo "  ✓ $sb: Running, image :${IMAGE_TAG}"
-    else
-        echo "  ✗ $sb: wrong image (expected :${IMAGE_TAG})"
-        ERRORS=$((ERRORS + 1))
-    fi
-
-    local_user=$(oc exec "$sb" -n "$NAMESPACE" -- ps aux 2>/dev/null | grep uvicorn | grep -v grep | awk '{print $1}' | head -1)
-    if [ "$local_user" = "default" ]; then
-        echo "  ✓ $sb: supervised (user: default)"
-    else
-        echo "  ✗ $sb: supervision check failed (user: ${local_user:-none})"
-        ERRORS=$((ERRORS + 1))
-    fi
-done
-
+# BFF health — must have minio and sonataflow connected (Fix 4)
 echo ""
-log "Routed health checks:"
-for sb in "${SANDBOXES[@]}"; do
-    local_code=$(oc exec deployment/openshell-router -n "$NAMESPACE" -- \
-        curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
-        -H "Host: ${sb}--http.openshell.localhost" \
-        http://openshell-http:8080/health 2>/dev/null || echo "000")
-    if [ "$local_code" = "200" ]; then
-        echo "  ✓ $sb routed: HTTP 200"
-    else
-        echo "  ✗ $sb routed: HTTP $local_code"
-        ERRORS=$((ERRORS + 1))
-    fi
-done
+log "BFF dependency check:"
+bff_health=$(oc exec deployment/cpg-ingester-bff -n "$NAMESPACE" -- \
+    curl -s --max-time 5 http://localhost:8080/health 2>/dev/null || echo "{}")
+bff_minio=$(echo "$bff_health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('minio',False))" 2>/dev/null || echo "False")
+bff_sonataflow=$(echo "$bff_health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('sonataflow',False))" 2>/dev/null || echo "False")
+
+if [ "$bff_minio" = "True" ] && [ "$bff_sonataflow" = "True" ]; then
+    echo "  ✓ BFF: minio=true, sonataflow=true"
+else
+    echo "  ✗ BFF dependencies missing: $bff_health"
+    ERRORS=$((ERRORS + 1))
+fi
 
 echo ""
 if [ $ERRORS -eq 0 ]; then

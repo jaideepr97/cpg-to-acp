@@ -88,9 +88,15 @@ fi
 
 if [ "$FULL_WIPE" = true ]; then
     log_step "Removing K8s Secrets (--full-wipe)"
-    for secret in llm-credentials minio-credentials fhir-client-credentials medplum-user-credentials; do
+    for secret in llm-credentials minio-credentials fhir-client-credentials medplum-user-credentials smart-client-credentials; do
         oc delete secret "$secret" -n "$NAMESPACE" 2>/dev/null && log "  Deleted $secret" || true
     done
+
+    log_step "Removing cluster-scoped OpenShell RBAC (--full-wipe)"
+    oc delete clusterrolebinding "${NAMESPACE}-openshell-tokenreview" 2>/dev/null \
+        && log "  Deleted ClusterRoleBinding ${NAMESPACE}-openshell-tokenreview" || true
+    oc delete clusterrole "${NAMESPACE}-openshell-tokenreview" 2>/dev/null \
+        && log "  Deleted ClusterRole ${NAMESPACE}-openshell-tokenreview" || true
 fi
 
 # Check for orphans

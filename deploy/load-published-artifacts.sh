@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# deploy/load-published-artifacts.sh — Load cpg-ingester published artifacts into acp-writer
+#
+# TEMPORARY stand-in for the delivery/notification flow (not wired yet).
+# Fetches published artifacts from MinIO and loads them into acp-writer
+# via routed API calls through the openshell-router.
+#
+# Usage:
+#   ./deploy/load-published-artifacts.sh --config <cluster.env> <cpg-id>
+#   ./deploy/load-published-artifacts.sh --config deploy/config/cluster.env UNK-HTN-UNDATED
+#
+# Prerequisites:
+#   - cpg-ingester has published artifacts under cpg-artifacts/published/<cpg-id>/
+#   - acp-writer sandboxes are running
+#   - openshell-router is running
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# shellcheck disable=SC1091
+source "$REPO_ROOT/deploy/lib.sh"
+
+CONFIG_PATH="$REPO_ROOT/deploy/config/cluster.env"
+CPG_ID=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --config) CONFIG_PATH="$2"; shift 2;;
+        -h|--help)
+            echo "Usage: deploy/load-published-artifacts.sh --config <cluster.env> <cpg-id>"
+            echo ""
+            echo "TEMPORARY: loads published CPG artifacts from MinIO into acp-writer."
+            echo "Will be replaced by the delivery/notification flow."
+            exit 0;;
+        *) CPG_ID="$1"; shift;;
+    esac
+done
+
+if [ -z "$CPG_ID" ]; then
+    echo "ERROR: CPG ID required. Usage: $0 --config <cluster.env> <cpg-id>"
+    exit 1
+fi
+
+load_config "$CONFIG_PATH"
+preflight
+
+ROUTER_POD=$(oc get pods -n "$NAMESPACE" -l app=openshell-router --field-selector=status.phase=Running -o name 2>/dev/null | head -1 | sed 's|pod/||')
+if [ -z "$ROUTER_POD" ]; then
+    echo "ERROR: openshell-router pod not found"
+    exit 1
+fi
+
+# Find a pod with MinIO access (BFF has it)
+BFF_POD=$(oc get pods -n "$NAMESPACE" -l app.kubernetes.io/name=cpg-ingester-bff -o name --no-headers 2>/dev/null | head -1 | sed 's|pod/||')
+if [ -z "$BFF_POD" ]; then
+    echo "ERROR: cpg-ingester-bff pod not found (needed for MinIO access)"
+    exit 1
+fi
+
+BASE_KEY="published/${CPG_ID}"
+
+log_step "Loading published artifacts for CPG: $CPG_ID"
+
+# Step 1: Register guideline metadata
+log "Registering guideline metadata..."
+oc exec "$BFF_POD" -n "$NAMESPACE" -- python3 -c "
+import os, boto3, sys
+s3 = boto3.client('s3',
+    endpoint_url=os.getenv('MINIO_ENDPOINT'),
+    aws_access_key_id=os.getenv('ARTIFACT_STORE_ACCESS_KEY'),
+    aws_secret_access_key=os.getenv('ARTIFACT_STORE_SECRET_KEY'))
+try:
+    body = s3.get_object(Bucket='cpg-artifacts', Key='${BASE_KEY}/metadata.json')['Body'].read()
+    sys.stdout.buffer.write(body)
+except Exception as e:
+    print(f'ERROR: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null > /tmp/cpg-metadata.json
+
+oc cp /tmp/cpg-metadata.json "$ROUTER_POD:/tmp/cpg-metadata.json" -n "$NAMESPACE"
+code=$(oc exec "$ROUTER_POD" -n "$NAMESPACE" -- \
+    curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+    -X POST -H "Host: acp-llm-reasoning" \
+    -H "Content-Type: application/json" \
+    --data-binary @/tmp/cpg-metadata.json \
+    http://localhost:8080/api/v1/guidelines 2>/dev/null)
+log "  Guideline registration: HTTP $code"
+
+# Step 2: Ingest recommendations
+log "Ingesting recommendations..."
+oc exec "$BFF_POD" -n "$NAMESPACE" -- python3 -c "
+import os, boto3, sys
+s3 = boto3.client('s3',
+    endpoint_url=os.getenv('MINIO_ENDPOINT'),
+    aws_access_key_id=os.getenv('ARTIFACT_STORE_ACCESS_KEY'),
+    aws_secret_access_key=os.getenv('ARTIFACT_STORE_SECRET_KEY'))
+try:
+    body = s3.get_object(Bucket='cpg-artifacts', Key='${BASE_KEY}/recommendations.json')['Body'].read()
+    sys.stdout.buffer.write(body)
+except Exception as e:
+    print(f'ERROR: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null > /tmp/cpg-recs.json
+
+oc cp /tmp/cpg-recs.json "$ROUTER_POD:/tmp/cpg-recs.json" -n "$NAMESPACE"
+code=$(oc exec "$ROUTER_POD" -n "$NAMESPACE" -- \
+    curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+    -X POST -H "Host: acp-llm-reasoning" \
+    -H "Content-Type: application/json" \
+    --data-binary @/tmp/cpg-recs.json \
+    http://localhost:8080/api/v1/knowledge/recommendations/batch 2>/dev/null)
+log "  Recommendations ingest: HTTP $code"
+
+# Step 3: Deploy DMN models
+log "Deploying DMN models..."
+dmn_keys=$(oc exec "$BFF_POD" -n "$NAMESPACE" -- python3 -c "
+import os, boto3
+s3 = boto3.client('s3',
+    endpoint_url=os.getenv('MINIO_ENDPOINT'),
+    aws_access_key_id=os.getenv('ARTIFACT_STORE_ACCESS_KEY'),
+    aws_secret_access_key=os.getenv('ARTIFACT_STORE_SECRET_KEY'))
+objs = s3.list_objects_v2(Bucket='cpg-artifacts', Prefix='${BASE_KEY}/dmn/').get('Contents', [])
+for o in objs:
+    if o['Key'].endswith('.dmn'):
+        print(o['Key'])
+" 2>/dev/null)
+
+dmn_count=0
+for key in $dmn_keys; do
+    name=$(basename "$key" .dmn)
+    oc exec "$BFF_POD" -n "$NAMESPACE" -- python3 -c "
+import os, boto3, sys
+s3 = boto3.client('s3',
+    endpoint_url=os.getenv('MINIO_ENDPOINT'),
+    aws_access_key_id=os.getenv('ARTIFACT_STORE_ACCESS_KEY'),
+    aws_secret_access_key=os.getenv('ARTIFACT_STORE_SECRET_KEY'))
+body = s3.get_object(Bucket='cpg-artifacts', Key='$key')['Body'].read()
+sys.stdout.buffer.write(body)
+" 2>/dev/null > "/tmp/dmn-${dmn_count}.dmn"
+
+    oc cp "/tmp/dmn-${dmn_count}.dmn" "$ROUTER_POD:/tmp/dmn-upload.dmn" -n "$NAMESPACE"
+    code=$(oc exec "$ROUTER_POD" -n "$NAMESPACE" -- \
+        curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+        -X POST -H "Host: acp-decision-engine" \
+        -H "Content-Type: application/xml" \
+        --data-binary @/tmp/dmn-upload.dmn \
+        http://localhost:8080/api/v1/decisions/models 2>/dev/null)
+    log "  $name: HTTP $code"
+    dmn_count=$((dmn_count + 1))
+done
+
+log_step "Published artifacts loaded: 1 guideline, 1 recommendations bundle, $dmn_count DMN models"

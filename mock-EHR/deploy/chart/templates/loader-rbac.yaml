@@ -1,0 +1,42 @@
+{{- if .Values.loader.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-loader
+  labels:
+    app.kubernetes.io/name: medplum-loader
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/part-of: cpg-to-acp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-loader-secret-writer
+  labels:
+    app.kubernetes.io/name: medplum-loader
+    app.kubernetes.io/instance: {{ .Release.Name }}
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["smart-client-credentials"]
+  verbs: ["get", "create", "update", "patch"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-loader-secret-writer
+  labels:
+    app.kubernetes.io/name: medplum-loader
+    app.kubernetes.io/instance: {{ .Release.Name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-loader-secret-writer
+subjects:
+- kind: ServiceAccount
+  name: {{ .Release.Name }}-loader
+{{- end }}

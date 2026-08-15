@@ -142,6 +142,15 @@ mock-EHR/deploy/teardown.sh
 
 Routine teardown preserves K8s Secrets and ImageStreams so you don't need to re-enter API keys or rebuild images on the next deploy. Only `--full-wipe` removes secrets.
 
+### Cluster-scoped resources
+
+`setup-openshell.sh` creates a ClusterRole and ClusterRoleBinding named `<namespace>-openshell-tokenreview`. These are **cluster-scoped**: deleting the namespace does *not* remove them. `teardown-all.sh --full-wipe` deletes them; if you delete a namespace without running `--full-wipe` first, clean them up manually:
+
+```bash
+oc delete clusterrolebinding <namespace>-openshell-tokenreview
+oc delete clusterrole <namespace>-openshell-tokenreview
+```
+
 ## Component Ownership
 
 Each component owns its deployment:

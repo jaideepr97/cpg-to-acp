@@ -74,6 +74,19 @@ helm upgrade --install cpg-mock-ehr "$SCRIPT_DIR/chart" \
     --wait --timeout 300s || { log "ERROR: mock-EHR helm install failed"; exit 1; }
 log "  mock-EHR installed ($(( SECONDS - helm_start ))s)"
 
+# If the loader ran, restart the IPS Viewer to pick up the SMART credentials Secret
+if [ "$LOADER_ENABLED" = "true" ]; then
+    log "Waiting for loader job to complete..."
+    oc wait --for=condition=Complete job -l app.kubernetes.io/instance=cpg-mock-ehr -n "$NAMESPACE" --timeout=120s 2>/dev/null || true
+    if oc get secret smart-client-credentials -n "$NAMESPACE" &>/dev/null; then
+        log "SMART credentials Secret found — restarting IPS Viewer"
+        oc rollout restart deployment/cpg-mock-ehr-ips-viewer -n "$NAMESPACE" 2>/dev/null || true
+        oc rollout status deployment/cpg-mock-ehr-ips-viewer -n "$NAMESPACE" --timeout=60s 2>/dev/null || true
+    else
+        log "WARNING: SMART credentials Secret not found after loader — IPS Viewer SMART launch will fail"
+    fi
+fi
+
 log_step "Deploying MCP server"
 render_template "$SCRIPT_DIR/mcp/mock-ehr-mcp.yaml.tmpl" "$REPO_ROOT/deploy/.rendered/mock-ehr-mcp.yaml"
 oc apply -f "$REPO_ROOT/deploy/.rendered/mock-ehr-mcp.yaml" -n "$NAMESPACE" 2>/dev/null \

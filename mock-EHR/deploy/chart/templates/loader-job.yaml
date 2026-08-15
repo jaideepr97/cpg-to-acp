@@ -21,6 +21,7 @@ spec:
         app.kubernetes.io/name: medplum-loader
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      serviceAccountName: {{ .Release.Name }}-loader
       restartPolicy: Never
       containers:
         - name: loader

@@ -398,6 +398,114 @@ except:
     done
 }
 
+# --- Sandbox verification with retry ---
+
+verify_sandboxes() {
+    # Verify sandboxes are Running with the correct image tag and routed health.
+    # Retries for up to VERIFY_TIMEOUT seconds (default 90) to handle startup races.
+    # Usage: verify_sandboxes <image_tag> <sandbox1> <sandbox2> ...
+    # Returns: number of errors (0 = all passed)
+    local tag="$1"; shift
+    local sandboxes=("$@")
+    local timeout="${VERIFY_TIMEOUT:-90}"
+    local interval=10
+    local errors=0
+    local start=$SECONDS
+
+    while true; do
+        errors=0
+        local elapsed=$(( SECONDS - start ))
+        local all_ok=true
+
+        for sb in "${sandboxes[@]}"; do
+            local phase
+            phase=$(oc get pod "$sb" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
+            if [ "$phase" != "Running" ]; then
+                all_ok=false
+                continue
+            fi
+
+            local img
+            img=$(oc get pod "$sb" -n "$NAMESPACE" -o jsonpath='{.spec.containers[0].image}' 2>/dev/null || echo "")
+            if ! echo "$img" | grep -q ":${tag}"; then
+                all_ok=false
+                continue
+            fi
+
+            local code
+            code=$(oc exec deployment/openshell-router -n "$NAMESPACE" -- \
+                curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
+                -H "Host: ${sb}--http.openshell.localhost" \
+                http://openshell-http:8080/health 2>/dev/null || echo "000")
+            if [ "$code" != "200" ]; then
+                all_ok=false
+                continue
+            fi
+        done
+
+        if [ "$all_ok" = true ]; then
+            break
+        fi
+
+        if [ $elapsed -ge "$timeout" ]; then
+            break
+        fi
+
+        log "  Sandboxes not ready yet (${elapsed}s / ${timeout}s) — retrying in ${interval}s..."
+        sleep "$interval"
+    done
+
+    # Final check with full reporting
+    for sb in "${sandboxes[@]}"; do
+        local phase
+        phase=$(oc get pod "$sb" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
+        if [ "$phase" != "Running" ]; then
+            echo "  ✗ $sb: not running (phase: $phase)"
+            errors=$((errors + 1))
+            continue
+        fi
+
+        local img
+        img=$(oc get pod "$sb" -n "$NAMESPACE" -o jsonpath='{.spec.containers[0].image}' 2>/dev/null || echo "")
+        if echo "$img" | grep -q ":${tag}"; then
+            echo "  ✓ $sb: Running, image :${tag}"
+        else
+            echo "  ✗ $sb: wrong image tag (expected :${tag}, got ${img})"
+            errors=$((errors + 1))
+        fi
+
+        local user
+        user=$(oc exec "$sb" -n "$NAMESPACE" -- ps aux 2>/dev/null | grep uvicorn | grep -v grep | awk '{print $1}' | head -1 || true)
+        if [ "$user" = "default" ]; then
+            echo "  ✓ $sb: supervised (user: default)"
+        elif [ -n "$user" ]; then
+            echo "  ✗ $sb: uvicorn running as '$user' (expected: default)"
+            errors=$((errors + 1))
+        else
+            echo "  ✗ $sb: no uvicorn process found"
+            errors=$((errors + 1))
+        fi
+    done
+
+    echo ""
+    log "Routed health checks:"
+    for sb in "${sandboxes[@]}"; do
+        local code
+        code=$(oc exec deployment/openshell-router -n "$NAMESPACE" -- \
+            curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+            -H "Host: ${sb}--http.openshell.localhost" \
+            http://openshell-http:8080/health 2>/dev/null || echo "000")
+        if [ "$code" = "200" ]; then
+            echo "  ✓ $sb routed: HTTP 200"
+        else
+            echo "  ✗ $sb routed: HTTP $code"
+            errors=$((errors + 1))
+        fi
+    done
+
+    return $errors
+}
+
 # --- Deploy state tracking ---
 
 save_deploy_state() {

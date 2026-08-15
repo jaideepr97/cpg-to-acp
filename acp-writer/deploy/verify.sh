@@ -2,10 +2,10 @@
 # acp-writer/deploy/verify.sh — Verify acp-writer deployment
 #
 # Checks pods, images, supervision, and routed health.
-# Runs in <30 seconds.
+# Retries sandbox checks for up to 90s to handle startup races.
 #
 # Usage:
-#   ./acp-writer/deploy/verify.sh [--config <path>]
+#   ./acp-writer/deploy/verify.sh [--config <path>] [--tag <sha>]
 
 set -euo pipefail
 
@@ -34,55 +34,9 @@ log_step "Verifying acp-writer deployment (tag: ${IMAGE_TAG})"
 
 ERRORS=0
 
-# Check sandbox pods
+# Sandbox checks with retry
 SANDBOXES=(sb-patient-data sb-llm-reasoning sb-decision-engine sb-fhir-generation sb-fhir-server)
-
-for sb in "${SANDBOXES[@]}"; do
-    # Pod exists and running?
-    local_phase=$(oc get pod "$sb" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
-    if [ "$local_phase" != "Running" ]; then
-        echo "  ✗ $sb: not running (phase: $local_phase)"
-        ERRORS=$((ERRORS + 1))
-        continue
-    fi
-
-    # Correct image tag?
-    local_image=$(oc get pod "$sb" -n "$NAMESPACE" -o jsonpath='{.spec.containers[0].image}' 2>/dev/null)
-    if echo "$local_image" | grep -q ":${IMAGE_TAG}"; then
-        echo "  ✓ $sb: Running, image :${IMAGE_TAG}"
-    else
-        echo "  ✗ $sb: wrong image tag (expected :${IMAGE_TAG}, got ${local_image})"
-        ERRORS=$((ERRORS + 1))
-    fi
-
-    # Supervised? (uvicorn as user 'default', not root)
-    local_user=$(oc exec "$sb" -n "$NAMESPACE" -- ps aux 2>/dev/null | grep uvicorn | grep -v grep | awk '{print $1}' | head -1)
-    if [ "$local_user" = "default" ]; then
-        echo "  ✓ $sb: supervised (user: default)"
-    elif [ -n "$local_user" ]; then
-        echo "  ✗ $sb: uvicorn running as '$local_user' (expected: default)"
-        ERRORS=$((ERRORS + 1))
-    else
-        echo "  ✗ $sb: no uvicorn process found"
-        ERRORS=$((ERRORS + 1))
-    fi
-done
-
-# Routed health checks (via openshell-router)
-echo ""
-log "Routed health checks:"
-for sb in "${SANDBOXES[@]}"; do
-    local_code=$(oc exec deployment/openshell-router -n "$NAMESPACE" -- \
-        curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
-        -H "Host: ${sb}--http.openshell.localhost" \
-        http://openshell-http:8080/health 2>/dev/null || echo "000")
-    if [ "$local_code" = "200" ]; then
-        echo "  ✓ $sb routed: HTTP 200"
-    else
-        echo "  ✗ $sb routed: HTTP $local_code"
-        ERRORS=$((ERRORS + 1))
-    fi
-done
+verify_sandboxes "$IMAGE_TAG" "${SANDBOXES[@]}" || ERRORS=$?
 
 # Decision service (Helm-deployed, not sandboxed)
 echo ""
