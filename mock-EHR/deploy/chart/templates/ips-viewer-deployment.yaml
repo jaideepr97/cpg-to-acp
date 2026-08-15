@@ -48,5 +48,6 @@ spec:
               readOnly: true
       volumes:
         - name: smart-config
-          configMap:
-            name: {{ .Release.Name }}-ips-viewer-config
+          secret:
+            secretName: smart-client-credentials
+            optional: true

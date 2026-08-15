@@ -4,7 +4,7 @@ import logging
 import time
 
 import mlflow
-from cpg_contracts import get_llm
+from cpg_contracts import content_to_text, get_llm
 from cpg_ingester.output import write_artifact
 from cpg_ingester.prompts.dmn_creator import DMN_CREATOR_SYSTEM, DMN_CREATOR_USER
 from cpg_ingester.reference.dmn_examples import REFERENCE_EXAMPLES
@@ -84,7 +84,7 @@ def dmn_creator(state: dict) -> dict:
     ])
     logger.info("LLM responded in %.1fs", time.time() - t0)
 
-    dmn_xml = _strip_markdown_fences(response.content)
+    dmn_xml = _strip_markdown_fences(content_to_text(response.content))
 
     safe_name = name.lower().replace(" ", "-").replace("/", "-")[:50]
     write_artifact(output_dir, f"dmn/{safe_name}.dmn", dmn_xml)

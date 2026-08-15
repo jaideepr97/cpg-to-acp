@@ -227,16 +227,48 @@ Without `SONATAFLOW_URL` / `MINIO_ENDPOINT` set, the BFF starts in mock mode aut
 
 ## Deployment
 
-### OpenShift (Helm)
+See [`deploy/README.md`](../deploy/README.md) for the full cluster deployment guide.
 
-The UI and BFF are deployed as separate pods via the existing Helm chart in `deploy/chart/`. The UI pod has an OpenShift Route for external access; the BFF is cluster-internal only.
+### Quick reference
 
+```bash
+# Full deploy (builds + Helm + OpenShell sandboxes)
+cpg-ingester/deploy/deploy.sh --config deploy/config/cluster.env
+
+# Redeploy without rebuilding images
+cpg-ingester/deploy/deploy.sh --skip-build --tag <sha> --config deploy/config/cluster.env
+
+# Verify (includes BFF minio/sonataflow dependency check)
+cpg-ingester/deploy/verify.sh --config deploy/config/cluster.env
+
+# Teardown (preserves Secrets and ImageStreams)
+cpg-ingester/deploy/teardown.sh --config deploy/config/cluster.env
 ```
-deploy/chart/values.yaml    # ui: and bff: pod entries
-deploy/pods/Containerfile.bff  # UBI9 + Python 3.12 + FastAPI
-```
 
-All pods (ingestion, llm-analysis, assembly, delivery, bff, ui) are managed by the same Helm release:
+### Pod-split architecture
+
+In cluster mode (`openshellMode: true`), cpg-ingester runs as 4 OpenShell sandboxes + 2 Helm pods:
+
+| Sandbox/Pod | Service | Role |
+|---|---|---|
+| `sb-ingestion` | `cpg-ingester-ingestion` | Docling PDF parsing |
+| `sb-llm-analysis` | `cpg-ingester-llm-analysis` | LLM structure analysis + DMN/recommendation generation |
+| `sb-assembly` | `cpg-ingester-assembly` | Artifact assembly |
+| `sb-delivery` | `cpg-ingester-delivery` | Publish to MinIO |
+| `cpg-ingester-bff` (Helm) | `cpg-ingester-bff` | BFF — upload, run management, SonataFlow trigger |
+| `cpg-ingester-ui` (Helm) | `cpg-ingester-ui` | Web UI (UBI nginx) |
+
+### BFF dependencies
+
+The BFF requires `MINIO_ENDPOINT` and `SONATAFLOW_URL` to be set. Without them it runs in **mock mode** (fake upload, no workflow trigger). The Helm chart sets these by default. The `verify.sh` script checks for `minio=true` and `sonataflow=true` in the BFF health response.
+
+### SonataFlow workflow
+
+The `cpgingester` SonataFlow workflow orchestrates: Parse → Analyze → ReviewManifest → Generate → ReviewArtifacts → Assemble → Deliver. The workflow and its props CM (`cpgingester-props.yaml`) are applied automatically by `deploy.sh`.
+
+### OpenShift (Helm only)
+
+All pods are managed by one Helm release. The deploy scripts handle all `--set` overrides:
 
 ```bash
 helm upgrade --install cpg-ingester deploy/chart/ \

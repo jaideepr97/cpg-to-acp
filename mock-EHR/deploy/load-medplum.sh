@@ -281,14 +281,68 @@ print(json.dumps(r))" 2>/dev/null)
   fi
 
   log "  Client ID:     $CLIENT_ID"
-  log "  Client Secret: $CLIENT_SECRET"
+  log "  Client Secret: (stored in Secret smart-client-credentials)"
   log "  Launch URI:    $ACP_WRITER_LAUNCH_URI"
   log "  Redirect URI:  $ACP_WRITER_REDIRECT_URI"
+
+  # Write credentials to a K8s Secret (not logs, not files, not ConfigMaps).
+  # The loader image has no kubectl, so talk to the API server directly with
+  # curl + the ServiceAccount token (RBAC: Role cpg-mock-ehr-loader-secret-writer).
+  SA_DIR="/var/run/secrets/kubernetes.io/serviceaccount"
+  if [ -f "$SA_DIR/token" ]; then
+    K8S_API="https://kubernetes.default.svc"
+    K8S_TOKEN=$(cat "$SA_DIR/token")
+    K8S_NS=$(cat "$SA_DIR/namespace")
+    SECRET_PAYLOAD=$(CLIENT_ID="$CLIENT_ID" CLIENT_SECRET="$CLIENT_SECRET" python3 - <<'PYEOF'
+import json, os
+print(json.dumps({
+    "apiVersion": "v1",
+    "kind": "Secret",
+    "metadata": {
+        "name": "smart-client-credentials",
+        "labels": {
+            "app.kubernetes.io/part-of": "cpg-to-acp",
+            "app.kubernetes.io/managed-by": "medplum-loader",
+        },
+    },
+    "type": "Opaque",
+    "stringData": {
+        "smart-config.json": json.dumps({
+            "clientId": os.environ["CLIENT_ID"],
+            "clientSecret": os.environ["CLIENT_SECRET"],
+        })
+    },
+}))
+PYEOF
+)
+    secret_code=$(echo "$SECRET_PAYLOAD" | curl -s -o /dev/null -w "%{http_code}" \
+      --cacert "$SA_DIR/ca.crt" --max-time 15 \
+      -H "Authorization: Bearer $K8S_TOKEN" \
+      -H "Content-Type: application/json" \
+      -X POST "$K8S_API/api/v1/namespaces/$K8S_NS/secrets" \
+      -d @- || echo "000")
+    if [ "$secret_code" = "409" ]; then
+      # Secret exists — replace its data via merge patch
+      secret_code=$(echo "$SECRET_PAYLOAD" | curl -s -o /dev/null -w "%{http_code}" \
+        --cacert "$SA_DIR/ca.crt" --max-time 15 \
+        -H "Authorization: Bearer $K8S_TOKEN" \
+        -H "Content-Type: application/merge-patch+json" \
+        -X PATCH "$K8S_API/api/v1/namespaces/$K8S_NS/secrets/smart-client-credentials" \
+        -d @- || echo "000")
+    fi
+    case "$secret_code" in
+      200|201) log "  Stored SMART credentials in Secret smart-client-credentials" ;;
+      *) log "  WARNING: Failed to store SMART credentials in Secret (HTTP $secret_code) — IPS Viewer SMART launch will fail" ;;
+    esac
+    unset SECRET_PAYLOAD K8S_TOKEN
+  else
+    log "  Not running in-cluster (no ServiceAccount token) — skipping Secret creation"
+  fi
 fi
 
 log "Registered acp-writer SMART app"
 
-# Write client credentials for downstream services
+# Legacy file-based config (kept for local dev / compose.yml)
 SMART_CONFIG_DIR="${SMART_CONFIG_DIR:-}"
 if [ -n "$SMART_CONFIG_DIR" ] && [ -n "$CLIENT_ID" ]; then
   echo "{\"clientId\":\"$CLIENT_ID\",\"clientSecret\":\"$CLIENT_SECRET\"}" > "$SMART_CONFIG_DIR/smart-config.json"

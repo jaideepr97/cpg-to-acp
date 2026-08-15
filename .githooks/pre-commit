@@ -1,7 +1,22 @@
 #!/usr/bin/env bash
-# Pre-commit hook: scan staged files for secrets using gitleaks.
+# Pre-commit hook: scan staged files for secrets using gitleaks,
+# and block staging of deploy config env files (defense in depth).
 # Install: git config core.hooksPath .githooks
 
+# Check 1: Block deploy config .env files from being staged.
+# These are gitignored, but git add -f bypasses .gitignore.
+env_files=$(git diff --cached --name-only | grep '^deploy/config/.*\.env$' | grep -v '\.template$')
+if [ -n "$env_files" ]; then
+  echo ""
+  echo "BLOCKED: deploy config .env files must never be committed:"
+  echo "$env_files"
+  echo ""
+  echo "These files contain secrets. Remove them from staging:"
+  echo "  git reset HEAD $env_files"
+  exit 1
+fi
+
+# Check 2: Gitleaks secret scan.
 if ! command -v gitleaks &> /dev/null; then
   echo "WARNING: gitleaks not installed — skipping secret scan"
   echo "  Install with: brew install gitleaks"

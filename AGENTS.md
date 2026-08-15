@@ -49,8 +49,14 @@ Producers must not assume a specific consumer runtime. Consumers are pluggable b
 
 ### Deployment
 
-- Each component owns its own deployment artifacts (Containerfiles, manifests, Helm charts, etc.).
-- A root-level deployment file (e.g., docker-compose) is allowed only as a thin wrapper that references component-level deployments.
+- **Cluster deployment guide:** [`deploy/README.md`](deploy/README.md) — the full procedure for deploying to OpenShift with MaaS + OpenShell. Follow it for any cluster work.
+- **Component-specific deployment:** each component has its own `deploy/deploy.sh`, `deploy/verify.sh`, and `deploy/teardown.sh`. See each component's README for details.
+- Each component owns its own deployment artifacts (Containerfiles, Helm charts, OpenShell policies, router fragments, SonataFlow workflows + props CMs).
+- A root-level `deploy/` directory holds only shared infrastructure (MinIO, openshell-router, MCP gateway CRs) and thin orchestrators (`deploy-all.sh`, `teardown-all.sh`, `verify-all.sh`). It must not contain component-specific knowledge.
+- **Secrets:** managed via `deploy/setup/setup-secrets.sh` → K8s Secrets → `secretKeyRef` (Helm pods) / `read_secret` + `--env` (OpenShell sandboxes). Never commit secrets. See [`deploy/README.md` § Secrets](deploy/README.md#secrets) for the full inventory and rotation procedure.
+- **OpenShell provisioning:** `deploy/setup/setup-openshell.sh` provisions the OpenShell gateway + SonataFlow platform per-namespace. Creates cluster-scoped RBAC that must be cleaned up via `teardown-all.sh --full-wipe` when abandoning a namespace.
+- **Images:** SHA-tagged (`git rev-parse --short HEAD`), `imagePullPolicy: Always`. Never use `--skip-build` without an explicit `--tag` matching built images.
+- **Local dev** uses `compose.yml` (unchanged by the cluster framework).
 
 ## Development Rules
 

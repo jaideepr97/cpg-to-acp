@@ -1,4 +1,6 @@
-{{- $ipsViewerRoute := printf "https://%s-ips-viewer-%s.apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com" .Release.Name .Release.Namespace -}}
+{{- if .Values.loader.enabled }}
+{{- $clusterDomain := .Values.clusterDomain | default "apps.example.com" -}}
+{{- $ipsViewerRoute := printf "https://%s-ips-viewer-%s.%s" .Release.Name .Release.Namespace $clusterDomain -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -19,6 +21,7 @@ spec:
         app.kubernetes.io/name: medplum-loader
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      serviceAccountName: {{ .Release.Name }}-loader
       restartPolicy: Never
       containers:
         - name: loader
@@ -53,3 +56,4 @@ spec:
                 secretKeyRef:
                   name: medplum-user-credentials
                   key: MEDPLUM_PRACTITIONER_PASSWORD
+{{- end }}

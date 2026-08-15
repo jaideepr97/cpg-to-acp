@@ -41,6 +41,9 @@ def __getattr__(name):
     if name == "get_llm":
         from cpg_contracts.llm import get_llm
         return get_llm
+    if name == "content_to_text":
+        from cpg_contracts.llm import content_to_text
+        return content_to_text
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -83,4 +86,5 @@ __all__ = [
     "store_artifact",
     # LLM
     "get_llm",
+    "content_to_text",
 ]

@@ -1,5 +1,6 @@
 {{- range $name, $pod := .Values.pods }}
 {{- if $pod.enabled }}
+{{- if not (and $.Values.openshellMode $pod.sandboxed) }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -45,13 +46,38 @@ spec:
             - name: LLM_MODEL
               value: {{ $pod.env.llmModel | quote }}
             {{- end }}
-            {{- if $pod.env.acpWriterUrl }}
-            - name: ACP_WRITER_URL
-              value: {{ $pod.env.acpWriterUrl | quote }}
-            {{- end }}
             {{- if $pod.env.bffHost }}
             - name: BFF_HOST
               value: {{ $pod.env.bffHost | quote }}
+            {{- end }}
+            {{- if $pod.env.sonataflowUrl }}
+            - name: SONATAFLOW_URL
+              value: {{ $pod.env.sonataflowUrl | quote }}
+            {{- end }}
+            {{- if $pod.env.minioEndpoint }}
+            - name: MINIO_ENDPOINT
+              value: {{ $pod.env.minioEndpoint | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if $pod.secrets }}
+            {{- if $pod.secrets.llm }}
+            - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: llm-credentials
+                  key: LLM_API_KEY
+            {{- end }}
+            {{- if $pod.secrets.minio }}
+            - name: ARTIFACT_STORE_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: ARTIFACT_STORE_ACCESS_KEY
+            - name: ARTIFACT_STORE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: ARTIFACT_STORE_SECRET_KEY
             {{- end }}
             {{- end }}
           readinessProbe:
@@ -68,5 +94,6 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml $pod.resources | nindent 12 }}
+{{- end }}
 {{- end }}
 {{- end }}

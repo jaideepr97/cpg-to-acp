@@ -120,10 +120,15 @@ podman login "$REGISTRY" -u unused -p "$TOKEN" --tls-verify=false 2>/dev/null ||
 push_image() {
   local src="$1" dest_is="$2" dest_tag="$3"
   local dest="$REGISTRY/$NAMESPACE/$dest_is:$dest_tag"
-  log "  $src -> $dest_is:$dest_tag"
+  local start_time=$SECONDS
+  log "  Pulling $src ..."
   podman pull --platform linux/amd64 "$src" 2>/dev/null
+  local pull_time=$(( SECONDS - start_time ))
+  log "  Pulled in ${pull_time}s. Pushing -> $dest_is:$dest_tag ..."
   podman tag "$src" "$dest"
   podman push "$dest" --tls-verify=false 2>/dev/null
+  local total_time=$(( SECONDS - start_time ))
+  log "  ✓ $dest_is:$dest_tag done (${total_time}s)"
 }
 
 push_image "docker.io/library/postgres:16"                    "postgres-16"              "16"
@@ -137,15 +142,19 @@ log ""
 log "=== Building custom images ==="
 
 for bc in mock-ehr-app ips-viewer medplum-loader; do
+  log "  Starting build: $bc"
   oc start-build "$bc" -n "$NAMESPACE" 2>&1 | head -1
 done
 
-log "Waiting for builds..."
+log "Waiting for builds (polling every 30s)..."
 for bc in mock-ehr-app ips-viewer medplum-loader; do
+  local_start=$SECONDS
   for i in $(seq 1 60); do
     phase=$(oc get builds -n "$NAMESPACE" -l "openshift.io/build-config.name=$bc" -o jsonpath='{.items[-1].status.phase}' 2>/dev/null)
-    if [ "$phase" = "Complete" ]; then log "  $bc: Complete"; break; fi
-    if [ "$phase" = "Failed" ]; then log "  $bc: FAILED"; break; fi
+    elapsed=$(( SECONDS - local_start ))
+    if [ "$phase" = "Complete" ]; then log "  ✓ $bc: Complete (${elapsed}s)"; break; fi
+    if [ "$phase" = "Failed" ]; then log "  ✗ $bc: FAILED (${elapsed}s)"; break; fi
+    if [ $((i % 3)) -eq 0 ]; then log "  $bc: $phase (${elapsed}s)"; fi
     sleep 10
   done
 done
@@ -167,7 +176,8 @@ log "       --env='MEDPLUM_BASE_URL=http://cpg-mock-ehr-medplum-server:8103' \\"
 log "       --env='DATA_DIR=/data' \\"
 log "       -n $NAMESPACE"
 log ""
-log "  3. For the IPS Viewer SMART credentials, pass them to the Helm chart:"
-log "     helm upgrade cpg-mock-ehr ./mock-EHR/deploy/chart \\"
-log "       --set ipsViewer.smartClientId=<ID> \\"
-log "       --set ipsViewer.smartClientSecret=<SECRET>"
+log "  3. IPS Viewer SMART credentials are handled automatically: the loader"
+log "     job registers the SMART app in Medplum and writes the credentials to"
+log "     the 'smart-client-credentials' K8s Secret, which the IPS Viewer mounts."
+log "     If the loader ran before the IPS Viewer was up, restart it:"
+log "     oc rollout restart deployment/cpg-mock-ehr-ips-viewer -n $NAMESPACE"
