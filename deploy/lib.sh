@@ -96,22 +96,30 @@ preflight_openshell() {
 
 ensure_openshell_portforward() {
     # The openshell CLI needs localhost:18080 → openshell-0:8080.
-    # Idempotent: reuse if running, start if not, retry on race.
-    if curl -s --max-time 2 http://localhost:18080/ &>/dev/null; then
-        return 0
+    # Always verifies the forward targets the current NAMESPACE — a stale
+    # forward to a different namespace's gateway silently routes sandbox
+    # operations to the wrong OpenShell instance.
+    local existing_ns
+    existing_ns=$(ps aux | grep "port-forward.*openshell.*18080" | grep -v grep | grep -oE -- "-n [^ ]+" | head -1 | sed 's/-n //')
+
+    if [ -n "$existing_ns" ] && [ "$existing_ns" = "$NAMESPACE" ]; then
+        if curl -s --max-time 2 http://localhost:18080/ &>/dev/null; then
+            return 0
+        fi
     fi
 
-    # Kill stale forwards
+    # Kill any existing forward (wrong namespace or unresponsive)
     pkill -f "port-forward.*openshell.*18080" 2>/dev/null || true
     sleep 1
 
+    log "  Starting port-forward to openshell-0 in $NAMESPACE..."
     oc port-forward pod/openshell-0 18080:8080 -n "$NAMESPACE" &>/dev/null &
     local pf_pid=$!
     sleep 3
 
     if ! curl -s --max-time 2 http://localhost:18080/ &>/dev/null; then
-        echo "ERROR: Failed to establish openshell port-forward (PID $pf_pid)"
-        echo "  Check: oc get pod openshell-0 -n $NAMESPACE"
+        log "ERROR: Failed to establish openshell port-forward (PID $pf_pid)"
+        log "  Check: oc get pod openshell-0 -n $NAMESPACE"
         exit 1
     fi
 }
