@@ -16,18 +16,21 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$REPO_ROOT/deploy/lib.sh"
 
 CONFIG_PATH="$REPO_ROOT/deploy/config/cluster.env"
+TAG_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --config) CONFIG_PATH="$2"; shift 2;;
-        -h|--help) echo "Usage: acp-writer/deploy/verify.sh [--config <path>]"; exit 0;;
+        --tag) TAG_OVERRIDE="$2"; shift 2;;
+        -h|--help) echo "Usage: acp-writer/deploy/verify.sh [--config <path>] [--tag <sha>]"; exit 0;;
         *) shift;;
     esac
 done
 
 load_config "$CONFIG_PATH"
+IMAGE_TAG=$(resolve_deploy_tag "acp-writer" "$TAG_OVERRIDE")
 
-log_step "Verifying acp-writer deployment"
+log_step "Verifying acp-writer deployment (tag: ${IMAGE_TAG})"
 
 ERRORS=0
 

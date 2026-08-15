@@ -77,6 +77,19 @@ mkdir -p "$RENDERED_DIR"
         fi
     done
 
+    # Default server: health probe endpoint + 404 fallback for unmatched hostnames
+    echo '    server {'
+    echo '        listen 8080 default_server;'
+    echo '        location /health {'
+    echo '            return 200 '\''{"status":"UP","service":"openshell-router"}'\'';'
+    echo '            add_header Content-Type application/json;'
+    echo '        }'
+    echo '        location / {'
+    echo '            return 404 '\''{"error":"no matching sandbox for this hostname"}'\'';'
+    echo '            add_header Content-Type application/json;'
+    echo '        }'
+    echo '    }'
+
     echo '}'
 } > "$RENDERED_DIR/openshell-router-nginx.conf"
 
@@ -145,11 +158,12 @@ fi
 
 # --- MCP Gateway ---
 
-log "Deploying MCP Gateway resources..."
-for manifest in "$REPO_ROOT/deploy/mcp-gateway"/*.yaml; do
-    [ -f "$manifest" ] || continue
-    oc apply -f "$manifest" -n "$NAMESPACE" 2>/dev/null || log "  WARNING: failed to apply $(basename "$manifest")"
-done
+log "Deploying MCP Gateway (shared resources only)..."
+# Render the gateway template (has namespace + cluster domain refs)
+render_template "$REPO_ROOT/deploy/mcp-gateway/gateway.yaml.tmpl" "$RENDERED_DIR/mcp-gateway.yaml"
+oc apply -f "$RENDERED_DIR/mcp-gateway.yaml" -n "$NAMESPACE" 2>/dev/null || log "  WARNING: failed to apply gateway"
+# Virtual servers are cross-component, no templating needed
+oc apply -f "$REPO_ROOT/deploy/mcp-gateway/virtual-servers.yaml" -n "$NAMESPACE" 2>/dev/null || log "  WARNING: failed to apply virtual-servers"
 
 # --- Quota check ---
 

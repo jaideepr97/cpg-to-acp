@@ -71,11 +71,12 @@ done
 if [ "$INFRA" = true ]; then
     log_step "Removing shared infrastructure"
 
-    log "Removing MCP Gateway..."
-    for manifest in "$REPO_ROOT/deploy/mcp-gateway"/*.yaml; do
-        [ -f "$manifest" ] || continue
-        oc delete -f "$manifest" -n "$NAMESPACE" 2>/dev/null || true
-    done
+    log "Removing shared MCP Gateway resources..."
+    render_template "$REPO_ROOT/deploy/mcp-gateway/gateway.yaml.tmpl" "$REPO_ROOT/deploy/.rendered/mcp-gateway.yaml"
+    oc delete -f "$REPO_ROOT/deploy/.rendered/mcp-gateway.yaml" -n "$NAMESPACE" 2>/dev/null || true
+    oc delete -f "$REPO_ROOT/deploy/mcp-gateway/virtual-servers.yaml" -n "$NAMESPACE" 2>/dev/null || true
+    # Clean up operator-managed secret left behind when gateway CRs are deleted
+    oc delete secret mcp-gateway-config -n "$NAMESPACE" 2>/dev/null || true
 
     log "Removing openshell-router..."
     oc delete -f "$REPO_ROOT/deploy/openshell-router/deploy.yaml" -n "$NAMESPACE" 2>/dev/null || true

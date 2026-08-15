@@ -127,13 +127,12 @@ deploy_sandboxes() {
         "${common_env[@]}" \
         "PYTHONPATH=/app/src"
 
-    # Delivery
+    # Delivery (MinIO-only after PR #115 decoupling — no acp-writer dependency)
     create_ing_sandbox "sb-delivery" "cpg-ingester-delivery" "cpg-ingester-delivery.yaml" \
         "cpg-ingester-delivery" \
         "uvicorn cpg_ingester.services.delivery_svc:app --host 0.0.0.0 --port 8080" \
         "${common_env[@]}" \
-        "PYTHONPATH=/app/src" \
-        "ACP_WRITER_URL=http://acp-writer-api:8080"
+        "PYTHONPATH=/app/src"
 
     sleep 5
 }

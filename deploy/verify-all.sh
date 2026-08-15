@@ -107,44 +107,67 @@ done
 log_step "S7 Secret-leak scan"
 
 { set +x; } 2>/dev/null
-LEAK_FOUND=false
 
 # Read secret prefixes to scan for (never print the full values)
 LLM_KEY_PREFIX=$(read_secret llm-credentials LLM_API_KEY | head -c 10)
 MINIO_PASS=$(read_secret minio-credentials ARTIFACT_STORE_SECRET_KEY | head -c 10)
 
-# Scan all pod specs for secret values in plain text
-POD_SPECS=$(oc get pods -n "$NAMESPACE" -o yaml 2>/dev/null)
+# Classify pods by OpenShell sandbox label and extract env values.
+# Sandbox pods (agents.x-k8s.io/sandbox-name-hash label) receive secrets
+# via --env — documented S6 exposure, reported as WARNING not FAIL.
+SCAN_RESULT=$(oc get pods -n "$NAMESPACE" --field-selector=status.phase=Running -o json 2>/dev/null | \
+    python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+sb_count = 0
+non_sb_values = []
+for pod in data.get('items', []):
+    labels = pod.get('metadata', {}).get('labels', {})
+    is_sandbox = 'agents.x-k8s.io/sandbox-name-hash' in labels
+    if is_sandbox:
+        sb_count += 1
+        continue
+    for c in pod.get('spec', {}).get('containers', []):
+        for env in c.get('env', []):
+            if 'value' in env and 'valueFrom' not in env:
+                non_sb_values.append(env['value'])
+print(f'SB_COUNT={sb_count}')
+for v in non_sb_values:
+    print(v)
+" 2>/dev/null || echo "SB_COUNT=0")
+
+SB_COUNT=$(echo "$SCAN_RESULT" | head -1 | sed 's/SB_COUNT=//')
+NON_SB_ENV_VALUES=$(echo "$SCAN_RESULT" | tail -n +2)
+REAL_LEAK=false
 
 for prefix_label in "LLM_API_KEY:$LLM_KEY_PREFIX" "MINIO_SECRET:$MINIO_PASS"; do
     label="${prefix_label%%:*}"
     prefix="${prefix_label##*:}"
-    if [ -z "$prefix" ]; then
-        continue
-    fi
-    # Search for the prefix in pod specs (env values, not secretKeyRef names)
-    hits=$(echo "$POD_SPECS" | grep -n "value:.*${prefix}" 2>/dev/null | grep -v "secretKeyRef" | head -5)
+    [ -z "$prefix" ] && continue
+    hits=$(echo "$NON_SB_ENV_VALUES" | grep -F "$prefix" | head -5 || true)
     if [ -n "$hits" ]; then
-        echo "  ✗ LEAK: $label prefix found in pod specs:"
-        echo "$hits" | sed 's/'"$prefix"'.*/[REDACTED]/g'
-        LEAK_FOUND=true
+        echo "  ✗ LEAK: $label prefix found in non-sandbox pod env values"
+        REAL_LEAK=true
     fi
 done
 
-if [ "$LEAK_FOUND" = true ]; then
-    echo ""
-    echo "  SECRET LEAK DETECTED in pod specs. Secrets should use secretKeyRef, not plain values."
+if [ "$REAL_LEAK" = true ]; then
+    echo "  SECRET LEAK DETECTED in non-sandbox pod specs. Secrets should use secretKeyRef."
     ERRORS=$((ERRORS + 1))
 else
-    echo "  ✓ No secret leaks found in pod specs"
+    echo "  ✓ No secret leaks in non-sandbox pod specs"
+fi
+
+if [ "$SB_COUNT" -gt 0 ]; then
+    echo "  ⚠ $SB_COUNT sandbox pod(s) have secrets via OpenShell --env (documented S6 exposure)"
 fi
 
 # --- 4. Orphan check ---
 
 log_step "Orphan check"
 
-EXPECTED_PREFIXES="sb-|cpg-mock-ehr|cpg-decision-svc|acp-ui|cpg-ingester-ui|cpg-ingester-bff|minio|openshell|sonataflow|mcp-gateway|cpg-gateway|acpwriter|cpgingester|mock-ehr-mcp"
-orphans=$(oc get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep -v -E "$EXPECTED_PREFIXES" | grep -v "Completed\|Error" | head -10)
+EXPECTED_PREFIXES="sb-|cpg-mock-ehr|cpg-decision-svc|acp-ui|acp-writer-mcp|cpg-ingester-ui|cpg-ingester-bff|minio|openshell|sonataflow|cpg-gateway|acpwriter|cpgingester|mock-ehr-mcp"
+orphans=$(oc get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep -v -E "$EXPECTED_PREFIXES" | grep -v "Completed\|Error" | head -10 || true)
 if [ -n "$orphans" ]; then
     echo "  ⚠ Unexpected pods found:"
     echo "$orphans"
@@ -163,26 +186,31 @@ if [ "$E2E" = true ]; then
     PATIENT_FILE="$REPO_ROOT/mock-EHR/data/patient-bundle-medication.json"
 
     if [ -f "$DMN_FILE" ] && [ -f "$PATIENT_FILE" ]; then
-        # Deploy DMN via routed path
-        oc cp "$DMN_FILE" sb-llm-reasoning:/tmp/test-dmn.dmn -n "$NAMESPACE" 2>/dev/null
-        deploy_code=$(oc exec sb-llm-reasoning -n "$NAMESPACE" -- \
-            curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
-            -X POST "http://acp-decision-engine:8080/api/v1/decisions/models" \
-            -H "Content-Type: application/xml" \
-            -d @/tmp/test-dmn.dmn 2>/dev/null || echo "000")
-
-        if [ "$deploy_code" = "201" ] || [ "$deploy_code" = "200" ]; then
-            echo "    ✓ DMN model deployed: HTTP $deploy_code"
-        else
-            echo "    ✗ DMN model deploy failed: HTTP $deploy_code"
+        ROUTER_POD=$(oc get pods -n "$NAMESPACE" -l app=openshell-router --field-selector=status.phase=Running -o name 2>/dev/null | head -1 | sed 's|pod/||')
+        if [ -z "$ROUTER_POD" ]; then
+            echo "    ✗ openshell-router pod not found — skipping e2e"
             ERRORS=$((ERRORS + 1))
-        fi
+        else
+            # Deploy DMN via router Host header
+            oc cp "$DMN_FILE" "${ROUTER_POD}:/tmp/test-dmn.dmn" -n "$NAMESPACE" 2>/dev/null
+            deploy_code=$(oc exec "$ROUTER_POD" -n "$NAMESPACE" -- \
+                curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+                -X POST -H "Host: acp-decision-engine" \
+                -H "Content-Type: application/xml" \
+                --data-binary @/tmp/test-dmn.dmn \
+                http://localhost:8080/api/v1/decisions/models 2>/dev/null || echo "000")
 
-        # Execute via execute-dmn
-        oc cp "$PATIENT_FILE" sb-llm-reasoning:/tmp/test-patient.json -n "$NAMESPACE" 2>/dev/null
-        oc exec sb-llm-reasoning -n "$NAMESPACE" -- python3 -c "
+            if [ "$deploy_code" = "201" ] || [ "$deploy_code" = "200" ]; then
+                echo "    ✓ DMN model deployed: HTTP $deploy_code"
+            else
+                echo "    ✗ DMN model deploy failed: HTTP $deploy_code"
+                ERRORS=$((ERRORS + 1))
+            fi
+
+            # Build execute-dmn payload locally, copy to router
+            python3 -c "
 import json
-with open('/tmp/test-patient.json') as f:
+with open('$PATIENT_FILE') as f:
     bundle = json.load(f)
 payload = {
     'ips_bundle': bundle,
@@ -195,14 +223,17 @@ payload = {
 with open('/tmp/test-execute-payload.json', 'w') as f:
     json.dump(payload, f)
 " 2>/dev/null
+            oc cp /tmp/test-execute-payload.json "${ROUTER_POD}:/tmp/test-execute-payload.json" -n "$NAMESPACE" 2>/dev/null
 
-        result=$(oc exec sb-llm-reasoning -n "$NAMESPACE" -- \
-            curl -s --max-time 120 \
-            -X POST "http://acp-llm-reasoning:8080/api/v1/execute-dmn" \
-            -H "Content-Type: application/json" \
-            -d @/tmp/test-execute-payload.json 2>/dev/null || echo "{}")
+            # Execute via router (LLM calls — generous timeout)
+            result=$(oc exec "$ROUTER_POD" -n "$NAMESPACE" -- \
+                curl -s --max-time 300 \
+                -X POST -H "Host: acp-llm-reasoning" \
+                -H "Content-Type: application/json" \
+                --data-binary @/tmp/test-execute-payload.json \
+                http://localhost:8080/api/v1/execute-dmn 2>/dev/null || echo "{}")
 
-        if echo "$result" | python3 -c "
+            if echo "$result" | python3 -c "
 import sys, json
 d = json.load(sys.stdin)
 r = d.get('dmn_results', [{}])[0]
@@ -212,26 +243,31 @@ has_match_basis = any(v.get('match_basis') for v in r.get('input_resolution', {}
 assert has_match_basis, 'no match_basis in audit'
 print('PASS')
 " 2>/dev/null; then
-            echo "    ✓ QA round trip: decision result with match_basis audit"
-        else
-            echo "    ✗ QA round trip failed"
-            ERRORS=$((ERRORS + 1))
+                echo "    ✓ QA round trip: decision result with match_basis audit"
+            else
+                echo "    ✗ QA round trip failed"
+                ERRORS=$((ERRORS + 1))
+            fi
         fi
     else
         echo "    ⚠ Test fixtures not found — skipping QA round trip"
     fi
 
-    # Terminology egress probe
+    # Terminology egress probe (from sandbox — tests OpenShell egress policy)
     echo "  Terminology egress:"
-    term_code=$(oc exec sb-llm-reasoning -n "$NAMESPACE" -- \
-        curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
-        "https://tx.fhir.org/r4/ValueSet/\$expand?url=http://snomed.info/sct?fhir_vs&filter=test&count=1" \
-        2>/dev/null || echo "000")
-    if [ "$term_code" = "200" ]; then
-        echo "    ✓ Terminology egress (tx.fhir.org): HTTP 200"
+    if oc get pod sb-llm-reasoning -n "$NAMESPACE" &>/dev/null; then
+        term_code=$(oc exec sb-llm-reasoning -n "$NAMESPACE" -- \
+            curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+            "https://tx.fhir.org/r4/ValueSet/\$expand?url=http://snomed.info/sct?fhir_vs&filter=test&count=1" \
+            2>/dev/null || echo "000")
+        if [ "$term_code" = "200" ]; then
+            echo "    ✓ Terminology egress (tx.fhir.org via sandbox): HTTP 200"
+        else
+            echo "    ⚠ Terminology egress blocked or unavailable: HTTP $term_code"
+            echo "      Pipeline degrades gracefully but terminology resolution is limited."
+        fi
     else
-        echo "    ⚠ Terminology egress blocked or unavailable: HTTP $term_code"
-        echo "      Pipeline degrades gracefully but terminology resolution is limited."
+        echo "    ⚠ sb-llm-reasoning not present (--skip-openshell?) — skipping terminology probe"
     fi
 fi
 

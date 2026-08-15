@@ -17,6 +17,23 @@ preflight
 
 log_step "Tearing down mock-EHR (namespace=$NAMESPACE)"
 
+# Helm release
 helm uninstall cpg-mock-ehr -n "$NAMESPACE" 2>/dev/null || log "  cpg-mock-ehr not installed"
+
+# Loader Job (may survive helm uninstall if in error state)
+oc delete jobs -l app.kubernetes.io/instance=cpg-mock-ehr -n "$NAMESPACE" 2>/dev/null || true
+
+# MCP server
+log "Removing MCP server..."
+oc delete -f "$SCRIPT_DIR/mcp/registration.yaml" -n "$NAMESPACE" 2>/dev/null || true
+render_template "$SCRIPT_DIR/mcp/mock-ehr-mcp.yaml.tmpl" "$REPO_ROOT/deploy/.rendered/mock-ehr-mcp.yaml"
+oc delete -f "$REPO_ROOT/deploy/.rendered/mock-ehr-mcp.yaml" -n "$NAMESPACE" 2>/dev/null || true
+
+# BuildConfigs
+log "Removing BuildConfigs..."
+for bc in mock-ehr-app ips-viewer medplum-loader; do
+    oc delete bc "$bc" -n "$NAMESPACE" 2>/dev/null || true
+done
+prune_builds "mock-ehr"
 
 log_step "mock-EHR teardown complete"

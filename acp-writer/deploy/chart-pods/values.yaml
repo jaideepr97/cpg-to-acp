@@ -3,9 +3,14 @@ image:
   # Namespace is overridden by deploy scripts (--set image.namespace=...)
   namespace: default
 
+# When true, sandboxed pods render no Deployment (OpenShell sandboxes replace
+# them) and their Services select the openshell-router instead of pod labels.
+openshellMode: true
+
 pods:
   patient-data:
     enabled: true
+    sandboxed: true
     image: acp-writer-patient-data
     tag: latest
     port: 8080
@@ -21,11 +26,11 @@ pods:
 
   llm-reasoning:
     enabled: true
+    sandboxed: true
     image: acp-writer-llm
     tag: latest
     port: 8080
     env:
-      # Bare origin — get_llm() appends /v1. Deploy scripts override this.
       litellmUrl: http://localhost:4000
       llmModel: default
       decisionEngineUrl: http://acp-decision-engine:8080
@@ -42,6 +47,7 @@ pods:
 
   decision-engine:
     enabled: true
+    sandboxed: true
     image: acp-writer-decision
     tag: latest
     port: 8080
@@ -59,6 +65,7 @@ pods:
 
   fhir-generation:
     enabled: true
+    sandboxed: true
     image: acp-writer-fhir-gen
     tag: latest
     port: 8080
@@ -78,6 +85,7 @@ pods:
 
   fhir-server:
     enabled: true
+    sandboxed: true
     image: acp-writer-fhir-srv
     tag: latest
     port: 8080
@@ -96,6 +104,7 @@ pods:
 
   ui:
     enabled: true
+    sandboxed: false
     image: acp-writer-ui
     tag: latest
     port: 8082

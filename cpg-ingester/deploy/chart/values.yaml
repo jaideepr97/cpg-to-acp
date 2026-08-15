@@ -3,9 +3,14 @@ image:
   # Namespace is overridden by deploy scripts (--set image.namespace=...)
   namespace: default
 
+# When true, sandboxed pods render no Deployment (OpenShell sandboxes replace
+# them) and their Services select the openshell-router instead of pod labels.
+openshellMode: true
+
 pods:
   ingestion:
     enabled: true
+    sandboxed: true
     image: cpg-ingester-ingestion
     tag: latest
     port: 8080
@@ -22,6 +27,7 @@ pods:
 
   llm-analysis:
     enabled: true
+    sandboxed: true
     image: cpg-ingester-llm
     tag: latest
     port: 8080
@@ -42,6 +48,7 @@ pods:
 
   assembly:
     enabled: true
+    sandboxed: true
     image: cpg-ingester-assembly
     tag: latest
     port: 8080
@@ -57,6 +64,7 @@ pods:
 
   delivery:
     enabled: true
+    sandboxed: true
     image: cpg-ingester-delivery
     tag: latest
     port: 8080
@@ -72,6 +80,7 @@ pods:
 
   bff:
     enabled: true
+    sandboxed: false
     image: cpg-ingester-bff
     tag: latest
     port: 8080
@@ -87,6 +96,7 @@ pods:
 
   ui:
     enabled: true
+    sandboxed: false
     image: cpg-ingester-ui
     tag: latest
     port: 8080

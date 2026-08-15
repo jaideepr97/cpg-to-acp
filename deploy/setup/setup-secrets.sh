@@ -49,9 +49,10 @@ while [[ $# -gt 0 ]]; do
             echo "  --config <path>     Path to cluster.env (default: deploy/config/cluster.env)"
             echo ""
             echo "Creates/updates K8s Secrets:"
-            echo "  llm-credentials           LLM_API_KEY (OpenAI API key)"
-            echo "  minio-credentials         MinIO root and artifact-store credentials"
-            echo "  fhir-client-credentials   FHIR server (Medplum) client credentials"
+            echo "  llm-credentials              LLM_API_KEY (OpenAI API key)"
+            echo "  minio-credentials            MinIO root and artifact-store credentials"
+            echo "  fhir-client-credentials      FHIR server (Medplum) client credentials (optional)"
+            echo "  medplum-user-credentials     Medplum admin/loader credentials (optional)"
             exit 0
             ;;
         *)
@@ -96,6 +97,15 @@ elif [ "$MODE" = "interactive" ]; then
     read -r -s -p "MinIO root password: " MINIO_ROOT_PASSWORD; echo ""
     read -r -s -p "FHIR client ID (blank to skip): " FHIR_CLIENT_ID; echo ""
     read -r -s -p "FHIR client secret (blank to skip): " FHIR_CLIENT_SECRET; echo ""
+    echo ""
+    read -r -p "Medplum admin email (blank to skip loader): " MEDPLUM_ADMIN_EMAIL
+    if [ -n "$MEDPLUM_ADMIN_EMAIL" ]; then
+        read -r -s -p "Medplum admin password: " MEDPLUM_ADMIN_PASSWORD; echo ""
+        read -r -s -p "Medplum superadmin password [same as admin]: " MEDPLUM_SUPERADMIN_PASSWORD; echo ""
+        MEDPLUM_SUPERADMIN_PASSWORD="${MEDPLUM_SUPERADMIN_PASSWORD:-$MEDPLUM_ADMIN_PASSWORD}"
+        read -r -s -p "Medplum practitioner password [same as admin]: " MEDPLUM_PRACTITIONER_PASSWORD; echo ""
+        MEDPLUM_PRACTITIONER_PASSWORD="${MEDPLUM_PRACTITIONER_PASSWORD:-$MEDPLUM_ADMIN_PASSWORD}"
+    fi
 fi
 
 # --- Validate required values ---
@@ -174,9 +184,33 @@ else
     log "Skipping fhir-client-credentials (no values provided)"
 fi
 
+# Medplum user credentials (optional — needed for the data loader job)
+if [ -n "${MEDPLUM_ADMIN_EMAIL:-}" ] && [ -n "${MEDPLUM_ADMIN_PASSWORD:-}" ]; then
+    log "Creating medplum-user-credentials..."
+    oc apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: medplum-user-credentials
+  namespace: $NAMESPACE
+  labels:
+    app.kubernetes.io/part-of: cpg-to-acp
+    app.kubernetes.io/managed-by: deploy-framework
+type: Opaque
+stringData:
+  MEDPLUM_SUPERADMIN_PASSWORD: "${MEDPLUM_SUPERADMIN_PASSWORD:-$MEDPLUM_ADMIN_PASSWORD}"
+  MEDPLUM_ADMIN_EMAIL: "$MEDPLUM_ADMIN_EMAIL"
+  MEDPLUM_ADMIN_PASSWORD: "$MEDPLUM_ADMIN_PASSWORD"
+  MEDPLUM_PRACTITIONER_PASSWORD: "${MEDPLUM_PRACTITIONER_PASSWORD:-$MEDPLUM_ADMIN_PASSWORD}"
+EOF
+else
+    log "Skipping medplum-user-credentials (no values provided — loader job won't run)"
+fi
+
 # --- Clear variables ---
 unset OPENAI_API_KEY MINIO_ROOT_USER MINIO_ROOT_PASSWORD FHIR_CLIENT_ID FHIR_CLIENT_SECRET
 unset ARTIFACT_STORE_ACCESS_KEY ARTIFACT_STORE_SECRET_KEY
+unset MEDPLUM_SUPERADMIN_PASSWORD MEDPLUM_ADMIN_EMAIL MEDPLUM_ADMIN_PASSWORD MEDPLUM_PRACTITIONER_PASSWORD
 
 echo ""
 log "Secrets created in namespace $NAMESPACE."

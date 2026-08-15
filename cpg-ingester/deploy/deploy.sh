@@ -29,7 +29,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --skip-build      Skip image builds"
-            echo "  --skip-openshell  Skip OpenShell sandbox creation"
+            echo "  --skip-openshell  Deploy Helm-managed pods instead of OpenShell sandboxes"
             echo "  --tag <sha>       Override image tag"
             echo "  --config <path>   Path to cluster.env"
             exit 0;;
@@ -45,7 +45,12 @@ preflight
 LLM_BASE_URL="${MAAS_GATEWAY_URL}/${MAAS_ROUTE_SEGMENT}"
 LLM_MODEL="${CPG_INGESTER_LLM_MODEL:-$LLM_MODEL_DEFAULT}"
 
-log_step "Deploying cpg-ingester (namespace=$NAMESPACE, tag=$IMAGE_TAG)"
+OPENSHELL_MODE="true"
+if [ "$SKIP_OPENSHELL" = true ]; then
+    OPENSHELL_MODE="false"
+fi
+
+log_step "Deploying cpg-ingester (namespace=$NAMESPACE, tag=$IMAGE_TAG, openshellMode=$OPENSHELL_MODE)"
 
 # --- Build ---
 
@@ -71,6 +76,7 @@ log "Installing cpg-ingester chart (timeout 120s)..."
 helm_start=$SECONDS
 helm upgrade --install cpg-ingester "$SCRIPT_DIR/chart" \
     -n "$NAMESPACE" \
+    --set openshellMode="$OPENSHELL_MODE" \
     --set image.namespace="$NAMESPACE" \
     --set mlflow.trackingUri="$MLFLOW_TRACKING_URI" \
     --set pods.ingestion.tag="$IMAGE_TAG" \
@@ -93,14 +99,12 @@ oc apply -f "$SCRIPT_DIR/orchestrator/cpg-ingester-workflow.yaml" -n "$NAMESPACE
 # --- OpenShell ---
 
 if [ "$SKIP_OPENSHELL" = false ]; then
-    log_step "Scaling down Helm pods for OpenShell"
-    for dep in cpg-ingester-ingestion cpg-ingester-llm-analysis cpg-ingester-assembly cpg-ingester-delivery; do
-        oc scale deployment "$dep" --replicas=0 -n "$NAMESPACE" 2>/dev/null || true
-    done
     "$SCRIPT_DIR/openshell/deploy.sh" --config "$CONFIG_PATH" --tag "$IMAGE_TAG"
 else
     log "Skipping OpenShell (--skip-openshell)"
 fi
+
+save_deploy_state "cpg-ingester" "$IMAGE_TAG"
 
 # --- Verify ---
 

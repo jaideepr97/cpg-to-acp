@@ -55,15 +55,16 @@ if command -v openshell &>/dev/null; then
     "$SCRIPT_DIR/openshell/deploy.sh" teardown --config "$CONFIG_PATH" || true
 fi
 
-# Scale up Helm pods (restore from OpenShell)
-for dep in acp-patient-data acp-llm-reasoning acp-decision-engine acp-fhir-generation acp-fhir-server; do
-    oc scale deployment "$dep" --replicas=0 -n "$NAMESPACE" 2>/dev/null || true
-done
-
 # Helm releases
 log "Removing Helm releases..."
 helm uninstall acp -n "$NAMESPACE" 2>/dev/null || log "  acp not installed"
 helm uninstall cpg-decision-svc -n "$NAMESPACE" 2>/dev/null || log "  cpg-decision-svc not installed"
+
+# MCP server
+log "Removing MCP server..."
+oc delete -f "$SCRIPT_DIR/mcp/registration.yaml" -n "$NAMESPACE" 2>/dev/null || true
+render_template "$SCRIPT_DIR/mcp/acp-writer-mcp.yaml.tmpl" "$REPO_ROOT/deploy/.rendered/acp-writer-mcp.yaml"
+oc delete -f "$REPO_ROOT/deploy/.rendered/acp-writer-mcp.yaml" -n "$NAMESPACE" 2>/dev/null || true
 
 # SonataFlow
 log "Removing SonataFlow workflow..."

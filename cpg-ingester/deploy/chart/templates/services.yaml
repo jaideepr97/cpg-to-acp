@@ -10,6 +10,14 @@ metadata:
     app.kubernetes.io/instance: {{ $.Release.Name }}
     app.kubernetes.io/part-of: cpg-to-acp
 spec:
+  {{- if and $.Values.openshellMode $pod.sandboxed }}
+  selector:
+    app: openshell-router
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+  {{- else }}
   selector:
     app.kubernetes.io/name: cpg-ingester-{{ $name }}
     app.kubernetes.io/instance: {{ $.Release.Name }}
@@ -17,5 +25,6 @@ spec:
     - port: {{ $pod.port }}
       targetPort: {{ $pod.port }}
       protocol: TCP
+  {{- end }}
 {{- end }}
 {{- end }}

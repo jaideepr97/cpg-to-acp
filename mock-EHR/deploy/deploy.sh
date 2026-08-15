@@ -47,20 +47,41 @@ else
 fi
 
 log_step "Deploying Helm chart"
+
+# Check if medplum-user-credentials secret exists → enable loader
+LOADER_ENABLED="false"
+if oc get secret medplum-user-credentials -n "$NAMESPACE" &>/dev/null; then
+    LOADER_ENABLED="true"
+    log "  medplum-user-credentials secret found — loader job enabled"
+else
+    log "  medplum-user-credentials secret not found — loader job disabled"
+fi
+
 log "Installing mock-EHR chart (timeout 300s)..."
 helm_start=$SECONDS
 helm upgrade --install cpg-mock-ehr "$SCRIPT_DIR/chart" \
     -n "$NAMESPACE" \
     --set image.namespace="$NAMESPACE" \
+    --set clusterDomain="$CLUSTER_DOMAIN" \
     --set postgres.image="${REGISTRY}/${NAMESPACE}/postgres-16:16" \
     --set redis.image="${REGISTRY}/${NAMESPACE}/redis-7:7" \
     --set medplumServer.image="${REGISTRY}/${NAMESPACE}/medplum-server-upstream:5.1.27" \
     --set medplumApp.image="${REGISTRY}/${NAMESPACE}/medplum-app-upstream:5.1.27" \
     --set mockEhrApp.image.tag="$IMAGE_TAG" \
     --set ipsViewer.image.tag="$IMAGE_TAG" \
+    --set loader.enabled="$LOADER_ENABLED" \
     --set loader.image.tag="$IMAGE_TAG" \
     --wait --timeout 300s || { log "ERROR: mock-EHR helm install failed"; exit 1; }
 log "  mock-EHR installed ($(( SECONDS - helm_start ))s)"
+
+log_step "Deploying MCP server"
+render_template "$SCRIPT_DIR/mcp/mock-ehr-mcp.yaml.tmpl" "$REPO_ROOT/deploy/.rendered/mock-ehr-mcp.yaml"
+oc apply -f "$REPO_ROOT/deploy/.rendered/mock-ehr-mcp.yaml" -n "$NAMESPACE" 2>/dev/null \
+    || log "WARNING: MCP server deploy failed"
+oc apply -f "$SCRIPT_DIR/mcp/registration.yaml" -n "$NAMESPACE" 2>/dev/null \
+    || log "WARNING: MCP registration apply failed"
+
+save_deploy_state "mock-ehr" "$IMAGE_TAG"
 
 log_step "Verifying mock-EHR"
 "$SCRIPT_DIR/verify.sh" --config "$CONFIG_PATH"

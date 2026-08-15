@@ -8,12 +8,14 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$REPO_ROOT/deploy/lib.sh"
 
 CONFIG_PATH="$REPO_ROOT/deploy/config/cluster.env"
+TAG_OVERRIDE=""
 while [[ $# -gt 0 ]]; do
-    case "$1" in --config) CONFIG_PATH="$2"; shift 2;; *) shift;; esac
+    case "$1" in --config) CONFIG_PATH="$2"; shift 2;; --tag) TAG_OVERRIDE="$2"; shift 2;; *) shift;; esac
 done
 load_config "$CONFIG_PATH"
+IMAGE_TAG=$(resolve_deploy_tag "cpg-ingester" "$TAG_OVERRIDE")
 
-log_step "Verifying cpg-ingester deployment"
+log_step "Verifying cpg-ingester deployment (tag: ${IMAGE_TAG})"
 ERRORS=0
 SANDBOXES=(sb-ingestion sb-llm-analysis sb-assembly sb-delivery)
 

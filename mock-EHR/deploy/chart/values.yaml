@@ -98,6 +98,11 @@ ipsViewer:
     port: 8080
 
 loader:
+  # Set to false to skip the data loader job (when medplum-user-credentials secret is absent)
+  enabled: true
   image:
     name: medplum-loader
     tag: latest
+
+# Cluster domain for route hostnames (overridden by deploy scripts)
+clusterDomain: ""

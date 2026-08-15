@@ -1,5 +1,6 @@
 {{- range $name, $pod := .Values.pods }}
 {{- if $pod.enabled }}
+{{- if not (and $.Values.openshellMode $pod.sandboxed) }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -45,10 +46,6 @@ spec:
             - name: LLM_MODEL
               value: {{ $pod.env.llmModel | quote }}
             {{- end }}
-            {{- if $pod.env.acpWriterUrl }}
-            - name: ACP_WRITER_URL
-              value: {{ $pod.env.acpWriterUrl | quote }}
-            {{- end }}
             {{- if $pod.env.bffHost }}
             - name: BFF_HOST
               value: {{ $pod.env.bffHost | quote }}
@@ -89,5 +86,6 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml $pod.resources | nindent 12 }}
+{{- end }}
 {{- end }}
 {{- end }}

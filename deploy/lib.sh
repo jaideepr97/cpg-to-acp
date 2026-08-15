@@ -61,7 +61,7 @@ preflight() {
         fi
     fi
 
-    for var in MAAS_GATEWAY_URL MAAS_ROUTE_SEGMENT LLM_MODEL_DEFAULT GIT_REPO; do
+    for var in MAAS_GATEWAY_URL MAAS_ROUTE_SEGMENT LLM_MODEL_DEFAULT GIT_REPO CLUSTER_DOMAIN; do
         if [ -z "${!var:-}" ]; then
             echo "ERROR: Required config variable $var is empty. Check deploy/config/cluster.env."
             errors=$((errors + 1))
@@ -271,9 +271,10 @@ start_builds_parallel() {
     done
 
     local total=${#build_names[@]}
-    log "  Waiting for $total builds (polling every 30s, timeout 20m)..."
+    local timeout="${BUILD_TIMEOUT:-1200}"
+    local timeout_min=$((timeout / 60))
+    log "  Waiting for $total builds (polling every 30s, timeout ${timeout_min}m)..."
     local start_time=$SECONDS
-    local timeout=1200
 
     while true; do
         local completed=0
@@ -387,6 +388,58 @@ except:
             oc tag -d "$is_name:$tag" -n "$NAMESPACE" 2>/dev/null || true
         fi
     done
+}
+
+# --- Deploy state tracking ---
+
+save_deploy_state() {
+    # Write a ConfigMap recording which tag was deployed for this component.
+    # verify.sh reads this instead of requiring a global IMAGE_TAG.
+    # Usage: save_deploy_state <component> <tag>
+    local component="$1"
+    local tag="$2"
+    oc apply -f - <<EOF || log "WARNING: failed to save deploy-state for ${component} (verify may use a stale tag)"
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: deploy-state-${component}
+  namespace: $NAMESPACE
+  labels:
+    app.kubernetes.io/managed-by: deploy-framework
+    app.kubernetes.io/component: deploy-state
+data:
+  component: "${component}"
+  tag: "${tag}"
+  timestamp: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+EOF
+}
+
+read_deploy_tag() {
+    # Read the deployed tag for a component. Returns empty if not set.
+    # Usage: local tag; tag=$(read_deploy_tag <component>)
+    local component="$1"
+    oc get configmap "deploy-state-${component}" -n "$NAMESPACE" -o jsonpath='{.data.tag}' 2>/dev/null || echo ""
+}
+
+resolve_deploy_tag() {
+    # Resolve the image tag for verification. Precedence:
+    #   1. Explicit --tag argument (caller passes as $2)
+    #   2. deploy-state ConfigMap for the component
+    #   3. IMAGE_TAG from load_config (git HEAD)
+    # Usage: IMAGE_TAG=$(resolve_deploy_tag <component> "${TAG_OVERRIDE:-}")
+    local component="$1"
+    local explicit="${2:-}"
+    if [ -n "$explicit" ]; then
+        echo "$explicit"
+        return
+    fi
+    local cm_tag
+    cm_tag=$(read_deploy_tag "$component")
+    if [ -n "$cm_tag" ]; then
+        echo "$cm_tag"
+        return
+    fi
+    echo "${IMAGE_TAG:-}"
 }
 
 # --- Logging ---

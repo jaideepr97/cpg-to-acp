@@ -33,7 +33,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --skip-build      Skip image builds (use existing images)"
-            echo "  --skip-openshell  Skip OpenShell sandbox creation (Helm-only deploy)"
+            echo "  --skip-openshell  Deploy Helm-managed pods instead of OpenShell sandboxes"
             echo "  --tag <sha>       Override image tag (default: git HEAD SHA)"
             echo "  --config <path>   Path to cluster.env"
             exit 0;;
@@ -49,7 +49,12 @@ preflight
 LLM_BASE_URL="${MAAS_GATEWAY_URL}/${MAAS_ROUTE_SEGMENT}"
 LLM_MODEL="${ACP_WRITER_LLM_MODEL:-$LLM_MODEL_DEFAULT}"
 
-log_step "Deploying acp-writer (namespace=$NAMESPACE, tag=$IMAGE_TAG)"
+OPENSHELL_MODE="true"
+if [ "$SKIP_OPENSHELL" = true ]; then
+    OPENSHELL_MODE="false"
+fi
+
+log_step "Deploying acp-writer (namespace=$NAMESPACE, tag=$IMAGE_TAG, openshellMode=$OPENSHELL_MODE)"
 
 # --- Step 1: Build images ---
 
@@ -96,6 +101,7 @@ log "Installing acp-writer chart (timeout 120s)..."
 helm_start=$SECONDS
 helm upgrade --install acp "$SCRIPT_DIR/chart-pods" \
     -n "$NAMESPACE" \
+    --set openshellMode="$OPENSHELL_MODE" \
     --set image.namespace="$NAMESPACE" \
     --set mlflow.trackingUri="$MLFLOW_TRACKING_URI" \
     --set pods.patient-data.tag="$IMAGE_TAG" \
@@ -117,26 +123,31 @@ log_step "Applying SonataFlow workflow"
 oc apply -f "$SCRIPT_DIR/orchestrator/acp-writer-workflow.yaml" -n "$NAMESPACE" 2>/dev/null \
     || log "WARNING: SonataFlow workflow apply failed"
 
-# --- Step 4: Scale down Helm pods (OpenShell replaces them) ---
+# --- Step 4: Deploy MCP server ---
+
+log_step "Deploying MCP server"
+render_template "$SCRIPT_DIR/mcp/acp-writer-mcp.yaml.tmpl" "$REPO_ROOT/deploy/.rendered/acp-writer-mcp.yaml"
+oc apply -f "$REPO_ROOT/deploy/.rendered/acp-writer-mcp.yaml" -n "$NAMESPACE" 2>/dev/null \
+    || log "WARNING: MCP server deploy failed"
+oc apply -f "$SCRIPT_DIR/mcp/registration.yaml" -n "$NAMESPACE" 2>/dev/null \
+    || log "WARNING: MCP registration apply failed"
+
+# --- Step 5: Create OpenShell sandboxes ---
 
 if [ "$SKIP_OPENSHELL" = false ]; then
-    log_step "Scaling down Helm pods (OpenShell sandboxes will replace them)"
-    for dep in acp-patient-data acp-llm-reasoning acp-decision-engine acp-fhir-generation acp-fhir-server; do
-        oc scale deployment "$dep" --replicas=0 -n "$NAMESPACE" 2>/dev/null || true
-    done
-
-    # Create OpenShell sandboxes
     "$SCRIPT_DIR/openshell/deploy.sh" --config "$CONFIG_PATH" --tag "$IMAGE_TAG"
 else
     log "Skipping OpenShell sandboxes (--skip-openshell)"
 fi
 
-# --- Step 5: Verify ---
+save_deploy_state "acp-writer" "$IMAGE_TAG"
+
+# --- Step 6: Verify ---
 
 log_step "Verifying acp-writer deployment"
 "$SCRIPT_DIR/verify.sh" --config "$CONFIG_PATH"
 
-# --- Step 6: Prune old image tags ---
+# --- Step 7: Prune old image tags ---
 
 for is in acp-writer-patient-data acp-writer-llm acp-writer-decision acp-writer-fhir-gen acp-writer-fhir-srv acp-writer-ui acp-writer-mcp decision-service; do
     prune_image_tags "$is" 5

@@ -37,10 +37,6 @@ if command -v openshell &>/dev/null; then
     "$SCRIPT_DIR/openshell/deploy.sh" teardown --config "$CONFIG_PATH" || true
 fi
 
-for dep in cpg-ingester-ingestion cpg-ingester-llm-analysis cpg-ingester-assembly cpg-ingester-delivery; do
-    oc scale deployment "$dep" --replicas=0 -n "$NAMESPACE" 2>/dev/null || true
-done
-
 helm uninstall cpg-ingester -n "$NAMESPACE" 2>/dev/null || log "  cpg-ingester not installed"
 
 oc delete -f "$SCRIPT_DIR/orchestrator/cpg-ingester-workflow.yaml" -n "$NAMESPACE" 2>/dev/null || true
