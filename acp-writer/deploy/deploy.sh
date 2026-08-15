@@ -120,6 +120,10 @@ log "  acp-writer installed ($(( SECONDS - helm_start ))s)"
 # --- Step 3: Apply SonataFlow workflow ---
 
 log_step "Applying SonataFlow workflow"
+# Props MUST be applied before (or with) the CR: they map CloudEvent channels
+# to the /wait-* HTTP endpoints and raise timeouts for long LLM calls.
+oc apply -f "$SCRIPT_DIR/orchestrator/acpwriter-props.yaml" -n "$NAMESPACE" 2>/dev/null \
+    || log "WARNING: acpwriter-props apply failed"
 oc apply -f "$SCRIPT_DIR/orchestrator/acp-writer-workflow.yaml" -n "$NAMESPACE" 2>/dev/null \
     || log "WARNING: SonataFlow workflow apply failed"
 

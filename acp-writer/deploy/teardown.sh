@@ -69,6 +69,7 @@ oc delete -f "$REPO_ROOT/deploy/.rendered/acp-writer-mcp.yaml" -n "$NAMESPACE" 2
 # SonataFlow
 log "Removing SonataFlow workflow..."
 oc delete -f "$SCRIPT_DIR/orchestrator/acp-writer-workflow.yaml" -n "$NAMESPACE" 2>/dev/null || true
+oc delete -f "$SCRIPT_DIR/orchestrator/acpwriter-props.yaml" -n "$NAMESPACE" 2>/dev/null || true
 
 # BuildConfigs and build pods
 log "Removing BuildConfigs and build pods..."

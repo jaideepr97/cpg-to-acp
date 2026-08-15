@@ -100,7 +100,7 @@ ensure_openshell_portforward() {
     # forward to a different namespace's gateway silently routes sandbox
     # operations to the wrong OpenShell instance.
     local existing_ns
-    existing_ns=$(ps aux | grep "port-forward.*openshell.*18080" | grep -v grep | grep -oE -- "-n [^ ]+" | head -1 | sed 's/-n //')
+    existing_ns=$(ps aux | grep "port-forward.*openshell.*18080" | grep -v grep | grep -oE -- "-n [^ ]+" | head -1 | sed 's/-n //' || true)
 
     if [ -n "$existing_ns" ] && [ "$existing_ns" = "$NAMESPACE" ]; then
         if curl -s --max-time 2 http://localhost:18080/ &>/dev/null; then

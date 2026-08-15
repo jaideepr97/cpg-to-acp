@@ -40,6 +40,7 @@ fi
 helm uninstall cpg-ingester -n "$NAMESPACE" 2>/dev/null || log "  cpg-ingester not installed"
 
 oc delete -f "$SCRIPT_DIR/orchestrator/cpg-ingester-workflow.yaml" -n "$NAMESPACE" 2>/dev/null || true
+oc delete -f "$SCRIPT_DIR/orchestrator/cpgingester-props.yaml" -n "$NAMESPACE" 2>/dev/null || true
 
 for bc in cpg-ingester-ingestion cpg-ingester-llm cpg-ingester-assembly cpg-ingester-delivery cpg-ingester-bff cpg-ingester-ui; do
     oc delete bc "$bc" -n "$NAMESPACE" 2>/dev/null || true

@@ -1,17 +1,6 @@
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: minio-credentials
-  labels:
-    app: minio
-type: Opaque
-stringData:
-  MINIO_ROOT_USER: CHANGE_ME
-  MINIO_ROOT_PASSWORD: CHANGE_ME
-  ARTIFACT_STORE_ACCESS_KEY: CHANGE_ME
-  ARTIFACT_STORE_SECRET_KEY: CHANGE_ME
----
+# minio-credentials Secret is created by setup-secrets.sh — not here.
+# The Deployment below references it via secretKeyRef.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

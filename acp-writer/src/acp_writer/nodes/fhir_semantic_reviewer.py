@@ -9,7 +9,7 @@ import logging
 import time
 
 import mlflow
-from cpg_contracts import get_llm
+from cpg_contracts import content_to_text, get_llm
 
 from acp_writer.output import write_artifact
 from acp_writer.prompts.fhir_semantic_reviewer import (
@@ -66,7 +66,7 @@ def fhir_semantic_reviewer(state: CarePlanComposerState) -> dict:
     logger.info("LLM responded in %.1fs", elapsed)
 
     try:
-        review = _parse_review_response(response.content)
+        review = _parse_review_response(content_to_text(response.content))
     except (json.JSONDecodeError, Exception) as e:
         logger.warning("Could not parse FHIR review response, treating as APPROVE: %s", e)
         review = {"verdict": "APPROVE", "issues": []}

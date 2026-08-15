@@ -93,6 +93,10 @@ log "  cpg-ingester installed ($(( SECONDS - helm_start ))s)"
 # --- SonataFlow ---
 
 log_step "Applying SonataFlow workflow"
+# Props MUST be applied before (or with) the CR: they map CloudEvent channels
+# to the /wait-* HTTP endpoints the async callbacks depend on.
+oc apply -f "$SCRIPT_DIR/orchestrator/cpgingester-props.yaml" -n "$NAMESPACE" 2>/dev/null \
+    || log "WARNING: cpgingester-props apply failed"
 oc apply -f "$SCRIPT_DIR/orchestrator/cpg-ingester-workflow.yaml" -n "$NAMESPACE" 2>/dev/null \
     || log "WARNING: SonataFlow workflow apply failed"
 

@@ -6,7 +6,7 @@ import re
 import time
 
 import mlflow
-from cpg_contracts import CPGMetadata, GradingSystem
+from cpg_contracts import content_to_text, CPGMetadata, GradingSystem
 from cpg_contracts import get_llm
 from cpg_ingester.nodes.structure_analyzer import _parse_llm_json
 from cpg_ingester.output import write_artifact
@@ -70,7 +70,7 @@ def metadata_extractor(state: dict) -> dict:
     logger.info("LLM responded in %.1fs", time.time() - t0)
 
     try:
-        raw = _parse_llm_json(response.content)
+        raw = _parse_llm_json(content_to_text(response.content))
     except (json.JSONDecodeError, ValueError):
         logger.error("Failed to parse metadata extractor response")
         return {"cpg_metadata": {}}

@@ -20,3 +20,31 @@ def get_llm(state: dict) -> ChatOpenAI:
         max_retries=LLM_MAX_RETRIES,
         request_timeout=LLM_REQUEST_TIMEOUT,
     )
+
+
+def content_to_text(content) -> str:
+    """Normalize an AIMessage.content value to plain text.
+
+    LangChain's message content is `str | list` by contract. With
+    use_responses_api=True (required for gpt-5.6 tool calling), reasoning
+    models return a list of content blocks — e.g. a reasoning block followed
+    by a text block — instead of a bare string. Code that assumes str (e.g.
+    `response.content.strip()`) crashes with
+    "'list' object has no attribute 'strip'".
+
+    Joins the text of all text-bearing blocks; skips reasoning/tool blocks.
+    """
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return str(content)
+    parts: list[str] = []
+    for block in content:
+        if isinstance(block, str):
+            parts.append(block)
+        elif isinstance(block, dict):
+            if block.get("type") in ("text", "output_text") or (
+                "type" not in block and "text" in block
+            ):
+                parts.append(block.get("text", ""))
+    return "".join(parts)

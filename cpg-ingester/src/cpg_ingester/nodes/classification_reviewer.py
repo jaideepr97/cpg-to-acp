@@ -5,7 +5,7 @@ import logging
 import time
 
 import mlflow
-from cpg_contracts import get_llm
+from cpg_contracts import content_to_text, get_llm
 from cpg_ingester.nodes.structure_analyzer import _parse_llm_json
 from cpg_ingester.output import write_artifact
 from cpg_ingester.prompts.classification_reviewer import (
@@ -57,7 +57,7 @@ def classification_reviewer(state: dict) -> dict:
     logger.info("LLM responded in %.1fs", time.time() - t0)
 
     try:
-        result = _parse_llm_json(response.content)
+        result = _parse_llm_json(content_to_text(response.content))
     except (json.JSONDecodeError, ValueError):
         logger.warning("Failed to parse reviewer response, treating as no issues")
         result = {"issues_found": False, "feedback": "", "issues": []}

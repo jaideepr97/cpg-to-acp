@@ -50,6 +50,14 @@ spec:
             - name: BFF_HOST
               value: {{ $pod.env.bffHost | quote }}
             {{- end }}
+            {{- if $pod.env.sonataflowUrl }}
+            - name: SONATAFLOW_URL
+              value: {{ $pod.env.sonataflowUrl | quote }}
+            {{- end }}
+            {{- if $pod.env.minioEndpoint }}
+            - name: MINIO_ENDPOINT
+              value: {{ $pod.env.minioEndpoint | quote }}
+            {{- end }}
             {{- end }}
             {{- if $pod.secrets }}
             {{- if $pod.secrets.llm }}

@@ -11,7 +11,7 @@ import time
 from typing import Any
 
 import mlflow
-from cpg_contracts import get_llm
+from cpg_contracts import content_to_text, get_llm
 
 from acp_writer.output import write_artifact
 from acp_writer.planning_brief import PlanningBrief
@@ -172,7 +172,7 @@ def plan_composer(state: CarePlanComposerState) -> dict:
     logger.info("LLM responded in %.1fs", elapsed)
 
     try:
-        brief_data = _parse_brief_from_response(response.content)
+        brief_data = _parse_brief_from_response(content_to_text(response.content))
         _sanitize_conflicts(brief_data)
         brief = PlanningBrief.model_validate(brief_data)
         brief_dict = brief.model_dump(mode="json")
@@ -194,7 +194,7 @@ def plan_composer(state: CarePlanComposerState) -> dict:
 
     except (json.JSONDecodeError, Exception) as e:
         logger.error("Failed to parse Planning Brief from LLM response: %s", e)
-        logger.debug("Raw response: %s", response.content[:500])
+        logger.debug("Raw response: %s", content_to_text(response.content)[:500])
         return {
             "planning_brief": {
                 "patient_reference": patient_ref,

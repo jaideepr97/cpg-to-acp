@@ -6,7 +6,7 @@ import re
 import time
 
 import mlflow
-from cpg_contracts import get_llm
+from cpg_contracts import content_to_text, get_llm
 from cpg_ingester.output import write_artifact
 from cpg_ingester.prompts.structure_analyzer import (
     ARCHETYPE_DETECTION_SYSTEM,
@@ -134,7 +134,7 @@ def structure_analyzer(state: dict) -> dict:
     ])
     logger.info("Section classification: %.1fs", time.time() - t0)
     try:
-        classifications = _parse_llm_json(classification_response.content)
+        classifications = _parse_llm_json(content_to_text(classification_response.content))
     except (json.JSONDecodeError, ValueError):
         logger.warning("Failed to parse section classifications, defaulting to 'recommendation'")
         classifications = [{"heading": s["heading"], "classification": "recommendation", "reason": "parse failure"} for s in sections]
@@ -166,7 +166,7 @@ def structure_analyzer(state: dict) -> dict:
     ])
     logger.info("Archetype detection: %.1fs", time.time() - t0)
     try:
-        archetype_result = _parse_llm_json(archetype_response.content)
+        archetype_result = _parse_llm_json(content_to_text(archetype_response.content))
         archetype = archetype_result.get("archetype", "institutional")
     except (json.JSONDecodeError, ValueError):
         archetype = "institutional"
@@ -181,7 +181,7 @@ def structure_analyzer(state: dict) -> dict:
     ])
     logger.info("Grading extraction: %.1fs", time.time() - t0)
     try:
-        grading_result = _parse_llm_json(grading_response.content)
+        grading_result = _parse_llm_json(content_to_text(grading_response.content))
         grading_definitions = grading_result.get("definitions") or ""
     except (json.JSONDecodeError, ValueError):
         grading_definitions = ""

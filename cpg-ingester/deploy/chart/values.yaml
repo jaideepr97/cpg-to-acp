@@ -84,6 +84,9 @@ pods:
     image: cpg-ingester-bff
     tag: latest
     port: 8080
+    env:
+      sonataflowUrl: http://cpgingester:80
+      minioEndpoint: http://minio:9000
     secrets:
       minio: true
     resources:
