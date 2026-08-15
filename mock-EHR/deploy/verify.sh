@@ -27,10 +27,10 @@ for dep in cpg-mock-ehr-medplum-server cpg-mock-ehr-postgres cpg-mock-ehr-redis;
     fi
 done
 
-# Medplum health
-local_code=$(oc exec deployment/cpg-mock-ehr-medplum-server -n "$NAMESPACE" -- \
+# Medplum health (check via router — Medplum image doesn't have curl)
+local_code=$(oc exec deployment/openshell-router -n "$NAMESPACE" -- \
     curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
-    http://localhost:8103/healthcheck 2>/dev/null || echo "000")
+    http://cpg-mock-ehr-medplum-server:8103/healthcheck 2>/dev/null || echo "000")
 if [ "$local_code" = "200" ]; then
     echo "  ✓ Medplum health: HTTP 200"
 else
