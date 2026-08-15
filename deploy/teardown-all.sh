@@ -62,7 +62,10 @@ for component in cpg-ingester acp-writer mock-EHR; do
     if [ -f "$script" ]; then
         log_step "Tearing down $component"
         wipe_arg=""
-        [ "$FULL_WIPE" = true ] && wipe_arg="--full-wipe"
+        if [ "$FULL_WIPE" = true ]; then
+            wipe_arg="--full-wipe"
+            [ "$SKIP_CONFIRM" = true ] && wipe_arg="$wipe_arg --yes"
+        fi
         "$script" --config "$CONFIG_PATH" $wipe_arg || log "WARNING: $component teardown had errors"
     fi
 done

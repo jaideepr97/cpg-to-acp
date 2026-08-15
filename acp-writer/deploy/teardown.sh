@@ -19,30 +19,30 @@ source "$REPO_ROOT/deploy/lib.sh"
 
 CONFIG_PATH="$REPO_ROOT/deploy/config/cluster.env"
 FULL_WIPE=false
+SKIP_CONFIRM=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --config) CONFIG_PATH="$2"; shift 2;;
-        --full-wipe)
-            echo "⚠ --full-wipe will delete ImageStreams (all built images)."
-            echo "  K8s Secrets are preserved even with --full-wipe."
-            echo "  Type 'wipe' to confirm:"
-            read -r confirm
-            if [ "$confirm" != "wipe" ]; then
-                echo "Aborted."
-                exit 1
-            fi
-            FULL_WIPE=true
-            shift;;
+        --full-wipe) FULL_WIPE=true; shift;;
+        --yes) SKIP_CONFIRM=true; shift;;
         -h|--help)
-            echo "Usage: acp-writer/deploy/teardown.sh [--config <path>] [--full-wipe]"
+            echo "Usage: acp-writer/deploy/teardown.sh [--config <path>] [--full-wipe] [--yes]"
             echo ""
             echo "Removes: sandboxes, Helm releases, SonataFlow CRs, BuildConfigs, build pods."
             echo "Preserves: K8s Secrets, ImageStreams (unless --full-wipe)."
+            echo "  --yes    Skip confirmation prompt (for automation)"
             exit 0;;
         *) shift;;
     esac
 done
+
+if [ "$FULL_WIPE" = true ] && [ "$SKIP_CONFIRM" = false ]; then
+    echo "⚠ --full-wipe will delete acp-writer ImageStreams (all built images)."
+    echo "  Type 'wipe' to confirm:"
+    read -r confirm
+    [ "$confirm" != "wipe" ] && echo "Aborted." && exit 1
+fi
 
 load_config "$CONFIG_PATH"
 preflight

@@ -115,8 +115,9 @@ log "  Recommendations ingest: HTTP $code"
 
 # Step 3: Deploy DMN models
 log "Deploying DMN models..."
-dmn_keys=$(oc exec "$BFF_POD" -n "$NAMESPACE" -- python3 -c "
-import os, boto3
+dmn_count=0
+oc exec "$BFF_POD" -n "$NAMESPACE" -- python3 -c "
+import os, boto3, sys, json
 s3 = boto3.client('s3',
     endpoint_url=os.getenv('MINIO_ENDPOINT'),
     aws_access_key_id=os.getenv('ARTIFACT_STORE_ACCESS_KEY'),
@@ -124,12 +125,11 @@ s3 = boto3.client('s3',
 objs = s3.list_objects_v2(Bucket='cpg-artifacts', Prefix='${BASE_KEY}/dmn/').get('Contents', [])
 for o in objs:
     if o['Key'].endswith('.dmn'):
-        print(o['Key'])
-" 2>/dev/null)
+        print(json.dumps({'key': o['Key'], 'name': o['Key'].rsplit('/',1)[-1].replace('.dmn','')}))
+" 2>/dev/null | while IFS= read -r line; do
+    key=$(echo "$line" | python3 -c "import sys,json; print(json.load(sys.stdin)['key'])")
+    name=$(echo "$line" | python3 -c "import sys,json; print(json.load(sys.stdin)['name'])")
 
-dmn_count=0
-for key in $dmn_keys; do
-    name=$(basename "$key" .dmn)
     oc exec "$BFF_POD" -n "$NAMESPACE" -- python3 -c "
 import os, boto3, sys
 s3 = boto3.client('s3',
@@ -138,9 +138,9 @@ s3 = boto3.client('s3',
     aws_secret_access_key=os.getenv('ARTIFACT_STORE_SECRET_KEY'))
 body = s3.get_object(Bucket='cpg-artifacts', Key='$key')['Body'].read()
 sys.stdout.buffer.write(body)
-" 2>/dev/null > "/tmp/dmn-${dmn_count}.dmn"
+" 2>/dev/null > "/tmp/dmn-upload.dmn"
 
-    oc cp "/tmp/dmn-${dmn_count}.dmn" "$ROUTER_POD:/tmp/dmn-upload.dmn" -n "$NAMESPACE"
+    oc cp "/tmp/dmn-upload.dmn" "$ROUTER_POD:/tmp/dmn-upload.dmn" -n "$NAMESPACE"
     code=$(oc exec "$ROUTER_POD" -n "$NAMESPACE" -- \
         curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
         -X POST -H "Host: acp-decision-engine" \

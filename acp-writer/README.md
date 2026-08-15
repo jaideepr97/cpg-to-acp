@@ -122,6 +122,48 @@ See `benchmarks/README.md` for details.
 
 MLflow tracing via `mlflow.langchain.autolog()` + `mlflow.fastapi.autolog()`. Set `MLFLOW_TRACKING_URI` to enable.
 
+## Cluster Deployment
+
+See [`deploy/README.md`](../deploy/README.md) for the full cluster deployment guide.
+
+### Quick reference
+
+```bash
+# Full deploy (builds + Helm + OpenShell sandboxes)
+acp-writer/deploy/deploy.sh --config deploy/config/cluster.env
+
+# Redeploy without rebuilding images
+acp-writer/deploy/deploy.sh --skip-build --tag <sha> --config deploy/config/cluster.env
+
+# Deploy with Helm-managed pods instead of OpenShell sandboxes
+acp-writer/deploy/deploy.sh --skip-openshell --config deploy/config/cluster.env
+
+# Verify
+acp-writer/deploy/verify.sh --config deploy/config/cluster.env
+
+# Teardown (preserves Secrets and ImageStreams)
+acp-writer/deploy/teardown.sh --config deploy/config/cluster.env
+```
+
+### Pod-split architecture
+
+In cluster mode (`openshellMode: true`), acp-writer runs as 5 OpenShell sandboxes + 1 Helm pod:
+
+| Sandbox/Pod | Service | Role |
+|---|---|---|
+| `sb-patient-data` | `acp-patient-data` | IPS scanning, condition extraction |
+| `sb-llm-reasoning` | `acp-llm-reasoning` | DMN input resolution, composition, recommendations |
+| `sb-decision-engine` | `acp-decision-engine` | DMN evaluation (thin wrapper) |
+| `sb-fhir-generation` | `acp-fhir-generation` | FHIR bundle generation |
+| `sb-fhir-server` | `acp-fhir-server` | Care plan storage, FHIR write |
+| `acp-ui` (Helm) | `acp-ui` | Web UI |
+
+The Kogito decision service (`cpg-decision-svc-decision-service`) runs as a separate Helm deployment.
+
+### SonataFlow workflow
+
+The `acpwriter` SonataFlow workflow orchestrates the pipeline: ScanPatient → ResolveGuidelines → ExecuteDMN → RetrieveRecommendations → ComposePlan → GenerateBundle → ReviewFHIR → WritePlan. The workflow and its props CM (`acpwriter-props.yaml`) are applied automatically by `deploy.sh`.
+
 ## Decision Service (Internal)
 
 Kogito auto-generates REST endpoints from DMN. Internal — use the acp-writer API, not Kogito directly.

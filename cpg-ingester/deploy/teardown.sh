@@ -10,22 +10,26 @@ source "$REPO_ROOT/deploy/lib.sh"
 
 CONFIG_PATH="$REPO_ROOT/deploy/config/cluster.env"
 FULL_WIPE=false
+SKIP_CONFIRM=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --config) CONFIG_PATH="$2"; shift 2;;
-        --full-wipe)
-            echo "⚠ --full-wipe will delete cpg-ingester ImageStreams."
-            echo "  Type 'wipe' to confirm:"
-            read -r confirm
-            [ "$confirm" != "wipe" ] && echo "Aborted." && exit 1
-            FULL_WIPE=true; shift;;
+        --full-wipe) FULL_WIPE=true; shift;;
+        --yes) SKIP_CONFIRM=true; shift;;
         -h|--help)
-            echo "Usage: cpg-ingester/deploy/teardown.sh [--config <path>] [--full-wipe]"
+            echo "Usage: cpg-ingester/deploy/teardown.sh [--config <path>] [--full-wipe] [--yes]"
             exit 0;;
         *) shift;;
     esac
 done
+
+if [ "$FULL_WIPE" = true ] && [ "$SKIP_CONFIRM" = false ]; then
+    echo "⚠ --full-wipe will delete cpg-ingester ImageStreams."
+    echo "  Type 'wipe' to confirm:"
+    read -r confirm
+    [ "$confirm" != "wipe" ] && echo "Aborted." && exit 1
+fi
 
 load_config "$CONFIG_PATH"
 preflight

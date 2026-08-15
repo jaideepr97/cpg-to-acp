@@ -10,6 +10,7 @@ Internal development documents for the CPG-to-ACP project. Not intended for user
 |-----------|----------|
 | `design/` | Component and contract design documents |
 | `spikes/` | Technical investigations and decision records |
+| `learning/` | Lessons learned — pitfalls and hard-won knowledge (e.g., deploying on OpenShift with MaaS, OpenShell, SonataFlow) |
 | `ui/` | UI/UX spikes and wireframes (Phase 4) |
 
 Top-level files: project plan, project proposal, and intro deck.

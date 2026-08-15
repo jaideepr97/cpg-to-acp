@@ -143,6 +143,38 @@ sequenceDiagram
 - The clientSecret is never printed to job logs.
 - For local dev (compose), the legacy `SMART_CONFIG_DIR` file-based path in `load-medplum.sh` still applies. The local `ips-viewer/public/smart-config.json` is gitignored and excluded from the image build (`.containerignore`) so a stale baked-in copy can never mask the mounted Secret.
 
+## Cluster Deployment
+
+See [`deploy/README.md`](../deploy/README.md) for the full cluster deployment guide.
+
+### Quick reference
+
+```bash
+# Full deploy (builds + Helm + loader job + SMART credential wiring)
+mock-EHR/deploy/deploy.sh --config deploy/config/cluster.env
+
+# Redeploy without rebuilding images
+mock-EHR/deploy/deploy.sh --skip-build --tag <sha> --config deploy/config/cluster.env
+
+# Verify
+mock-EHR/deploy/verify.sh --config deploy/config/cluster.env
+
+# Teardown (preserves Secrets and ImageStreams)
+mock-EHR/deploy/teardown.sh --config deploy/config/cluster.env
+```
+
+The deploy script:
+1. Builds/pushes Docker Hub images to the internal registry (postgres, redis, medplum) to avoid rate limits
+2. Builds custom images (mock-ehr-app, ips-viewer, medplum-loader)
+3. Installs the Helm chart with all image tags and namespace overrides
+4. If `medplum-user-credentials` Secret exists, enables the loader job — which seeds patient data, creates demo users, and registers the SMART app (writing credentials to the `smart-client-credentials` Secret)
+5. Restarts the IPS Viewer to mount the SMART credentials
+6. Deploys the mock-ehr-mcp server and registration
+
+### Known issue: Docker Hub rate limits
+
+`mock-EHR/ui/Containerfile` and `mock-EHR/ips-viewer/Containerfile` still pull base images from Docker Hub (`node:22-alpine`, `nginxinc/nginx-unprivileged:alpine`). On shared cluster egress IPs these can hit anonymous pull rate limits. cpg-ingester's UI has been migrated to UBI base images; mock-EHR migration is pending.
+
 ## Version Pinning
 
 All Medplum components are pinned to version **5.1.27**. See `dev_docs/ui/mock-ehr-design.md` for the version pinning rationale and upgrade process.
