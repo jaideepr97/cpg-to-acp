@@ -21,14 +21,12 @@ except Exception:
 @click.command()
 @click.argument("input_pdf", type=click.Path(exists=True, path_type=Path))
 @click.option("--output-dir", "-o", type=click.Path(path_type=Path), default=None)
-@click.option("--acp-writer-url", default="http://localhost:8082")
 @click.option("--litellm-url", envvar="LITELLM_URL", default="http://localhost:4000")
 @click.option("--model", envvar="LLM_MODEL", default="default")
 @click.option("--api-key", envvar="LITELLM_API_KEY", default="sk-change-me")
 def main(
     input_pdf: Path,
     output_dir: Path | None,
-    acp_writer_url: str,
     litellm_url: str,
     model: str,
     api_key: str,
@@ -49,7 +47,6 @@ def main(
         "run_id": run_id,
         "output_dir": str(output_dir),
         "pdf_path": str(input_pdf),
-        "acp_writer_url": acp_writer_url,
         "litellm_url": litellm_url,
         "llm_model": model,
         "llm_api_key": api_key,

@@ -47,6 +47,7 @@ export interface DecisionVariable {
 }
 
 export interface DecisionResult {
+  artifact_id?: string;
   dmn_xml: string;
   item: {
     name: string;
@@ -65,6 +66,7 @@ export interface DecisionResult {
 }
 
 export interface RecommendationResult {
+  artifact_id?: string;
   id: string;
   source_cpg: string;
   title: string;
@@ -107,15 +109,23 @@ export interface EscalatedItem {
   reason?: string;
 }
 
+export interface PublishedArtifact {
+  type: 'metadata' | 'dmn' | 'recommendations' | 'assembly_report' | 'escalated_items';
+  ref: string;
+  artifact_id?: string;
+  name?: string;
+  cpg_id?: string;
+  count?: number;
+}
+
 export interface DeliveryStatus {
-  delivered: boolean;
-  acp_writer_url: string;
-  results: {
-    metadata?: { status: number; cpg_id: string };
-    dmn_models?: Array<{ status: number; name: string }>;
-    recommendations?: { status: number; count: number };
-    errors: string[];
-  };
+  published: boolean;
+  cpg_id: string;
+  artifact_location?: string;
+  artifacts: PublishedArtifact[];
+  errors: string[];
+  escalated_items_count?: number;
+  reason?: string;
 }
 
 export interface ReviewFeedbackItem {

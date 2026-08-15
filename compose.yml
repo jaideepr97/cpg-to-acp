@@ -258,11 +258,6 @@ services:
     build:
       context: .
       dockerfile: cpg-ingester/deploy/pods/Containerfile.delivery
-    depends_on:
-      acp-writer:
-        condition: service_healthy
-    environment:
-      - ACP_WRITER_URL=http://acp-writer:8082
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
       interval: 5s

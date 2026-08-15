@@ -60,11 +60,6 @@ pods:
     image: cpg-ingester-delivery
     tag: latest
     port: 8080
-    env:
-      # Delivery deploys DMN models via POST /api/v1/decisions/models.
-      # In pods+OpenShell mode, this endpoint is on the decision-engine service
-      # (routed through openshell-router to sb-decision-engine).
-      acpWriterUrl: http://acp-decision-engine:8080
     secrets:
       minio: true
     resources:

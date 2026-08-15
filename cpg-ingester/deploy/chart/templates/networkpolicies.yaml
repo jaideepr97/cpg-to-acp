@@ -114,7 +114,7 @@ spec:
         - port: 8080
           protocol: TCP
 
-# Delivery pod: acp-writer API gateway + MinIO artifact store
+# Delivery pod: MinIO artifact store only (no external consumers)
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -135,13 +135,6 @@ spec:
         - port: 5353
           protocol: UDP
         - port: 5353
-          protocol: TCP
-    - to:
-        - podSelector:
-            matchLabels:
-              app: acp-writer-api
-      ports:
-        - port: 8080
           protocol: TCP
     - to:
         - podSelector:

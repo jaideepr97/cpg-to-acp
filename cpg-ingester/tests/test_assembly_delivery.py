@@ -156,9 +156,17 @@ class TestAssemblyNode:
 
 # --- Delivery tests ---
 
+def _mock_store():
+    store = MagicMock()
+    store.bucket = "cpg-artifacts"
+    store.put.side_effect = lambda key, data: f"cpg-artifacts:{key}"
+    store.put_raw.side_effect = lambda key, data, ct: f"cpg-artifacts:{key}"
+    return store
+
+
 class TestDeliveryNode:
 
-    def test_skips_when_no_url(self):
+    def test_no_store_returns_unpublished(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             state = {
                 "cpg_metadata": {"cpg_id": "CPG-001"},
@@ -166,69 +174,86 @@ class TestDeliveryNode:
                 "recommendation_results": [],
                 "escalated_items": [],
                 "assembly_report": {},
-                "acp_writer_url": "",
+                "artifact_store": None,
                 "output_dir": tmpdir,
             }
             result = delivery(state)
-            assert result["delivery_status"]["delivered"] is False
+            assert result["delivery_status"]["published"] is False
             assert (Path(tmpdir) / "delivery-status.json").exists()
 
-    def test_delivers_all_artifacts(self):
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.raise_for_status = MagicMock()
-
-        with tempfile.TemporaryDirectory() as tmpdir, \
-             patch("cpg_ingester.nodes.delivery.requests.post", return_value=mock_response) as mock_post:
+    def test_publishes_all_artifacts(self):
+        store = _mock_store()
+        with tempfile.TemporaryDirectory() as tmpdir:
             state = {
                 "cpg_metadata": {"cpg_id": "CPG-001", "title": "Test", "contract_version": "1.0"},
                 "dmn_results": [{"dmn_xml": "<definitions/>", "item": {"name": "D1"}}],
                 "recommendation_results": [{"id": "r1", "title": "R1"}],
                 "escalated_items": [],
-                "assembly_report": {},
-                "acp_writer_url": "http://localhost:8082",
+                "assembly_report": {"cpg_id": "CPG-001"},
+                "artifact_store": store,
                 "output_dir": tmpdir,
             }
             result = delivery(state)
+            ds = result["delivery_status"]
 
-            assert result["delivery_status"]["delivered"] is True
-            assert mock_post.call_count == 3
-            urls = [call.args[0] for call in mock_post.call_args_list]
-            assert any("guidelines" in u for u in urls)
-            assert any("decisions" in u for u in urls)
-            assert any("recommendations" in u for u in urls)
+            assert ds["published"] is True
+            assert ds["cpg_id"] == "CPG-001"
+            assert ds["artifact_location"] == "cpg-artifacts:published/CPG-001"
 
-    def test_handles_connection_error(self):
-        with tempfile.TemporaryDirectory() as tmpdir, \
-             patch("cpg_ingester.nodes.delivery.requests.post", side_effect=Exception("Connection refused")), \
-             patch("cpg_ingester.nodes.delivery.time.sleep"):
+            types = [a["type"] for a in ds["artifacts"]]
+            assert "metadata" in types
+            assert "dmn" in types
+            assert "recommendations" in types
+            assert "assembly_report" in types
+
+            assert store.put.call_count == 3  # metadata, recommendations, assembly report
+            assert store.put_raw.call_count == 1  # DMN XML
+
+    def test_handles_store_error(self):
+        store = _mock_store()
+        store.put.side_effect = Exception("MinIO unavailable")
+        store.put_raw.side_effect = Exception("MinIO unavailable")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
             state = {
                 "cpg_metadata": {"cpg_id": "CPG-001"},
                 "dmn_results": [],
                 "recommendation_results": [],
                 "escalated_items": [],
                 "assembly_report": {},
-                "acp_writer_url": "http://localhost:8082",
+                "artifact_store": store,
                 "output_dir": tmpdir,
             }
             result = delivery(state)
+            assert result["delivery_status"]["published"] is False
 
-            assert len(result["delivery_status"]["results"]["errors"]) > 0
+    def test_publishes_escalated_items(self):
+        store = _mock_store()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state = {
+                "cpg_metadata": {"cpg_id": "CPG-001", "contract_version": "1.0"},
+                "dmn_results": [],
+                "recommendation_results": [],
+                "escalated_items": [{"name": "Bad item"}, {"name": "Another"}],
+                "assembly_report": {},
+                "artifact_store": store,
+                "output_dir": tmpdir,
+            }
+            result = delivery(state)
+            assert result["delivery_status"]["escalated_items_count"] == 2
+            types = [a["type"] for a in result["delivery_status"]["artifacts"]]
+            assert "escalated_items" in types
 
-    def test_writes_delivery_status(self):
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.raise_for_status = MagicMock()
-
-        with tempfile.TemporaryDirectory() as tmpdir, \
-             patch("cpg_ingester.nodes.delivery.requests.post", return_value=mock_response):
+    def test_writes_delivery_status_file(self):
+        store = _mock_store()
+        with tempfile.TemporaryDirectory() as tmpdir:
             state = {
                 "cpg_metadata": {"cpg_id": "CPG-001", "contract_version": "1.0"},
                 "dmn_results": [],
                 "recommendation_results": [{"id": "r1"}],
                 "escalated_items": [],
                 "assembly_report": {},
-                "acp_writer_url": "http://localhost:8082",
+                "artifact_store": store,
                 "output_dir": tmpdir,
             }
             delivery(state)
@@ -236,23 +261,19 @@ class TestDeliveryNode:
             status_file = Path(tmpdir) / "delivery-status.json"
             assert status_file.exists()
             status = json.loads(status_file.read_text())
-            assert status["delivered"] is True
+            assert status["published"] is True
 
-    def test_reports_escalated_count(self):
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.raise_for_status = MagicMock()
-
-        with tempfile.TemporaryDirectory() as tmpdir, \
-             patch("cpg_ingester.nodes.delivery.requests.post", return_value=mock_response):
+    def test_artifact_location_uses_cpg_id(self):
+        store = _mock_store()
+        with tempfile.TemporaryDirectory() as tmpdir:
             state = {
-                "cpg_metadata": {"cpg_id": "CPG-001", "contract_version": "1.0"},
+                "cpg_metadata": {"cpg_id": "MY-CUSTOM-ID"},
                 "dmn_results": [],
                 "recommendation_results": [],
-                "escalated_items": [{"name": "Bad item"}, {"name": "Another"}],
+                "escalated_items": [],
                 "assembly_report": {},
-                "acp_writer_url": "http://localhost:8082",
+                "artifact_store": store,
                 "output_dir": tmpdir,
             }
             result = delivery(state)
-            assert result["delivery_status"]["escalated_items_count"] == 2
+            assert "MY-CUSTOM-ID" in result["delivery_status"]["artifact_location"]

@@ -10,7 +10,6 @@ class CPGIngesterState(TypedDict, total=False):
     run_id: str
     output_dir: str
     pdf_path: str
-    acp_writer_url: str
     litellm_url: str
     llm_model: str
     llm_api_key: str

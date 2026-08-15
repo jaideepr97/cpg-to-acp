@@ -26,7 +26,7 @@ import { StructureReviewPage } from './StructureReviewPage';
 import { DecisionReviewPage } from './DecisionReviewPage';
 import { RecommendationReviewPage } from './RecommendationReviewPage';
 import { AssemblyReportPage } from './AssemblyReportPage';
-import { ApprovalDeliveryPage } from './ApprovalDeliveryPage';
+import { ProvenancePage } from './ProvenancePage';
 
 function isAtLeast(current: RunStatus, threshold: RunStatus): boolean {
   const order: RunStatus[] = [
@@ -92,7 +92,7 @@ export function RunDetailPage() {
   const showDecisions = isAtLeast(run.status, 'awaiting_artifact_review');
   const showRecommendations = showDecisions;
   const showAssembly = isAtLeast(run.status, 'assembling');
-  const showDelivery = isAtLeast(run.status, 'delivering');
+  const showProvenance = isAtLeast(run.status, 'awaiting_artifact_review');
 
   return (
     <>
@@ -178,9 +178,9 @@ export function RunDetailPage() {
             </Tab>
           )}
 
-          {showDelivery && (
-            <Tab eventKey={5} title={<TabTitleText>Delivery</TabTitleText>}>
-              <ApprovalDeliveryPage run={run} />
+          {showProvenance && (
+            <Tab eventKey={5} title={<TabTitleText>Provenance</TabTitleText>}>
+              <ProvenancePage run={run} />
             </Tab>
           )}
         </Tabs>

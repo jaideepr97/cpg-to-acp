@@ -10,6 +10,8 @@ from typing import Any
 
 from cpg_contracts.artifact_store import ArtifactStore
 
+from cpg_ingester.artifact_id import make_artifact_id
+
 logger = logging.getLogger(__name__)
 
 _ANALYSIS_FIELDS = {
@@ -77,6 +79,24 @@ def enrich_run_detail(
             if src_key in gen:
                 detail[dest_key] = gen[src_key]
 
+    # --- Artifact IDs (deterministic, computed from cpg_id + name + section) ---
+    cpg_id = (detail.get("metadata") or {}).get("cpg_id", "")
+    if cpg_id:
+        for d in detail.get("decisions", []):
+            if isinstance(d, dict) and "item" in d:
+                d["artifact_id"] = make_artifact_id(
+                    cpg_id, "dmn",
+                    d["item"].get("name", ""),
+                    d["item"].get("section", ""),
+                )
+        for r in detail.get("recommendations", []):
+            if isinstance(r, dict):
+                r["artifact_id"] = make_artifact_id(
+                    cpg_id, "rec",
+                    r.get("title", ""),
+                    r.get("section", ""),
+                )
+
     # --- Assembly ---
     assembly_raw = wd.get("assemblyResult") or {}
     if "error" in assembly_raw:
@@ -88,13 +108,19 @@ def enrich_run_detail(
             resolved = _fetch_ref(store, ref)
             if resolved:
                 assembly = resolved
-        if "report" in assembly:
+        if "assembly_report" in assembly:
+            detail["assemblyReport"] = assembly["assembly_report"]
+        elif "report" in assembly:
             detail["assemblyReport"] = assembly["report"]
 
     # --- Delivery (always inline, no ref) ---
-    delivery = wd.get("deliveryResult") or {}
-    if delivery:
-        detail["deliveryStatus"] = delivery.get("delivery_status", delivery)
+    delivery_raw = wd.get("deliveryResult") or {}
+    if delivery_raw:
+        ds = delivery_raw.get("delivery_status", delivery_raw)
+        # Normalize: support both old ("delivered") and new ("published") shapes
+        if "published" not in ds and "delivered" in ds:
+            ds["published"] = ds.pop("delivered")
+        detail["deliveryStatus"] = ds
 
     if errors:
         detail["errors"] = errors

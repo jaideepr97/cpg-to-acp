@@ -9,7 +9,7 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { useMutation } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { api } from '../api/client';
@@ -21,6 +21,14 @@ export function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [filename, setFilename] = useState('');
   const [validationError, setValidationError] = useState('');
+
+  const previewUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   const uploadMutation = useMutation({
     mutationFn: (f: File) => api.uploadCpg(f),
@@ -86,8 +94,7 @@ export function UploadPage() {
           <FormGroup label="CPG PDF file" isRequired fieldId="cpg-pdf">
             <FileUpload
               id="cpg-pdf"
-              type="text"
-              value={file ?? undefined}
+              value=""
               filename={filename}
               filenamePlaceholder="Drag a PDF here or click to upload"
               onFileInputChange={handleFileChange}
@@ -95,8 +102,20 @@ export function UploadPage() {
               browseButtonText="Browse"
               accept=".pdf"
               isLoading={uploadMutation.isPending}
+              hideDefaultPreview
             />
           </FormGroup>
+
+          {previewUrl && (
+            <FormGroup label="Preview" fieldId="cpg-preview">
+              <iframe
+                src={`${previewUrl}#page=1&toolbar=0&navpanes=0&view=FitH`}
+                title="PDF preview"
+                width="100%"
+                style={{ height: 500, border: '1px solid var(--pf-t--global--border--color--default)', borderRadius: 4 }}
+              />
+            </FormGroup>
+          )}
 
           <ActionGroup>
             <Button
