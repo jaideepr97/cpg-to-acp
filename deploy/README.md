@@ -282,3 +282,19 @@ The deploy scripts apply these automatically (`cpgingester-props.yaml` and `acpw
 - `etcd` encryption at rest is not verified for this cluster. K8s Secrets may be stored in plaintext.
 - **Delivery/notification not wired:** cpg-ingester publishes artifacts to MinIO but does not notify acp-writer. Use `deploy/load-published-artifacts.sh` as a stopgap.
 - **mock-EHR Docker Hub base images:** `mock-EHR/ui/Containerfile` and `mock-EHR/ips-viewer/Containerfile` still pull from Docker Hub (`node:22-alpine`, `nginxinc/nginx-unprivileged:alpine`). These are subject to rate limits on shared cluster egress IPs. cpg-ingester's UI has been migrated to UBI base images; mock-EHR migration is pending.
+
+## Test Coverage
+
+The framework was validated on virgin namespaces (August 2026): full setup sequence, single-shot `deploy-all.sh` (exit 0, zero manual actions), `verify-all.sh --e2e` (all checks including a DMN + LLM QA round trip), component teardown, `teardown-all.sh --infra` (zero orphans), and `--full-wipe` including cluster-scoped RBAC cleanup. The full application flow was exercised end-to-end: CPG upload → published artifacts → loaded into acp-writer → DMN-driven care plan → SMART launch in mock-EHR.
+
+The following paths are **documented but have not been exercised** — expect rough edges on first use:
+
+| Untested path | Notes |
+|---|---|
+| `teardown-all.sh --full-wipe --yes` (non-interactive) | The `--yes` propagation to component scripts was fixed after test 3 but not re-run |
+| `--skip-openshell` mode | Helm-managed pods instead of OpenShell sandboxes |
+| Rollback (`--skip-build --tag <old-sha>`) | Mechanism is the same as a normal skip-build deploy, but never run against a prior SHA |
+| Key rotation end-to-end | Both steps work individually; the full rotate-and-verify sequence hasn't been run |
+| `setup-secrets.sh --interactive` | Only `--from-env` has been used |
+| Single-component update | Changing one component and verifying the others are untouched |
+| Non-admin deploy | All testing ran with cluster-admin; a least-privilege role has not been derived |
