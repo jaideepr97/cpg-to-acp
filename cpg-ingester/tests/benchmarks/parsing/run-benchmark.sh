@@ -11,8 +11,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# cpg-ingester/tests/benchmark -> cpg-ingester
-CPG_INGESTER_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# cpg-ingester/tests/benchmarks/parsing -> cpg-ingester
+CPG_INGESTER_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 PY="${BENCH_PYTHON:-${CPG_INGESTER_DIR}/.venv/bin/python}"
 
 if [[ ! -x "${PY}" ]]; then

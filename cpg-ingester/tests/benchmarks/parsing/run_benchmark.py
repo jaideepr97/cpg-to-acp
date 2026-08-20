@@ -3,11 +3,12 @@
 
 Runs ``metrics.score_pdf`` over a selected PDF set and writes both a
 machine-readable ``report.json`` and a human-readable ``report.md`` to
-``working/benchmark/reports/`` (gitignored).
+``working/benchmarks/parsing/reports/`` (gitignored).
 
 Sets:
     --synthetic   the checked-in synthetic corpus (NO network; CI-safe)
-    --real        downloaded real CPGs under working/benchmark/real/ (local only)
+    --real        downloaded real CPGs under working/benchmarks/parsing/real/
+                  (local only)
     --all         both
 
 The synthetic path has no network dependency beyond Docling's local model
@@ -22,10 +23,11 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-REPO_ROOT = HERE.parents[2]  # cpg-ingester/tests/benchmark -> repo root
+# cpg-ingester/tests/benchmarks/parsing -> repo root
+REPO_ROOT = HERE.parents[3]
 SYNTHETIC_DIR = HERE / "synthetic"
-REAL_DIR = REPO_ROOT / "working" / "benchmark" / "real"
-REPORTS_DIR = REPO_ROOT / "working" / "benchmark" / "reports"
+REAL_DIR = REPO_ROOT / "working" / "benchmarks" / "parsing" / "real"
+REPORTS_DIR = REPO_ROOT / "working" / "benchmarks" / "parsing" / "reports"
 
 sys.path.insert(0, str(HERE))
 import metrics as metrics_mod  # noqa: E402

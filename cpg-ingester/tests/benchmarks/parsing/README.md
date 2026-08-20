@@ -5,19 +5,23 @@ Objective yardstick for the Docling PDF-parse stage of `cpg-ingester`
 headings, tables, and figures from CPG PDFs so later phases (figure
 extraction/interpretation, OCR) can be proven to *improve* against a baseline.
 
+> This is the **parsing** benchmark. It lives under `cpg-ingester/tests/benchmarks/`,
+> one subfolder per benchmark (e.g. a future `benchmarks/dmn/` for DMN
+> generation). Keep each benchmark self-contained in its own subfolder.
+
 > **COPYRIGHT / COMMIT POLICY — read first**
 >
 > **No real third-party CPG PDF is ever committed to this repository.** This is a
 > uniform rule with no per-document license adjudication — it applies even to
 > U.S.-federal public-domain guidelines. Real CPGs are downloaded on demand into
-> the **gitignored** `working/benchmark/real/` directory by
+> the **gitignored** `working/benchmarks/parsing/real/` directory by
 > `fetch-benchmark-cpgs.sh`. Only the **synthetic** corpus (which we author) and
 > the manifest/scripts are committed.
 
 ## Layout
 
 ```
-cpg-ingester/tests/benchmark/
+cpg-ingester/tests/benchmarks/parsing/
 ├── README.md                     # this file
 ├── requirements.txt              # benchmark-only deps (reportlab, PyMuPDF, PyYAML)
 ├── generate_synthetic.py         # authors the synthetic corpus (deterministic)
@@ -29,14 +33,14 @@ cpg-ingester/tests/benchmark/
 │   ├── mixed.pdf                 + .groundtruth.json
 │   └── single-column-scanned.pdf + .groundtruth.json  (image-only; OCR fixture)
 ├── real-cpgs.manifest.yaml       # COMMITTED: manifest of real CPGs (URLs, no PDFs)
-├── fetch-benchmark-cpgs.sh       # downloads real CPGs -> working/benchmark/real/
+├── fetch-benchmark-cpgs.sh       # downloads real CPGs -> working/benchmarks/parsing/real/
 ├── metrics.py                    # self-contained Docling parse + scoring
 ├── run_benchmark.py              # runs metrics over a set, emits report.json + .md
 └── run-benchmark.sh              # thin wrapper (uses the cpg-ingester venv)
 ```
 
-Reports are written to `working/benchmark/reports/{report.json,report.md}`
-(gitignored).
+Reports are written to
+`working/benchmarks/parsing/reports/{report.json,report.md}` (gitignored).
 
 ## Prerequisites
 
@@ -44,7 +48,7 @@ Uses the existing `cpg-ingester` venv (where Docling is installed). Install the
 benchmark-only extras once:
 
 ```bash
-cpg-ingester/.venv/bin/pip install -r cpg-ingester/tests/benchmark/requirements.txt
+cpg-ingester/.venv/bin/pip install -r cpg-ingester/tests/benchmarks/parsing/requirements.txt
 ```
 
 The scripts call `cpg-ingester/.venv/bin/python` by default. Point them at a
@@ -56,7 +60,7 @@ different interpreter with `BENCH_PYTHON=/path/to/python`.
 ## 1. Generate the synthetic corpus
 
 ```bash
-cpg-ingester/.venv/bin/python cpg-ingester/tests/benchmark/generate_synthetic.py
+cpg-ingester/.venv/bin/python cpg-ingester/tests/benchmarks/parsing/generate_synthetic.py
 ```
 
 Produces 5 born-digital PDFs + 1 image-only "scanned" variant, each with a
@@ -87,11 +91,11 @@ binaries churn-free.
 ## 2. Fetch real CPGs (local realism, never committed)
 
 ```bash
-./cpg-ingester/tests/benchmark/fetch-benchmark-cpgs.sh
+./cpg-ingester/tests/benchmarks/parsing/fetch-benchmark-cpgs.sh
 ```
 
 Reads `real-cpgs.manifest.yaml`, downloads each entry into
-`working/benchmark/real/`, verifies `sha256` when pinned (records the observed
+`working/benchmarks/parsing/real/`, verifies `sha256` when pinned (records the observed
 hash when the manifest says `TBD`), and prints a **manual-fallback** message for
 any URL that 404s or blocks scripted fetch (e.g. cdc.gov returns 403 to
 non-browser agents — open the URL in a browser, save to the printed path, and
@@ -104,16 +108,16 @@ To pin a hash: run the fetch once, copy the printed `sha256` into the manifest's
 
 ```bash
 # Synthetic only — NO network, CI-safe:
-./cpg-ingester/tests/benchmark/run-benchmark.sh --synthetic
+./cpg-ingester/tests/benchmarks/parsing/run-benchmark.sh --synthetic
 
 # Downloaded real CPGs (local only):
-./cpg-ingester/tests/benchmark/run-benchmark.sh --real
+./cpg-ingester/tests/benchmarks/parsing/run-benchmark.sh --real
 
 # Both:
-./cpg-ingester/tests/benchmark/run-benchmark.sh --all
+./cpg-ingester/tests/benchmarks/parsing/run-benchmark.sh --all
 ```
 
-Outputs `working/benchmark/reports/report.json` (machine-readable) and
+Outputs `working/benchmarks/parsing/reports/report.json` (machine-readable) and
 `report.md` (human-readable). The `--synthetic` path has no network dependency
 beyond Docling's local model cache and is the intended CI target.
 

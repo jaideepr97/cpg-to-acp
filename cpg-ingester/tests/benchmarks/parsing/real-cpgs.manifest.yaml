@@ -4,7 +4,7 @@
 #   * NO real CPG PDF is ever committed to this repository. Uniform rule, no
 #     per-document license adjudication. This manifest and the fetch script are
 #     committed; the downloaded PDFs are NOT (they land in the gitignored
-#     working/benchmark/real/ directory).
+#     working/benchmarks/parsing/real/ directory).
 #   * Seeds below are works of the U.S. federal government (CDC / NIH-NHLBI /
 #     USPSTF), which are in the public domain (17 U.S.C. sec. 105). We still do
 #     not commit them, to keep one simple rule.

@@ -14,7 +14,8 @@ Re-running this script MUST produce byte-identical PDFs (verified by
 generating twice and diffing). If you change layout, regenerate and commit.
 
 Usage:
-    cpg-ingester/.venv/bin/python cpg-ingester/tests/benchmark/generate_synthetic.py
+    cpg-ingester/.venv/bin/python \
+        cpg-ingester/tests/benchmarks/parsing/generate_synthetic.py
 
 The ground-truth sidecar schema (``<name>.groundtruth.json``):
     {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fetch real CPGs listed in real-cpgs.manifest.yaml into the gitignored
-# working/benchmark/real/ directory (RHAIENG-6461 P1b).
+# working/benchmarks/parsing/real/ directory (RHAIENG-6461 P1b).
 #
 # POLICY: real CPGs are NEVER committed. They are downloaded here for local
 # realism testing only. See real-cpgs.manifest.yaml for the full policy.
@@ -20,10 +20,10 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CPG_INGESTER_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+CPG_INGESTER_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 REPO_ROOT="$(cd "${CPG_INGESTER_DIR}/.." && pwd)"
 MANIFEST="${SCRIPT_DIR}/real-cpgs.manifest.yaml"
-DEST_DIR="${REPO_ROOT}/working/benchmark/real"
+DEST_DIR="${REPO_ROOT}/working/benchmarks/parsing/real"
 PY="${BENCH_PYTHON:-${CPG_INGESTER_DIR}/.venv/bin/python}"
 
 if [[ ! -f "${MANIFEST}" ]]; then
