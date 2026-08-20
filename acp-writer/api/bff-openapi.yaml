@@ -1,0 +1,447 @@
+# acp-writer BFF ↔ React UI contract
+#
+# The single source of truth for the interface between the acp-writer React UI and
+# its Backend-for-Frontend. Designed screen-first: each screen's rendering needs
+# drive the endpoints and field shapes. The two tracks stay in sync mechanically,
+# not by hand:
+#   - UI generates types:  npx openapi-typescript acp-writer/api/bff-openapi.yaml -o acp-writer/ui/src/api/types.ts
+#   - BFF validates requests/responses against it server-side.
+#
+# Scope: the UI-facing surface only. The BFF's internal endpoints
+# (/api/v1/notifications/artifacts-available, /api/v1/notify-review) are
+# backend↔SonataFlow/cpg-ingester plumbing and are out of scope here.
+#
+# Screen → endpoint map:
+#   PatientEntryPage   POST /runs                            → start a run (upload or client-side SMART), get runId
+#   RunListPage        GET  /runs                            → dashboard rows
+#   RunDetailPage      GET  /runs/{id} (polled)              → stepper + care-plan review gate
+#   CarePlanReview     POST /runs/{id}/review/careplan       → approve / request_changes (in-run gate)
+#   CarePlanList       GET  /careplans                       → persisted plans
+#   CarePlanDetail     GET  /careplans/{id}                  → read-only view of a persisted plan
+#   SystemStatus       GET  /status                          → engine + KB health
+
+openapi: 3.1.0
+info:
+  title: acp-writer BFF API (UI contract)
+  version: 0.1.0
+  description: >
+    Backend-for-Frontend contract consumed by the acp-writer React UI. The BFF
+    mediates SonataFlow (workflow), MinIO (artifacts/PHI), and the backend service
+    pods, and returns UI-shaped view-models so the client never parses FHIR or
+    polls raw workflow state.
+
+servers:
+  - url: /api/v1
+    description: Served behind nginx, which proxies /api/ to the BFF (${BFF_HOST}).
+
+paths:
+  /runs:
+    get:
+      operationId: listRuns
+      summary: RunListPage — dashboard of active/recent runs
+      parameters:
+        - { name: status, in: query, required: false, schema: { $ref: '#/components/schemas/RunStatus' } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 50 } }
+      responses:
+        '200':
+          description: Run summaries, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RunSummary' }
+    post:
+      operationId: createRun
+      summary: PatientEntryPage — start a run from an IPS bundle
+      description: >
+        Single entry point for both PatientEntryPage tabs. The IPS bundle is
+        supplied by the client — either from a file upload, or fetched by the
+        browser via a client-side SMART launch (the UI completes the SMART token
+        exchange and the `Patient/$summary` read itself; the BFF never touches the
+        SMART token or the FHIR server for patient data).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ipsBundle]
+              properties:
+                ipsBundle:
+                  type: object
+                  description: FHIR IPS Bundle (resourceType=Bundle). BFF stores it in the MinIO PHI bucket.
+                  additionalProperties: true
+      responses:
+        '202':
+          description: Run accepted; workflow started
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RunCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /runs/{runId}:
+    parameters:
+      - { name: runId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getRunDetail
+      summary: RunDetailPage — stepper + review gate (polled)
+      description: >
+        The crux object. The UI renders the entire RunDetail screen from this
+        response with no second call and no FHIR parsing. Poll until `status`
+        is terminal OR an `awaiting_*` gate (then stop auto-advancing and show
+        the review panel).
+      responses:
+        '200':
+          description: Full run detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RunDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: cancelRun
+      summary: Cancel a run (RunDetailPage / RunListPage)
+      responses:
+        '204': { description: Cancelled }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /runs/{runId}/review/careplan:
+    post:
+      operationId: submitReview
+      summary: CarePlanReview — approve / request_changes at the care-plan gate
+      description: >
+        The single care-plan approval mechanism (the only human gate; brief review is
+        automated). approve → the workflow writes the plan as `active`; request_changes
+        → the workflow regenerates the bundle with the feedback. Resumes a workflow
+        paused at `awaiting_careplan_review`.
+      parameters:
+        - { name: runId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewAction' }
+      responses:
+        '202':
+          description: Review accepted; workflow resumes. Returns the updated run.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RunDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Run is not currently awaiting this gate
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+
+  /careplans:
+    get:
+      operationId: listCarePlans
+      summary: CarePlanList — persisted care plans
+      responses:
+        '200':
+          description: Care plan summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CarePlanSummary' }
+
+  /careplans/{careplanId}:
+    parameters:
+      - { name: careplanId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getCarePlan
+      summary: CarePlanDetail — read-only view of a persisted (already-approved) plan
+      description: >
+        Persisted plans are written as `active` only after in-run approval at the
+        care-plan gate, so this is a read-only view (view-model + raw FHIR for the
+        JSON viewer). Approval/rejection happens in-run via
+        POST /runs/{runId}/review/careplan, not here.
+      responses:
+        '200':
+          description: Care plan detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CarePlanDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /status:
+    get:
+      operationId: getSystemStatus
+      summary: SystemStatus page — aggregate health
+      responses:
+        '200':
+          description: System status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SystemStatus' }
+
+components:
+  responses:
+    BadRequest:
+      description: Invalid request
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    NotFound:
+      description: Not found
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+
+  schemas:
+    # ---- Enums (the polling / branching backbone) ----
+    RunStatus:
+      type: string
+      description: >
+        Drives UI polling. UI keeps polling on `running`; STOPS and shows the
+        care-plan review panel on `awaiting_careplan_review`; STOPS on terminal
+        (`completed`/`failed`/`cancelled`).
+        `awaiting_careplan_review` is an in-run human gate (design decision): the
+        workflow pauses before writing and the plan is only persisted on approval.
+        Requires a `ReviewCarePlan` SonataFlow Callback state (backend work-item),
+        modeled on the ingester's ReviewManifest/ReviewArtifacts gates.
+      enum: [running, awaiting_careplan_review, completed, failed, cancelled]
+
+    StepStatus:
+      type: string
+      enum: [pending, active, done, error, skipped]
+
+    ReviewGate:
+      type: string
+      description: Only care-plan review is a human gate (brief review is automated, not a human step).
+      enum: [careplan]
+
+    ReviewDecision:
+      type: string
+      enum: [approve, request_changes]
+
+    StepKey:
+      type: string
+      description: >
+        Stable, ordered pipeline step identifiers. UI maps key → label/icon; do NOT
+        hardcode the list in the UI beyond this shared vocabulary. Keys are snake_case
+        here and map to the PascalCase SonataFlow state names — the BFF owns the
+        state-name → StepKey mapping when deriving `currentSteps` from a live instance.
+        The automated steps map 1:1 to states in
+        acp-writer/deploy/orchestrator/acp-writer-workflow.yaml; the workflow's
+        inject/switch plumbing (InitFHIRReview, IncrementFHIRReview, CheckFHIRVerdict)
+        is not surfaced as UI steps.
+      enum:
+        - scan_patient            # SonataFlow: ScanPatient
+        - resolve_guidelines      # SonataFlow: ResolveGuidelines
+        - execute_dmn             # SonataFlow: ExecuteDMN
+        - retrieve_recommendations # SonataFlow: RetrieveRecommendations
+        - compose_plan            # SonataFlow: ComposePlan (includes the automated brief_reviewer loop)
+        - generate_bundle         # SonataFlow: GenerateBundle (loops with review_fhir)
+        - review_fhir             # SonataFlow: ReviewFHIR (automated LLM review, loops)
+        - review_careplan         # human review; today done POST-write via PUT /careplans/{id}/status, not an in-run pause (design-review)
+        - write_fhir              # SonataFlow: WriteFHIR
+        - done                    # SonataFlow: Done
+
+    # ---- Run objects ----
+    RunCreated:
+      type: object
+      required: [runId, status]
+      properties:
+        runId: { type: string }
+        status: { $ref: '#/components/schemas/RunStatus' }
+
+    RunSummary:
+      type: object
+      description: RunListPage rows.
+      required: [runId, status, createdAt]
+      properties:
+        runId: { type: string }
+        status: { $ref: '#/components/schemas/RunStatus' }
+        patientName: { type: string, description: Display name resolved by the BFF (never make the UI parse a reference). }
+        patientReference: { type: string }
+        currentSteps:
+          type: array
+          description: Steps currently active. Usually one, but the pipeline is not strictly linear (steps can run in parallel), so this is a list.
+          items: { $ref: '#/components/schemas/StepKey' }
+        careplanId: { type: string, description: Present once the run has produced a persisted plan. }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    PipelineStep:
+      type: object
+      required: [key, status]
+      properties:
+        key: { $ref: '#/components/schemas/StepKey' }
+        status: { $ref: '#/components/schemas/StepStatus' }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }
+        detail: { type: string, description: Optional human-readable note (e.g. error summary). }
+
+    RunDetail:
+      type: object
+      description: The full RunDetailPage state.
+      required: [runId, status, steps]
+      properties:
+        runId: { type: string }
+        status: { $ref: '#/components/schemas/RunStatus' }
+        patient: { $ref: '#/components/schemas/PatientSummary' }
+        steps:
+          type: array
+          items: { $ref: '#/components/schemas/PipelineStep' }
+        currentSteps:
+          type: array
+          description: Steps currently active. Usually one, but the pipeline is not strictly linear (steps can run in parallel), so this is a list.
+          items: { $ref: '#/components/schemas/StepKey' }
+        awaitingReview:
+          description: Set to `careplan` when the care-plan gate is blocking, else null. Mirrors status but convenient for rendering.
+          oneOf:
+            - { $ref: '#/components/schemas/ReviewGate' }
+            - { type: 'null' }
+        carePlan:
+          description: Present at the `careplan` gate — the same view-model as CarePlanDetail.
+          oneOf:
+            - { $ref: '#/components/schemas/CarePlanView' }
+            - { type: 'null' }
+        reviewIteration:
+          type: integer
+          description: Which care-plan review round this is (0 on the first review). Increments each time changes are requested and the plan is regenerated.
+        previousFeedback:
+          description: The review submitted in the previous round (when request_changes was chosen), so the UI can show what was asked for. Null on the first review.
+          oneOf:
+            - { $ref: '#/components/schemas/ReviewAction' }
+            - { type: 'null' }
+        careplanId: { type: string }
+        error: { $ref: '#/components/schemas/RunError' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    RunError:
+      type: object
+      properties:
+        stepKey: { $ref: '#/components/schemas/StepKey' }
+        message: { type: string }
+
+    # ---- Patient / clinical view-models (BFF-shaped; UI never parses FHIR) ----
+    PatientSummary:
+      type: object
+      description: Extracted by the BFF (or client for upload) from the IPS bundle.
+      properties:
+        name: { type: string }
+        birthDate: { type: string }
+        gender: { type: string }
+        patientReference: { type: string }
+        conditions: { type: array, items: { $ref: '#/components/schemas/CodedItem' } }
+        medications: { type: array, items: { $ref: '#/components/schemas/CodedItem' } }
+        allergies: { type: array, items: { $ref: '#/components/schemas/CodedItem' } }
+        observations: { type: array, items: { $ref: '#/components/schemas/CodedItem' } }
+
+    CodedItem:
+      type: object
+      required: [display]
+      properties:
+        display: { type: string }
+        code: { type: string }
+        system: { type: string }
+
+    # ---- Care-plan items (goals / activities / conflicts) ----
+    PlanGoal:
+      type: object
+      required: [id, description]
+      properties:
+        id: { type: string, description: Stable within the run; referenced by ReviewAction feedback. }
+        description: { type: string }
+        rationale: { type: string }
+        sourceCpgId: { type: string }
+
+    PlanActivity:
+      type: object
+      required: [id, description]
+      properties:
+        id: { type: string }
+        description: { type: string }
+        goalId: { type: string, description: Links to the goal it serves. }
+        detail: { type: string }
+
+    PlanConflict:
+      type: object
+      required: [id, description]
+      properties:
+        id: { type: string }
+        severity: { type: string, enum: [info, warning, critical] }
+        description: { type: string }
+
+    # ---- Care plan (careplan review gate + persisted list/detail) ----
+    CarePlanView:
+      type: object
+      description: >
+        View-model reused by CarePlanReviewPanel and CarePlanDetail, rendered by
+        GoalCard/ActivityCard/ConflictAlert. Raw FHIR is included ONLY for the
+        "View FHIR JSON" viewer.
+        NOTE: this is a deliberately flattened first cut. The internal model carries
+        richer provenance (targets, dose/route/frequency, source refs, DMN audit);
+        extending the view-model with those fields is tracked in #128.
+      properties:
+        goals: { type: array, items: { $ref: '#/components/schemas/PlanGoal' } }
+        activities: { type: array, items: { $ref: '#/components/schemas/PlanActivity' } }
+        conflicts: { type: array, items: { $ref: '#/components/schemas/PlanConflict' } }
+        fhirBundle:
+          type: object
+          description: Raw FHIR bundle for the JSON viewer only. UI does not parse this for display.
+          additionalProperties: true
+
+    CarePlanSummary:
+      type: object
+      description: >
+        CarePlanList rows. patientName and generatedAt are BFF-resolved so the UI
+        never renders a raw reference or an unparsed date.
+      required: [id, status]
+      properties:
+        id: { type: string }
+        patientName: { type: string }
+        patientReference: { type: string }
+        status: { type: string, description: FHIR CarePlan.status (draft, active, entered-in-error, ...). }
+        generatedAt: { type: string, format: date-time }
+        runId: { type: string, description: Links back to the producing run. }
+
+    CarePlanDetail:
+      allOf:
+        - { $ref: '#/components/schemas/CarePlanSummary' }
+        - type: object
+          properties:
+            patient: { $ref: '#/components/schemas/PatientSummary' }
+            view: { $ref: '#/components/schemas/CarePlanView' }
+
+    # ---- Review submission ----
+    ReviewAction:
+      type: object
+      required: [decision]
+      properties:
+        decision: { $ref: '#/components/schemas/ReviewDecision' }
+        clinician: { type: string }
+        comment: { type: string, description: Overall free-text note. }
+        feedback:
+          type: array
+          description: Per-item feedback (CarePlanReviewPanel/FeedbackInput). Required-ish when decision=request_changes.
+          items: { $ref: '#/components/schemas/FeedbackItem' }
+
+    FeedbackItem:
+      type: object
+      required: [itemId, comment]
+      properties:
+        itemId: { type: string, description: References a PlanGoal/PlanActivity/PlanConflict.id in the CarePlanView. }
+        comment: { type: string }
+
+    # ---- System status ----
+    SystemStatus:
+      type: object
+      properties:
+        version: { type: string }
+        decisionEngine:
+          type: object
+          properties:
+            available: { type: boolean }
+            modelsDeployed: { type: integer }
+        knowledgeBase:
+          type: object
+          properties:
+            available: { type: boolean }
+            guidelines: { type: integer }
+            recommendations: { type: integer }
+
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+        code: { type: string }
