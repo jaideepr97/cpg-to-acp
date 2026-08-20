@@ -114,7 +114,7 @@ export function RunDetailPage() {
                   : ''}
               </Label>
             )}
-            {run.status !== 'completed' && run.status !== 'failed' && (
+            {run.status !== 'completed' && run.status !== 'failed' && run.status !== 'cancelled' && (
               <Button
                 variant="secondary"
                 isDanger
@@ -126,7 +126,7 @@ export function RunDetailPage() {
                 Cancel
               </Button>
             )}
-            {(run.status === 'completed' || run.status === 'failed') && (
+            {(run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled') && (
               <Button
                 variant="secondary"
                 icon={<RedoIcon />}

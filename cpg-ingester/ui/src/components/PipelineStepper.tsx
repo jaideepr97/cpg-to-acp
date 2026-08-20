@@ -22,6 +22,7 @@ function stepVariant(status: PipelineStep['status']) {
     case 'completed': return 'success' as const;
     case 'active': return 'info' as const;
     case 'failed': return 'danger' as const;
+    case 'cancelled': return 'warning' as const;
     default: return 'pending' as const;
   }
 }

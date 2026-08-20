@@ -7,7 +7,8 @@ export type RunStatus =
   | 'assembling'
   | 'delivering'
   | 'completed'
-  | 'failed';
+  | 'failed'
+  | 'cancelled';
 
 export interface RunSummary {
   id: string;
@@ -19,7 +20,7 @@ export interface RunSummary {
 
 export interface PipelineStep {
   name: string;
-  status: 'pending' | 'active' | 'completed' | 'failed';
+  status: 'pending' | 'active' | 'completed' | 'failed' | 'cancelled';
   startedAt?: string;
   completedAt?: string;
   iteration?: number;
