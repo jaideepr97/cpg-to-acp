@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the synthetic CPG benchmark corpus (RHAIENG-6461 P1a).
 
-Produces 5 born-digital PDFs spanning CPG archetypes plus 1 image-only
+Produces 6 born-digital PDFs spanning CPG archetypes plus 1 image-only
 "scanned" variant, each with a ground-truth JSON sidecar. Output lands in
 ``synthetic/`` next to this file and IS committed to git.
 
@@ -24,8 +24,12 @@ The ground-truth sidecar schema (``<name>.groundtruth.json``):
       "headings": [str, ...],      # section headings expected in parse output
       "tables": [{"rows","cols","cells"}, ...],
       "table_cells": int,          # total across all tables
-      "flowchart_nodes": [str],    # flowchart doc only
-      "flowchart_edges": [[from,to,label]]  # flowchart doc only
+      "flowchart_nodes": [str],    # flowchart doc only (aggregate if multi-figure)
+      "flowchart_edges": [[from,to,label]],  # flowchart doc only (aggregate)
+      "figures": [                 # multi-figure doc only: per-figure ground truth
+        {"index", "heading", "classification_expected",
+         "flowchart_nodes": [str], "flowchart_edges": [[from,to,label]]}
+      ]
     }
 """
 from __future__ import annotations
@@ -297,6 +301,29 @@ FLOWCHART_EDGES = [
     ("d2", "end", "Yes"),
     ("a2", "end", ""),
 ]
+
+# A second, semantically DIFFERENT flowchart (same layout coordinates so the
+# drawing/determinism logic is reused, but distinct clinical text). Used by the
+# multi-figure fixture so a downstream figure interpreter (P5) must produce two
+# clearly different diagrams/descriptions — proving each is placed correctly.
+FLOWCHART_B_NODES = [
+    {"id": "start", "kind": "start", "text": "New AFib diagnosis", "xy": (300, 40), "wh": (240, 50)},
+    {"id": "d1", "kind": "decision", "text": "CHA2DS2-VASc at least 2?", "xy": (300, 150), "wh": (200, 90)},
+    {"id": "a1", "kind": "action", "text": "Start oral anticoagulant", "xy": (120, 300), "wh": (200, 60)},
+    {"id": "a2", "kind": "action", "text": "Defer, reassess yearly", "xy": (500, 300), "wh": (200, 60)},
+    {"id": "d2", "kind": "decision", "text": "High bleeding risk?", "xy": (120, 430), "wh": (200, 90)},
+    {"id": "a3", "kind": "action", "text": "Prefer DOAC, monitor", "xy": (120, 580), "wh": (220, 60)},
+    {"id": "end", "kind": "end", "text": "Shared decision, follow up", "xy": (500, 580), "wh": (220, 60)},
+]
+FLOWCHART_B_EDGES = [
+    ("start", "d1", ""),
+    ("d1", "a1", "Yes"),
+    ("d1", "a2", "No"),
+    ("a1", "d2", ""),
+    ("d2", "a3", "Yes"),
+    ("d2", "end", "No"),
+    ("a2", "end", ""),
+]
 CANVAS_WH = (820, 700)
 
 
@@ -343,12 +370,14 @@ def _center_text(draw, cx, cy, text, font, fill=(0, 0, 0)):
         y += line_h
 
 
-def _draw_flowchart_png(scale: int = 2) -> bytes:
+def _draw_flowchart_png(nodes=None, edges=None, scale: int = 2) -> bytes:
+    nodes = FLOWCHART_NODES if nodes is None else nodes
+    edges = FLOWCHART_EDGES if edges is None else edges
     W, H = CANVAS_WH[0] * scale, CANVAS_WH[1] * scale
     img = PILImage.new("RGB", (W, H), "white")
     d = ImageDraw.Draw(img)
     font = _font(15 * scale)
-    node_by_id = {n["id"]: n for n in FLOWCHART_NODES}
+    node_by_id = {n["id"]: n for n in nodes}
 
     def rect(n):
         cx, cy = n["xy"][0] * scale, n["xy"][1] * scale
@@ -356,7 +385,7 @@ def _draw_flowchart_png(scale: int = 2) -> bytes:
         return (cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
 
     # edges first (so nodes overlay endpoints)
-    for src, dst, label in FLOWCHART_EDGES:
+    for src, dst, label in edges:
         s, t = node_by_id[src], node_by_id[dst]
         x1, y1 = s["xy"][0] * scale, (s["xy"][1] + s["wh"][1] / 2) * scale
         x2, y2 = t["xy"][0] * scale, (t["xy"][1] - t["wh"][1] / 2) * scale
@@ -371,7 +400,7 @@ def _draw_flowchart_png(scale: int = 2) -> bytes:
             _center_text(d, mx, my, label, font, fill=(180, 0, 0))
 
     # nodes
-    for n in FLOWCHART_NODES:
+    for n in nodes:
         x0, y0, x1, y1 = rect(n)
         cx, cy = n["xy"][0] * scale, n["xy"][1] * scale
         if n["kind"] == "decision":
@@ -492,6 +521,77 @@ def build_mixed(path: Path) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# 6. Multi-figure (two DIFFERENT flowcharts interleaved with text)
+# ---------------------------------------------------------------------------
+def build_multi_figure(path: Path) -> dict:
+    """Two distinct flowcharts in reading order, each under its own heading.
+
+    Exists to verify figure↔location correlation once P5 interprets figures:
+    because the two charts are semantically different, a correct implementation
+    must emit two different diagrams/descriptions AND place each next to its own
+    heading. Same-chart-twice would not prove placement — this does.
+    """
+    styles = _styles()
+    heading_a = "Algorithm A: Condition C Treatment"
+    heading_b = "Algorithm B: Anticoagulation in AFib"
+    heading_notes = "Combined Notes"
+    headings = [heading_a, heading_b, heading_notes]
+
+    def _img(nodes, edges, width_in):
+        png = _draw_flowchart_png(nodes, edges, scale=2)
+        pil = PILImage.open(io.BytesIO(png))
+        iw, ih = pil.size
+        disp_w = width_in * inch
+        return Image(io.BytesIO(png), width=disp_w, height=disp_w * ih / iw)
+
+    story = [
+        Paragraph("Multi-Algorithm Guideline (Two Decision Charts)", styles["h1"]),
+        Paragraph(heading_a, styles["h2"]),
+        Paragraph("Figure A is the first-line treatment algorithm for Condition C.", styles["body"]),
+        _img(FLOWCHART_NODES, FLOWCHART_EDGES, 5.0),
+        Spacer(1, 10),
+        Paragraph(heading_b, styles["h2"]),
+        Paragraph("Figure B is the anticoagulation decision pathway for new AFib.", styles["body"]),
+        _img(FLOWCHART_B_NODES, FLOWCHART_B_EDGES, 5.0),
+        Spacer(1, 10),
+        Paragraph(heading_notes, styles["h2"]),
+        Paragraph(LOREM, styles["body"]),
+    ]
+    doc = SimpleDocTemplate(
+        str(path), pagesize=LETTER, title=DOC_META["title"],
+        author=DOC_META["author"], subject=DOC_META["subject"],
+        creator=DOC_META["creator"],
+        leftMargin=inch, rightMargin=inch, topMargin=inch, bottomMargin=inch,
+    )
+    doc.build(story)
+
+    fig_a = {
+        "index": 0,
+        "heading": heading_a,
+        "classification_expected": "flow_chart",
+        "flowchart_nodes": [n["text"] for n in FLOWCHART_NODES],
+        "flowchart_edges": [[s, t, lbl] for (s, t, lbl) in FLOWCHART_EDGES],
+    }
+    fig_b = {
+        "index": 1,
+        "heading": heading_b,
+        "classification_expected": "flow_chart",
+        "flowchart_nodes": [n["text"] for n in FLOWCHART_B_NODES],
+        "flowchart_edges": [[s, t, lbl] for (s, t, lbl) in FLOWCHART_B_EDGES],
+    }
+    return {
+        "archetype": "multi-figure",
+        "headings": headings,
+        "tables": [],
+        # Aggregate across both charts (keeps the existing flowchart_* metrics
+        # meaningful); per-figure ground truth lives in "figures" for placement.
+        "flowchart_nodes": fig_a["flowchart_nodes"] + fig_b["flowchart_nodes"],
+        "flowchart_edges": fig_a["flowchart_edges"] + fig_b["flowchart_edges"],
+        "figures": [fig_a, fig_b],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Scanned variant: rasterize a born-digital PDF into an image-only PDF.
 # ---------------------------------------------------------------------------
 def build_scanned_from(src_pdf: Path, dst_pdf: Path, dpi: int = 150) -> None:
@@ -550,6 +650,10 @@ def _write_sidecar(pdf_path: Path, meta: dict, born_digital: bool) -> None:
         "flowchart_nodes": meta["flowchart_nodes"],
         "flowchart_edges": meta["flowchart_edges"],
     }
+    # Per-figure ground truth (multi-figure fixture): reading-order index +
+    # each figure's own nodes/edges, so figure↔location placement can be scored.
+    if meta.get("figures"):
+        gt["figures"] = meta["figures"]
     side = pdf_path.with_suffix(".groundtruth.json")
     side.write_text(json.dumps(gt, indent=2, sort_keys=True) + "\n")
 
@@ -564,6 +668,7 @@ def main() -> None:
         ("table-heavy.pdf", build_table_heavy),
         ("flowchart-heavy.pdf", build_flowchart_heavy),
         ("mixed.pdf", build_mixed),
+        ("multi-figure.pdf", build_multi_figure),
     ]
     for name, fn in specs:
         p = OUT_DIR / name

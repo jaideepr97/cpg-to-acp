@@ -11,7 +11,7 @@ options land in every entry point at once.
 """
 
 from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import PdfPipelineOptions
+from docling.datamodel.pipeline_options import PdfPipelineOptions, RapidOcrOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption
 
 # Upscale factor for extracted figure bitmaps. CPG flowcharts/decision trees
@@ -30,7 +30,9 @@ def build_pdf_pipeline_options(
 
     ``do_ocr`` defaults to ``False``: most CPGs are born-digital, and OCR adds
     significant latency. Scanned PDFs are handled by a conditional re-parse
-    (see plan P4), which calls this with ``do_ocr=True``.
+    (see plan P4), which calls this with ``do_ocr=True``. When enabled we use
+    **RapidOCR** (ONNX, pip-installable, offline — no system binary), with
+    ``force_full_page_ocr`` since scanned pages have no text layer to sample.
 
     ``extract_figures`` (default ``True``, plan P3) turns on picture-image
     generation and classification so ``docling_agent`` can pull each figure's
@@ -39,6 +41,8 @@ def build_pdf_pipeline_options(
     image); disable it where that model is unavailable.
     """
     options = PdfPipelineOptions(do_ocr=do_ocr)
+    if do_ocr:
+        options.ocr_options = RapidOcrOptions(force_full_page_ocr=True)
     if extract_figures:
         options.generate_picture_images = True
         options.images_scale = images_scale

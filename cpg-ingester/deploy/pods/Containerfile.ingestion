@@ -6,7 +6,10 @@ COPY shared/ /app/shared/
 RUN pip install --no-cache-dir /app/shared/
 COPY cpg-ingester/pyproject.toml .
 COPY cpg-ingester/src/ src/
-RUN pip install --no-cache-dir boto3 python-multipart .
+# rapidocr_onnxruntime + onnxruntime power the conditional-OCR re-parse (plan
+# P4). RapidOCR bundles its own ONNX models in the wheel, so OCR stays fully
+# offline — no docling-tools prefetch or network access at runtime.
+RUN pip install --no-cache-dir boto3 python-multipart rapidocr_onnxruntime onnxruntime .
 ENV DOCLING_CACHE_DIR=/app/.cache/docling
 ENV DOCLING_ARTIFACTS_PATH=/app/.cache/docling/models
 ENV HF_HUB_ENABLE_HF_TRANSFER=0

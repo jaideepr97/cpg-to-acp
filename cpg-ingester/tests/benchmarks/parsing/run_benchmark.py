@@ -44,13 +44,13 @@ def _discover(directory: Path) -> list[tuple[Path, Path | None]]:
     return pairs
 
 
-def _run_set(label: str, pairs, *, classify: bool) -> list[dict]:
+def _run_set(label: str, pairs, *, classify: bool, do_ocr: bool) -> list[dict]:
     rows = []
     for pdf, gt in pairs:
-        print(f"[{label}] parsing {pdf.name} ...", flush=True)
+        print(f"[{label}] parsing {pdf.name} (ocr={do_ocr}) ...", flush=True)
         try:
             m = metrics_mod.score_pdf(
-                pdf, str(gt) if gt else None, do_ocr=False, classify_pictures=classify
+                pdf, str(gt) if gt else None, do_ocr=do_ocr, classify_pictures=classify
             )
             m["set"] = label
             m["error"] = None
@@ -64,11 +64,12 @@ def _fmt(v):
     return "-" if v is None else v
 
 
-def _markdown_report(rows: list[dict], generated_at: str) -> str:
+def _markdown_report(rows: list[dict], generated_at: str, *, ocr: bool) -> str:
     lines = [
         "# CPG Docling Parse-Quality Benchmark Report",
         "",
         f"_Generated: {generated_at}_",
+        f"_OCR: {'ON (RapidOCR, forced full-page — plan P4)' if ocr else 'OFF (baseline)'}_",
         "",
         "Baseline metrics for the Docling parse stage (RHAIENG-6461). "
         "Ground-truth-dependent columns (heading/table recovery) are only "
@@ -154,6 +155,11 @@ def main() -> int:
         help="disable Docling picture classification (on by default to match the "
              "production parser, which extracts + classifies figures — plan P3)",
     )
+    ap.add_argument(
+        "--ocr", action="store_true",
+        help="force RapidOCR on for every PDF (plan P4). Baseline runs keep OCR "
+             "off; use this to measure the OCR recovery on scanned fixtures.",
+    )
     args = ap.parse_args()
     classify = not args.no_classify
 
@@ -165,7 +171,7 @@ def main() -> int:
         if not pairs_synth:
             print("No synthetic PDFs found — run generate_synthetic.py first.", file=sys.stderr)
             return 2
-        rows += _run_set("synthetic", pairs_synth, classify=classify)
+        rows += _run_set("synthetic", pairs_synth, classify=classify, do_ocr=args.ocr)
     if args.real or args.all:
         if not pairs_real:
             print(
@@ -176,18 +182,19 @@ def main() -> int:
             if args.real:
                 return 2
         else:
-            rows += _run_set("real", pairs_real, classify=classify)
+            rows += _run_set("real", pairs_real, classify=classify, do_ocr=args.ocr)
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     generated_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
     report_json = {
         "generated_at": generated_at,
+        "ocr": args.ocr,
         "likely_scanned_threshold_cpp": metrics_mod.LIKELY_SCANNED_CPP,
         "results": rows,
     }
     (REPORTS_DIR / "report.json").write_text(json.dumps(report_json, indent=2) + "\n")
-    (REPORTS_DIR / "report.md").write_text(_markdown_report(rows, generated_at))
+    (REPORTS_DIR / "report.md").write_text(_markdown_report(rows, generated_at, ocr=args.ocr))
 
     print(f"\nWrote:\n  {REPORTS_DIR / 'report.json'}\n  {REPORTS_DIR / 'report.md'}")
     return 0

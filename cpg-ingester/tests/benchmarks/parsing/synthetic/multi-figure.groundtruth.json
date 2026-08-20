@@ -1,0 +1,205 @@
+{
+  "archetype": "multi-figure",
+  "born_digital": true,
+  "figures": [
+    {
+      "classification_expected": "flow_chart",
+      "flowchart_edges": [
+        [
+          "start",
+          "d1",
+          ""
+        ],
+        [
+          "d1",
+          "a1",
+          "Yes"
+        ],
+        [
+          "d1",
+          "a2",
+          "No"
+        ],
+        [
+          "a1",
+          "d2",
+          ""
+        ],
+        [
+          "d2",
+          "a3",
+          "No"
+        ],
+        [
+          "d2",
+          "end",
+          "Yes"
+        ],
+        [
+          "a2",
+          "end",
+          ""
+        ]
+      ],
+      "flowchart_nodes": [
+        "Patient with Condition C",
+        "Symptoms severe?",
+        "Start first-line therapy",
+        "Lifestyle counseling",
+        "Response at 4 weeks?",
+        "Escalate to second-line",
+        "Continue and monitor"
+      ],
+      "heading": "Algorithm A: Condition C Treatment",
+      "index": 0
+    },
+    {
+      "classification_expected": "flow_chart",
+      "flowchart_edges": [
+        [
+          "start",
+          "d1",
+          ""
+        ],
+        [
+          "d1",
+          "a1",
+          "Yes"
+        ],
+        [
+          "d1",
+          "a2",
+          "No"
+        ],
+        [
+          "a1",
+          "d2",
+          ""
+        ],
+        [
+          "d2",
+          "a3",
+          "Yes"
+        ],
+        [
+          "d2",
+          "end",
+          "No"
+        ],
+        [
+          "a2",
+          "end",
+          ""
+        ]
+      ],
+      "flowchart_nodes": [
+        "New AFib diagnosis",
+        "CHA2DS2-VASc at least 2?",
+        "Start oral anticoagulant",
+        "Defer, reassess yearly",
+        "High bleeding risk?",
+        "Prefer DOAC, monitor",
+        "Shared decision, follow up"
+      ],
+      "heading": "Algorithm B: Anticoagulation in AFib",
+      "index": 1
+    }
+  ],
+  "flowchart_edges": [
+    [
+      "start",
+      "d1",
+      ""
+    ],
+    [
+      "d1",
+      "a1",
+      "Yes"
+    ],
+    [
+      "d1",
+      "a2",
+      "No"
+    ],
+    [
+      "a1",
+      "d2",
+      ""
+    ],
+    [
+      "d2",
+      "a3",
+      "No"
+    ],
+    [
+      "d2",
+      "end",
+      "Yes"
+    ],
+    [
+      "a2",
+      "end",
+      ""
+    ],
+    [
+      "start",
+      "d1",
+      ""
+    ],
+    [
+      "d1",
+      "a1",
+      "Yes"
+    ],
+    [
+      "d1",
+      "a2",
+      "No"
+    ],
+    [
+      "a1",
+      "d2",
+      ""
+    ],
+    [
+      "d2",
+      "a3",
+      "Yes"
+    ],
+    [
+      "d2",
+      "end",
+      "No"
+    ],
+    [
+      "a2",
+      "end",
+      ""
+    ]
+  ],
+  "flowchart_nodes": [
+    "Patient with Condition C",
+    "Symptoms severe?",
+    "Start first-line therapy",
+    "Lifestyle counseling",
+    "Response at 4 weeks?",
+    "Escalate to second-line",
+    "Continue and monitor",
+    "New AFib diagnosis",
+    "CHA2DS2-VASc at least 2?",
+    "Start oral anticoagulant",
+    "Defer, reassess yearly",
+    "High bleeding risk?",
+    "Prefer DOAC, monitor",
+    "Shared decision, follow up"
+  ],
+  "headings": [
+    "Algorithm A: Condition C Treatment",
+    "Algorithm B: Anticoagulation in AFib",
+    "Combined Notes"
+  ],
+  "name": "multi-figure.pdf",
+  "page_count": 2,
+  "table_cells": 0,
+  "tables": []
+}

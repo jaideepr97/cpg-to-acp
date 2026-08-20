@@ -3,6 +3,7 @@
 import base64
 import io
 import logging
+import os
 from pathlib import Path
 
 import mlflow
@@ -20,9 +21,30 @@ from cpg_ingester.output import write_artifact
 logger = logging.getLogger(__name__)
 
 # Below this many characters of extracted text per page, a PDF is likely
-# scanned/image-only and needs OCR. Consumed by the conditional-OCR re-parse
-# (plan P4); for now it is a telemetry signal only.
+# scanned/image-only and needs OCR. Drives the conditional-OCR re-parse (plan
+# P4): a first pass runs without OCR, and if the yield is below this threshold
+# the node re-parses with OCR on and keeps whichever result has more text.
 LIKELY_SCANNED_CHARS_PER_PAGE = 100
+
+
+def _ocr_enabled() -> bool:
+    """Whether the conditional OCR re-parse (plan P4) may run.
+
+    On by default; set ``INGESTION_OCR_ENABLED`` to a falsey value
+    (``0``/``false``/``no``/``off``) to skip it — e.g. where the RapidOCR
+    models are not available in the image.
+    """
+    return os.environ.get("INGESTION_OCR_ENABLED", "true").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
+
+def _convert(pdf_path, *, do_ocr: bool):
+    """Run Docling over ``pdf_path`` and return the parsed document."""
+    return build_converter(do_ocr=do_ocr).convert(str(pdf_path)).document
 
 
 def _parse_telemetry(doc, markdown: str, page_count: int) -> dict:
@@ -152,14 +174,51 @@ def docling_agent(state: dict) -> dict:
     output_dir = state.get("output_dir", "output")
 
     logger.info("Parsing PDF with Docling: %s", pdf_path)
-    converter = build_converter(do_ocr=False)
-    result = converter.convert(str(pdf_path))
-    doc = result.document
-
+    doc = _convert(pdf_path, do_ocr=False)
     markdown = doc.export_to_markdown()
+    page_count = len(doc.pages)
+    telemetry = _parse_telemetry(doc, markdown, page_count)
+    ocr_used = False
+
+    # Conditional OCR re-parse (plan P4): a low text yield means the PDF is
+    # scanned/image-only (no text layer). Re-parse with OCR on and keep
+    # whichever pass extracted more text — OCR can underperform on born-digital
+    # pages, so we never blindly trust it.
+    if telemetry["likely_scanned"] and _ocr_enabled():
+        logger.warning(
+            "PDF appears scanned/image-only (%.1f chars/page < %d) — "
+            "re-parsing with OCR",
+            telemetry["chars_per_page"], LIKELY_SCANNED_CHARS_PER_PAGE,
+        )
+        ocr_doc = _convert(pdf_path, do_ocr=True)
+        ocr_markdown = ocr_doc.export_to_markdown()
+        ocr_telemetry = _parse_telemetry(ocr_doc, ocr_markdown, len(ocr_doc.pages))
+        if ocr_telemetry["chars"] > telemetry["chars"]:
+            logger.info(
+                "OCR re-parse improved text yield: %d -> %d chars",
+                telemetry["chars"], ocr_telemetry["chars"],
+            )
+            doc, markdown, page_count, telemetry = (
+                ocr_doc, ocr_markdown, len(ocr_doc.pages), ocr_telemetry
+            )
+            ocr_used = True
+        else:
+            logger.info(
+                "OCR re-parse did not improve text yield (%d chars) — "
+                "keeping the original pass",
+                ocr_telemetry["chars"],
+            )
+    elif telemetry["likely_scanned"]:
+        logger.warning(
+            "PDF appears scanned/image-only (%.1f chars/page < %d) but OCR is "
+            "disabled (INGESTION_OCR_ENABLED); leaving text unrecovered",
+            telemetry["chars_per_page"], LIKELY_SCANNED_CHARS_PER_PAGE,
+        )
+    telemetry["ocr_used"] = ocr_used
 
     # Figure extraction (plan P3): pull each picture's bitmap, class, and
-    # provenance out BEFORE stripping images, so get_image() still resolves.
+    # provenance out of the chosen doc BEFORE stripping images, so get_image()
+    # still resolves.
     figures, figure_images = _extract_figures(doc, output_dir)
     # Strip embedded picture bitmaps from the doc before serializing so
     # docling_json stays lean (~14x smaller on figure-heavy PDFs). The bitmaps
@@ -169,7 +228,6 @@ def docling_agent(state: dict) -> dict:
     docling_json = doc.export_to_dict()
 
     heading_page_map = _build_heading_page_map(doc)
-    page_count = len(doc.pages)
 
     write_artifact(output_dir, "parsed.md", markdown)
     write_artifact(output_dir, "heading-page-map.json", heading_page_map)
@@ -177,18 +235,11 @@ def docling_agent(state: dict) -> dict:
         write_artifact(output_dir, "figures-index.json", figures)
 
     logger.info(
-        "Docling parsed %d pages, %d headings, %d chars of markdown, %d figures",
-        page_count, len(heading_page_map), len(markdown), len(figures),
+        "Docling parsed %d pages, %d headings, %d chars of markdown, "
+        "%d figures (ocr=%s)",
+        page_count, len(heading_page_map), len(markdown), len(figures), ocr_used,
     )
-
-    telemetry = _parse_telemetry(doc, markdown, page_count)
     logger.info("Parse telemetry: %s", telemetry)
-    if telemetry["likely_scanned"]:
-        logger.warning(
-            "PDF appears scanned/image-only (%.1f chars/page < %d) — OCR "
-            "re-parse will be needed (plan P4)",
-            telemetry["chars_per_page"], LIKELY_SCANNED_CHARS_PER_PAGE,
-        )
     span = mlflow.get_current_active_span()
     if span is not None:
         span.set_attributes({f"parse.{k}": v for k, v in telemetry.items()})

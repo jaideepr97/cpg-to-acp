@@ -31,6 +31,7 @@ cpg-ingester/tests/benchmarks/parsing/
 │   ├── table-heavy.pdf           + .groundtruth.json
 │   ├── flowchart-heavy.pdf       + .groundtruth.json
 │   ├── mixed.pdf                 + .groundtruth.json
+│   ├── multi-figure.pdf          + .groundtruth.json  (two DIFFERENT flowcharts; figure-placement fixture)
 │   └── single-column-scanned.pdf + .groundtruth.json  (image-only; OCR fixture)
 ├── real-cpgs.manifest.yaml       # COMMITTED: manifest of real CPGs (URLs, no PDFs)
 ├── fetch-benchmark-cpgs.sh       # downloads real CPGs -> working/benchmarks/parsing/real/
@@ -63,8 +64,18 @@ different interpreter with `BENCH_PYTHON=/path/to/python`.
 cpg-ingester/.venv/bin/python cpg-ingester/tests/benchmarks/parsing/generate_synthetic.py
 ```
 
-Produces 5 born-digital PDFs + 1 image-only "scanned" variant, each with a
+Produces 6 born-digital PDFs + 1 image-only "scanned" variant, each with a
 `*.groundtruth.json` sidecar, under `synthetic/`.
+
+The `multi-figure.pdf` fixture embeds **two different** flowcharts (Condition C
+treatment vs. AFib anticoagulation), each under its own heading. It exists to
+verify figure↔location correlation: Docling preserves reading order in
+`docling_json.body.children` (e.g. `…heading A → #/pictures/0 → heading B →
+#/pictures/1 → Notes`), so figure interpretation (P5) anchors on the picture's
+`self_ref`/position, **not** the anonymous `<!-- image -->` markdown comment.
+Its sidecar adds a `figures[]` array with per-figure `index`, `heading`, and
+`flowchart_nodes/edges` for scoring placement (the top-level `flowchart_*` keys
+hold the aggregate across both charts).
 
 **Determinism:** generation is fully reproducible — `reportlab` invariant mode,
 a fixed random seed, fixed PDF metadata/dates, and a pinned PDF `/ID` on the
@@ -124,6 +135,24 @@ beyond Docling's local model cache and is the intended CI target.
 Picture extraction + classification is **on by default** to match the production
 parser (plan P3). Pass `--no-classify` to measure the pre-P3 baseline (parse
 without the `picture_classifier` model), e.g. for a before/after comparison.
+
+Pass `--ocr` to force RapidOCR on for every PDF (plan P4), mirroring the OCR
+engine the production conditional re-parse uses. Baseline runs keep OCR off;
+use `--ocr` to measure the recovery on scanned fixtures. The report header
+records the OCR mode, so preserve baseline vs. OCR runs under distinct names
+for a before/after comparison, e.g.:
+
+```bash
+run-benchmark.sh --synthetic            # baseline → report.md
+cp .../report.md .../report-baseline.md
+run-benchmark.sh --synthetic --ocr      # OCR on   → report.md
+cp .../report.md .../report-ocr.md
+```
+
+> **Note:** forced full-page OCR *reduces* text yield on born-digital PDFs
+> (the native text layer beats OCR). This is why the production node only OCRs
+> when `likely_scanned` and keeps whichever pass extracts more text — the
+> `--ocr` flag here forces it unconditionally purely for measurement.
 
 ## Metrics — what they mean
 
