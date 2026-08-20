@@ -4,13 +4,39 @@ import logging
 from pathlib import Path
 
 import mlflow
-from docling.document_converter import DocumentConverter
 from docling_core.types.doc import DocItem, SectionHeaderItem, TextItem
 
 from cpg_contracts import SourceLocation
+from cpg_ingester.docling_convert import build_converter
 from cpg_ingester.output import write_artifact
 
 logger = logging.getLogger(__name__)
+
+# Below this many characters of extracted text per page, a PDF is likely
+# scanned/image-only and needs OCR. Consumed by the conditional-OCR re-parse
+# (plan P4); for now it is a telemetry signal only.
+LIKELY_SCANNED_CHARS_PER_PAGE = 100
+
+
+def _parse_telemetry(doc, markdown: str, page_count: int) -> dict:
+    """Compute parse-quality telemetry for observability (plan P2.2).
+
+    Log-only for now — does not alter the node's return contract.
+    """
+    chars = len(markdown)
+    chars_per_page = chars / page_count if page_count else 0.0
+    return {
+        "page_count": page_count,
+        "chars": chars,
+        "chars_per_page": round(chars_per_page, 1),
+        "heading_count": sum(
+            1 for item, _ in doc.iterate_items() if isinstance(item, SectionHeaderItem)
+        ),
+        "table_count": len(getattr(doc, "tables", []) or []),
+        "figure_count": len(getattr(doc, "pictures", []) or []),
+        "likely_scanned": page_count > 0
+        and chars_per_page < LIKELY_SCANNED_CHARS_PER_PAGE,
+    }
 
 
 def _extract_source_location(item: DocItem) -> SourceLocation | None:
@@ -57,13 +83,7 @@ def docling_agent(state: dict) -> dict:
     output_dir = state.get("output_dir", "output")
 
     logger.info("Parsing PDF with Docling: %s", pdf_path)
-    from docling.document_converter import PdfFormatOption
-    from docling.datamodel.pipeline_options import PdfPipelineOptions
-    from docling.datamodel.base_models import InputFormat
-    pipeline_options = PdfPipelineOptions(do_ocr=False)
-    converter = DocumentConverter(
-        format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
-    )
+    converter = build_converter(do_ocr=False)
     result = converter.convert(str(pdf_path))
     doc = result.document
 
@@ -80,6 +100,18 @@ def docling_agent(state: dict) -> dict:
         "Docling parsed %d pages, %d headings, %d chars of markdown",
         page_count, len(heading_page_map), len(markdown),
     )
+
+    telemetry = _parse_telemetry(doc, markdown, page_count)
+    logger.info("Parse telemetry: %s", telemetry)
+    if telemetry["likely_scanned"]:
+        logger.warning(
+            "PDF appears scanned/image-only (%.1f chars/page < %d) — OCR "
+            "re-parse will be needed (plan P4)",
+            telemetry["chars_per_page"], LIKELY_SCANNED_CHARS_PER_PAGE,
+        )
+    span = mlflow.get_current_active_span()
+    if span is not None:
+        span.set_attributes({f"parse.{k}": v for k, v in telemetry.items()})
 
     return {
         "markdown": markdown,

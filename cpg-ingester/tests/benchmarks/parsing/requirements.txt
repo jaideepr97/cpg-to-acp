@@ -1,0 +1,16 @@
+# Benchmark-harness-only dependencies (RHAIENG-6461 P1).
+#
+# Kept SEPARATE from cpg-ingester/pyproject.toml so production stays lean:
+# these libraries are used only to author synthetic PDFs and score parse
+# quality; they are never imported by cpg_ingester production code.
+#
+# Docling itself is intentionally NOT pinned here — the benchmark runs against
+# whatever Docling version the cpg-ingester venv already has installed, so it
+# measures the same parser production uses. (Observed at authoring time: 2.113.0.)
+#
+# Install into the existing venv:
+#   cpg-ingester/.venv/bin/pip install -r cpg-ingester/tests/benchmark/requirements.txt
+
+reportlab>=4,<6      # born-digital PDF authoring (headings, paragraphs, tables, flowchart graphics)
+PyMuPDF>=1.24,<2     # rasterize born-digital PDFs -> image-only "scanned" variant (fitz)
+PyYAML>=6,<7         # parse the real-CPG manifest
