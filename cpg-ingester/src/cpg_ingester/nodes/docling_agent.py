@@ -1,10 +1,17 @@
 """Docling Agent — converts CPG PDF to markdown + JSON with provenance data."""
 
+import base64
+import io
 import logging
 from pathlib import Path
 
 import mlflow
-from docling_core.types.doc import DocItem, SectionHeaderItem, TextItem
+from docling_core.types.doc import (
+    DocItem,
+    PictureItem,
+    SectionHeaderItem,
+    TextItem,
+)
 
 from cpg_contracts import SourceLocation
 from cpg_ingester.docling_convert import build_converter
@@ -61,6 +68,68 @@ def _extract_source_location(item: DocItem) -> SourceLocation | None:
     )
 
 
+def _picture_classification(pic: PictureItem) -> tuple[str | None, float | None]:
+    """Return the top predicted class name + confidence, or (None, None).
+
+    Populated when the converter runs with ``do_picture_classification`` (plan
+    P3). Uses ``get_annotations()`` (the ``.annotations`` attribute is
+    deprecated in docling-core).
+    """
+    best_name, best_conf = None, None
+    for ann in pic.get_annotations() or []:
+        for cls in getattr(ann, "predicted_classes", None) or []:
+            conf = getattr(cls, "confidence", None)
+            if conf is not None and (best_conf is None or conf > best_conf):
+                best_name, best_conf = getattr(cls, "class_name", None), conf
+    return best_name, best_conf
+
+
+def _extract_figures(doc, output_dir: str) -> tuple[list[dict], dict[str, str]]:
+    """Pull each picture's bitmap, class, and provenance out of the document.
+
+    Returns ``(figures, figure_images)`` where ``figures`` is a metadata index
+    (``id``, ``page``, ``bbox``, ``classification``, ``confidence``, ``caption``,
+    and a local ``image_filename`` when a bitmap was captured) and
+    ``figure_images`` maps figure id → base64-PNG. The ingestion service moves
+    those bitmaps to the artifact store and records an ``image_ref`` (plan P3.3);
+    the interpreter (plan P5) consumes the index.
+
+    Requires the converter to have run with ``extract_figures=True`` so picture
+    images are generated; without it ``get_image`` returns ``None`` and only
+    metadata is captured.
+    """
+    figures: list[dict] = []
+    images: dict[str, str] = {}
+    fig_dir = Path(output_dir) / "figures"
+
+    for idx, pic in enumerate(getattr(doc, "pictures", []) or [], start=1):
+        fid = f"fig-{idx:03d}"
+        loc = _extract_source_location(pic)
+        classification, confidence = _picture_classification(pic)
+        entry: dict = {
+            "id": fid,
+            "page": loc.page_start if loc else None,
+            "bbox": loc.bbox if loc else None,
+            "classification": classification,
+            "confidence": round(confidence, 3) if confidence is not None else None,
+            "caption": pic.caption_text(doc) or "",
+        }
+
+        pil = pic.get_image(doc)
+        if pil is not None:
+            buf = io.BytesIO()
+            pil.save(buf, format="PNG")
+            png = buf.getvalue()
+            fig_dir.mkdir(parents=True, exist_ok=True)
+            (fig_dir / f"{fid}.png").write_bytes(png)
+            entry["image_filename"] = f"figures/{fid}.png"
+            images[fid] = base64.b64encode(png).decode("ascii")
+
+        figures.append(entry)
+
+    return figures, images
+
+
 def _build_heading_page_map(doc) -> dict[str, dict]:
     """Build a map of section heading text → page/level info from provenance."""
     heading_map = {}
@@ -88,6 +157,15 @@ def docling_agent(state: dict) -> dict:
     doc = result.document
 
     markdown = doc.export_to_markdown()
+
+    # Figure extraction (plan P3): pull each picture's bitmap, class, and
+    # provenance out BEFORE stripping images, so get_image() still resolves.
+    figures, figure_images = _extract_figures(doc, output_dir)
+    # Strip embedded picture bitmaps from the doc before serializing so
+    # docling_json stays lean (~14x smaller on figure-heavy PDFs). The bitmaps
+    # are preserved separately via the figures index + figure_images (MinIO).
+    for pic in getattr(doc, "pictures", []) or []:
+        pic.image = None
     docling_json = doc.export_to_dict()
 
     heading_page_map = _build_heading_page_map(doc)
@@ -95,10 +173,12 @@ def docling_agent(state: dict) -> dict:
 
     write_artifact(output_dir, "parsed.md", markdown)
     write_artifact(output_dir, "heading-page-map.json", heading_page_map)
+    if figures:
+        write_artifact(output_dir, "figures-index.json", figures)
 
     logger.info(
-        "Docling parsed %d pages, %d headings, %d chars of markdown",
-        page_count, len(heading_page_map), len(markdown),
+        "Docling parsed %d pages, %d headings, %d chars of markdown, %d figures",
+        page_count, len(heading_page_map), len(markdown), len(figures),
     )
 
     telemetry = _parse_telemetry(doc, markdown, page_count)
@@ -116,4 +196,6 @@ def docling_agent(state: dict) -> dict:
     return {
         "markdown": markdown,
         "docling_json": docling_json,
+        "figures": figures,
+        "figure_images": figure_images,
     }

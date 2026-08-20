@@ -13,6 +13,9 @@ from cpg_ingester.nodes.docling_agent import (
 )
 
 SYNTHETIC_CPG = Path(__file__).parent.parent / "data" / "synthetic-hypertension-cpg.pdf"
+FLOWCHART_CPG = (
+    Path(__file__).parent / "benchmarks" / "parsing" / "synthetic" / "flowchart-heavy.pdf"
+)
 
 
 @pytest.mark.skipif(not SYNTHETIC_CPG.exists(), reason="Synthetic CPG PDF not found")
@@ -58,6 +61,58 @@ class TestDoclingAgent:
             assert "Hypertension" in md
             assert "Lisinopril" in md
             assert "DASH" in md
+
+    def test_returns_figure_index(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state = {"pdf_path": str(SYNTHETIC_CPG), "output_dir": tmpdir}
+            result = docling_agent(state)
+            assert isinstance(result.get("figures"), list)
+            assert isinstance(result.get("figure_images"), dict)
+
+    def test_docling_json_has_no_embedded_bitmaps(self):
+        # Picture images are stripped before serialization to keep docling_json
+        # lean; bitmaps live in the figures index / figure_images instead.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state = {"pdf_path": str(SYNTHETIC_CPG), "output_dir": tmpdir}
+            result = docling_agent(state)
+            for pic in result["docling_json"].get("pictures", []):
+                assert pic.get("image") is None
+
+
+@pytest.mark.skipif(not FLOWCHART_CPG.exists(), reason="Flowchart benchmark PDF not found")
+class TestFigureExtraction:
+
+    def test_extracts_classified_flowchart_figure(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state = {"pdf_path": str(FLOWCHART_CPG), "output_dir": tmpdir}
+            result = docling_agent(state)
+
+            figures = result["figures"]
+            assert len(figures) >= 1
+
+            fig = figures[0]
+            assert fig["id"] == "fig-001"
+            assert fig["page"] == 1
+            assert fig["bbox"] is not None
+            # The fixture embeds a flowchart raster; the classifier should tag it.
+            assert fig["classification"] is not None
+            assert "flow" in fig["classification"].lower()
+
+            # Bitmap captured: local artifact + base64 in figure_images.
+            assert fig["image_filename"] == "figures/fig-001.png"
+            assert (Path(tmpdir) / "figures" / "fig-001.png").exists()
+            assert (Path(tmpdir) / "figures-index.json").exists()
+            assert fig["id"] in result["figure_images"]
+
+    def test_figure_bitmap_is_valid_png(self):
+        import base64
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state = {"pdf_path": str(FLOWCHART_CPG), "output_dir": tmpdir}
+            result = docling_agent(state)
+            b64 = result["figure_images"]["fig-001"]
+            png = base64.b64decode(b64)
+            assert png[:8] == b"\x89PNG\r\n\x1a\n"
 
 
 class TestSourceLocationHelper:

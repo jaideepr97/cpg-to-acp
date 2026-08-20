@@ -17,6 +17,7 @@ class CPGIngesterState(TypedDict, total=False):
     # Phase 1 outputs
     markdown: str
     docling_json: dict
+    figures: list[dict]  # figure index: id, page, bbox, class, image_ref (plan P3)
     section_map: list[dict]
     abbreviations: dict[str, str]
     grading_definitions: str

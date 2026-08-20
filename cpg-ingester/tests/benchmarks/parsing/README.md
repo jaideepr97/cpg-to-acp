@@ -121,9 +121,9 @@ Outputs `working/benchmarks/parsing/reports/report.json` (machine-readable) and
 `report.md` (human-readable). The `--synthetic` path has no network dependency
 beyond Docling's local model cache and is the intended CI target.
 
-`--classify` additionally turns on Docling picture classification (needs the
-classifier models; off by default so the baseline matches the production parser,
-which currently sets only `do_ocr=False`).
+Picture extraction + classification is **on by default** to match the production
+parser (plan P3). Pass `--no-classify` to measure the pre-P3 baseline (parse
+without the `picture_classifier` model), e.g. for a before/after comparison.
 
 ## Metrics — what they mean
 
@@ -133,7 +133,7 @@ which currently sets only `do_ocr=False`).
 | **total_chars / page_count** | Raw extracted markdown length and page count. |
 | **heading_recovery** | Fraction of ground-truth section headings found in output (synthetic only). |
 | **table_recovery** | Detected structured table cells vs. ground-truth cell count (synthetic only). |
-| **figure_count / figure_types** | Picture regions detected (types only when `--classify`). Figure *content* interpretation is a later phase (P5) — this only measures detection. |
+| **figure_count / figure_types** | Picture regions detected + their predicted classes (classification on by default; use `--no-classify` to skip). Figure *content* interpretation is a later phase (P5) — this only measures detection. |
 | **likely_scanned** | Heuristic low-yield flag; the trigger the conditional-OCR phase (P4) will consume. |
 | **ocr_used** | Whether OCR was enabled for this parse (baseline: false). |
 

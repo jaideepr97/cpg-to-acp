@@ -111,6 +111,10 @@ def _markdown_report(rows: list[dict], generated_at: str) -> str:
         notes = []
         if r.get("headings_missing"):
             notes.append(f"missing headings: {r['headings_missing']}")
+        figure_types = r.get("figure_types") or {}
+        if figure_types:
+            classes = ", ".join(f"{k}×{v}" for k, v in sorted(figure_types.items()))
+            notes.append(f"figure classes: {classes}")
         if r.get("flowchart_nodes_expected"):
             notes.append(
                 f"flowchart ground truth: {r['flowchart_nodes_expected']} nodes / "
@@ -146,11 +150,12 @@ def main() -> int:
     g.add_argument("--real", action="store_true", help="downloaded real CPGs (local)")
     g.add_argument("--all", action="store_true", help="both sets")
     ap.add_argument(
-        "--classify", action="store_true",
-        help="enable Docling picture classification (needs models; off by default "
-             "to match production baseline)",
+        "--no-classify", action="store_true",
+        help="disable Docling picture classification (on by default to match the "
+             "production parser, which extracts + classifies figures — plan P3)",
     )
     args = ap.parse_args()
+    classify = not args.no_classify
 
     pairs_synth = _discover(SYNTHETIC_DIR)
     pairs_real = _discover(REAL_DIR)
@@ -160,7 +165,7 @@ def main() -> int:
         if not pairs_synth:
             print("No synthetic PDFs found — run generate_synthetic.py first.", file=sys.stderr)
             return 2
-        rows += _run_set("synthetic", pairs_synth, classify=args.classify)
+        rows += _run_set("synthetic", pairs_synth, classify=classify)
     if args.real or args.all:
         if not pairs_real:
             print(
@@ -171,7 +176,7 @@ def main() -> int:
             if args.real:
                 return 2
         else:
-            rows += _run_set("real", pairs_real, classify=args.classify)
+            rows += _run_set("real", pairs_real, classify=classify)
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     generated_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
