@@ -64,7 +64,6 @@ describe("useAdaptivePolling", () => {
       .mockResolvedValueOnce({ done: true })
       .mockResolvedValue({ done: true });
 
-    // Must be a stable reference — the hook includes isComplete in useCallback deps
     const isComplete = (d: { done: boolean }) => d.done;
 
     const { result } = renderHook(() =>
@@ -86,6 +85,31 @@ describe("useAdaptivePolling", () => {
     expect(fetcher.mock.calls.length).toBe(callsAtCompletion);
 
     vi.useFakeTimers();
+  });
+
+  it("does not restart polling when only isComplete's identity changes", async () => {
+    // Regression for the CarePlanReview infinite-fetch loop (#125): pages pass
+    // isComplete inline (e.g. `() => true`), so it gets a new identity every
+    // render. That must not tear down and re-run the poll effect — otherwise
+    // each fetch's state update re-renders, which re-fetches, unbounded.
+    const fetcher = vi.fn().mockResolvedValue({ done: false });
+
+    const { rerender } = renderHook(
+      ({ ic }: { ic: () => boolean }) =>
+        useAdaptivePolling({ fetcher, isComplete: ic, initialInterval: 100000 }),
+      { initialProps: { ic: () => false } },
+    );
+
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    // Re-render with brand-new isComplete references (the inline-callback footgun).
+    rerender({ ic: () => false });
+    rerender({ ic: () => false });
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    // A new isComplete identity must not trigger any extra fetches.
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it("sets error on fetch failure", async () => {

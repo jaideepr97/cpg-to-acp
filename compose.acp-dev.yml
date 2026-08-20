@@ -1,0 +1,51 @@
+# acp-writer development stack: acp-writer + LiteLLM + Kogito
+# No Medplum/EHR, no MLflow. Care plans stored in-memory, viewable at /ui.
+#
+# Prerequisites:
+#   cp platform/litellm/deploy/.env.example platform/litellm/deploy/.env
+#   # then set OPENAI_API_KEY and LITELLM_MASTER_KEY in .env
+#
+# Usage:
+#   podman compose -f compose.acp-dev.yml up --build
+
+services:
+
+  kogito:
+    build:
+      context: ./acp-writer/decision-service
+      dockerfile: deploy/Containerfile
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/q/health/ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  litellm:
+    build:
+      context: ./platform/litellm
+      dockerfile: deploy/Containerfile
+    ports:
+      - "4000:4000"
+    env_file:
+      - ./platform/litellm/deploy/.env
+
+  acp-writer:
+    build:
+      context: .
+      dockerfile: acp-writer/deploy/Containerfile
+    ports:
+      - "8082:8082"
+    depends_on:
+      kogito:
+        condition: service_healthy
+    environment:
+      - KOGITO_URL=http://kogito:8081
+      - LITELLM_URL=http://litellm:4000
+      - LITELLM_API_KEY=sk-change-me
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8082/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

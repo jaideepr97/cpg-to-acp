@@ -37,6 +37,14 @@ export function useAdaptivePolling<T>({
   const startTimeRef = useRef<number>(Date.now());
   const completedRef = useRef(false);
 
+  // isComplete is a predicate (behavior), not a lifecycle trigger. Keeping it in
+  // a ref — rather than in poll's deps — means callers can pass it inline (e.g.
+  // `() => true`) without a new identity restarting the poll effect on every
+  // render, which otherwise causes an infinite fetch loop (#125). fetcher stays
+  // a dependency: changing it (new id, refresh) intentionally restarts polling.
+  const isCompleteRef = useRef(isComplete);
+  isCompleteRef.current = isComplete;
+
   const poll = useCallback(async () => {
     if (completedRef.current) return;
     try {
@@ -52,7 +60,7 @@ export function useAdaptivePolling<T>({
       setData(result);
       setError(null);
 
-      if (isComplete?.(result)) {
+      if (isCompleteRef.current?.(result)) {
         completedRef.current = true;
       }
     } catch (e) {
@@ -60,7 +68,7 @@ export function useAdaptivePolling<T>({
     } finally {
       setIsLoading(false);
     }
-  }, [fetcher, isComplete]);
+  }, [fetcher]);
 
   useEffect(() => {
     if (!enabled) return;

@@ -1,0 +1,16 @@
+# Keep the build context (and OpenShift binary upload) lean, and out of the image.
+# The UI Containerfile runs `npm ci` fresh, so installed deps/build output must not
+# be copied in.
+**/node_modules
+**/dist
+.git
+.claude
+**/*.log
+**/.DS_Store
+# other components not needed by the UI image (repo-root build context)
+automation/
+cpg-ingester/
+mock-EHR/
+platform/
+dev_docs/
+docs/

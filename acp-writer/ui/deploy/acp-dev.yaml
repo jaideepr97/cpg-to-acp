@@ -1,0 +1,91 @@
+# Standalone deployment for the acp-writer React/PatternFly UI.
+# nginx serves the SPA and proxies /api/ to the framework BFF (${BFF_HOST}).
+#
+#   oc apply -f acp-writer/ui/deploy/acp-dev.yaml -n <namespace>
+#
+# Set the image namespace + BFF_HOST to your target namespace. Image is built by
+# the acp-writer-react-ui BuildConfig (repo-root context, UBI bases,
+# dockerfilePath acp-writer/ui/Containerfile).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: acp-dev-react-ui
+  labels:
+    app.kubernetes.io/name: acp-writer-react-ui
+    app.kubernetes.io/component: ui
+    app.kubernetes.io/part-of: cpg-to-acp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: acp-writer-react-ui
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: acp-writer-react-ui
+        app.kubernetes.io/component: ui
+        app.kubernetes.io/part-of: cpg-to-acp
+    spec:
+      containers:
+        - name: ui
+          image: image-registry.openshift-image-registry.svc:5000/jrao-cpg-acp/acp-writer-react-ui:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env:
+            # nginx proxies /api/ to http://${BFF_HOST}/api/ (envsubst at startup).
+            # acp-bff is the framework's BFF service; same-namespace ClusterIP.
+            - name: BFF_HOST
+              value: acp-bff:8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: acp-dev-react-ui
+  labels:
+    app.kubernetes.io/name: acp-writer-react-ui
+    app.kubernetes.io/part-of: cpg-to-acp
+spec:
+  selector:
+    app.kubernetes.io/name: acp-writer-react-ui
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: acp-dev-react-ui
+  labels:
+    app.kubernetes.io/name: acp-writer-react-ui
+    app.kubernetes.io/part-of: cpg-to-acp
+spec:
+  to:
+    kind: Service
+    name: acp-dev-react-ui
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
