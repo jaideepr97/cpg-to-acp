@@ -194,12 +194,19 @@ def build_fhir_bundle(
             activity_refs.append({"reference": {"reference": _urn(uid)}})
 
         else:
-            activity_refs.append({
-                "performedActivity": [_codeable_concept(
-                    activity.code.model_dump() if activity.code else None,
-                    activity.description,
-                )],
-            })
+            detail_entry: dict[str, Any] = {
+                "detail": {
+                    "status": "not-started",
+                    "description": activity.description,
+                },
+            }
+            code = _codeable_concept(
+                activity.code.model_dump() if activity.code else None,
+                activity.description,
+            )
+            if code:
+                detail_entry["detail"]["code"] = code
+            activity_refs.append(detail_entry)
 
     careplan_uid = _uuid()
     careplan: dict[str, Any] = {
@@ -294,7 +301,7 @@ def build_fhir_bundle(
                 "reference": _urn(careplan_uid),
                 "extension": [{
                     "url": f"{AI_TRANSPARENCY_PROFILE}/targetPath",
-                    "valueString": f"CarePlan.activity[{i}].performedActivity",
+                    "valueString": f"CarePlan.activity[{i}].detail",
                 }],
             }
 

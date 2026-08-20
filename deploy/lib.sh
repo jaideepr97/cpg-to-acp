@@ -26,7 +26,11 @@ load_config() {
     set +a
 
     # Compute derived values
-    export LLM_BASE_URL="${MAAS_GATEWAY_URL}/${MAAS_ROUTE_SEGMENT}"
+    if [ -n "${MAAS_ROUTE_SEGMENT:-}" ]; then
+        export LLM_BASE_URL="${MAAS_GATEWAY_URL}/${MAAS_ROUTE_SEGMENT}"
+    else
+        export LLM_BASE_URL="${MAAS_GATEWAY_URL}"
+    fi
     export IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD 2>/dev/null || echo 'latest')}"
     # Extract MLflow hostname for use in OpenShell policy templates
     export MLFLOW_HOST
@@ -61,7 +65,7 @@ preflight() {
         fi
     fi
 
-    for var in MAAS_GATEWAY_URL MAAS_ROUTE_SEGMENT LLM_MODEL_DEFAULT GIT_REPO CLUSTER_DOMAIN; do
+    for var in MAAS_GATEWAY_URL LLM_MODEL_DEFAULT GIT_REPO CLUSTER_DOMAIN; do
         if [ -z "${!var:-}" ]; then
             echo "ERROR: Required config variable $var is empty. Check deploy/config/cluster.env."
             errors=$((errors + 1))

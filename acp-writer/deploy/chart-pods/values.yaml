@@ -102,12 +102,36 @@ pods:
         cpu: 200m
         memory: 512Mi
 
+  bff:
+    enabled: true
+    sandboxed: false
+    image: acp-writer-bff
+    tag: latest
+    port: 8080
+    env:
+      sonataflowUrl: http://acpwriter:80
+      minioEndpoint: http://minio:9000
+      llmReasoningUrl: http://acp-llm-reasoning:8080
+      decisionEngineUrl: http://acp-decision-engine:8080
+      fhirServerUrl: http://acp-fhir-server:8080
+    secrets:
+      minio: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
+
   ui:
     enabled: true
     sandboxed: false
     image: acp-writer-ui
     tag: latest
     port: 8082
+    env:
+      bffHost: http://acp-writer-bff:8080
     route: true
     resources:
       requests:

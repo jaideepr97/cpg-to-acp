@@ -25,8 +25,8 @@ def fhir_bundle_generator(state: CarePlanComposerState) -> dict:
     output_dir = state.get("output_dir", "")
     feedback = state.get("fhir_review_feedback", "")
 
-    if not brief_dict or not brief_dict.get("goals"):
-        logger.warning("No Planning Brief or empty goals — producing empty bundle")
+    if not brief_dict or (not brief_dict.get("goals") and not brief_dict.get("activities")):
+        logger.warning("No Planning Brief or empty goals/activities — producing empty bundle")
         return {
             "fhir_bundle": {
                 "resourceType": "Bundle",

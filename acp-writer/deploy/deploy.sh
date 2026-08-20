@@ -46,7 +46,11 @@ load_config "$CONFIG_PATH"
 
 preflight
 
-LLM_BASE_URL="${MAAS_GATEWAY_URL}/${MAAS_ROUTE_SEGMENT}"
+if [ -n "${MAAS_ROUTE_SEGMENT:-}" ]; then
+    LLM_BASE_URL="${MAAS_GATEWAY_URL}/${MAAS_ROUTE_SEGMENT}"
+else
+    LLM_BASE_URL="${MAAS_GATEWAY_URL}"
+fi
 LLM_MODEL="${ACP_WRITER_LLM_MODEL:-$LLM_MODEL_DEFAULT}"
 
 OPENSHELL_MODE="true"
@@ -71,6 +75,7 @@ if [ "$SKIP_BUILD" = false ]; then
         acp-writer-decision \
         acp-writer-fhir-gen \
         acp-writer-fhir-srv \
+        acp-writer-bff \
         acp-writer-ui \
         acp-writer-mcp \
         decision-service
@@ -113,6 +118,7 @@ helm upgrade --install acp "$SCRIPT_DIR/chart-pods" \
     --set pods.fhir-generation.env.litellmUrl="$LLM_BASE_URL" \
     --set pods.fhir-generation.env.llmModel="$LLM_MODEL" \
     --set pods.fhir-server.tag="$IMAGE_TAG" \
+    --set pods.bff.tag="$IMAGE_TAG" \
     --set pods.ui.tag="$IMAGE_TAG" \
     --wait --timeout 120s || { log "ERROR: acp-writer helm install failed"; exit 1; }
 log "  acp-writer installed ($(( SECONDS - helm_start ))s)"
@@ -153,7 +159,7 @@ log_step "Verifying acp-writer deployment"
 
 # --- Step 7: Prune old image tags ---
 
-for is in acp-writer-patient-data acp-writer-llm acp-writer-decision acp-writer-fhir-gen acp-writer-fhir-srv acp-writer-ui acp-writer-mcp decision-service; do
+for is in acp-writer-patient-data acp-writer-llm acp-writer-decision acp-writer-fhir-gen acp-writer-fhir-srv acp-writer-bff acp-writer-ui acp-writer-mcp decision-service; do
     prune_image_tags "$is" 5
 done
 

@@ -127,11 +127,15 @@ def fhir_server_writer(state: CarePlanComposerState) -> dict:
         return {"delivery_status": "skipped", "careplan_id": ""}
 
     careplan_id = str(uuid.uuid4())
+    initial_status = "active" if state.get("approved", False) else "draft"
+
+    if initial_status == "active":
+        _apply_active_tags(bundle)
 
     _care_plans[careplan_id] = {
         "id": careplan_id,
         "bundle": bundle,
-        "status": "draft",
+        "status": initial_status,
         "patient_reference": state.get("patient_reference", ""),
         "server_ids": {},
     }
@@ -152,6 +156,21 @@ def fhir_server_writer(state: CarePlanComposerState) -> dict:
 
         if r.status_code in (200, 201):
             logger.info("FHIR Bundle posted successfully (status %d)", r.status_code)
+            if response_data.get("entry"):
+                for i, entry in enumerate(response_data["entry"][:10]):
+                    resp_info = entry.get("response", {})
+                    logger.info(
+                        "  entry[%d]: status=%s location=%s",
+                        i, resp_info.get("status", "?"), resp_info.get("location", "?")[:80],
+                    )
+            elif response_data.get("issue"):
+                for iss in response_data["issue"][:5]:
+                    logger.warning(
+                        "  OperationOutcome: %s — %s",
+                        iss.get("severity", "?"), iss.get("diagnostics", "?")[:120],
+                    )
+            else:
+                logger.info("  Response body: %s", json.dumps(response_data)[:500])
             server_ids = _parse_server_ids(bundle, response_data)
             _care_plans[careplan_id]["fhir_response"] = response_data
             _care_plans[careplan_id]["server_ids"] = server_ids
@@ -215,6 +234,18 @@ CLINAST_AIRPT_SECURITY = {
     "code": "CLINAST_AIRPT",
     "display": "clinician asserted from AI reported",
 }
+
+
+def _apply_active_tags(bundle: dict) -> None:
+    """Set CarePlan status to active and swap AIAST → CLINAST_AIRPT security tags."""
+    for entry in bundle.get("entry", []):
+        resource = entry.get("resource", {})
+        security = resource.get("meta", {}).get("security", [])
+        for i, sec in enumerate(security):
+            if sec.get("code") == "AIAST":
+                security[i] = CLINAST_AIRPT_SECURITY
+        if resource.get("resourceType") == "CarePlan":
+            resource["status"] = "active"
 
 
 def approve_care_plan(careplan_id: str, clinician: str | None = None) -> dict | None:
