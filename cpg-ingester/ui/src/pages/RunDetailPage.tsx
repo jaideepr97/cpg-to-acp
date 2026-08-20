@@ -1,4 +1,5 @@
 import {
+  Alert,
   Button,
   Card,
   CardBody,
@@ -142,6 +143,15 @@ export function RunDetailPage() {
       <PageSection>
         <Tabs activeKey={activeTab} onSelect={(_e, key) => setActiveTab(key as number)}>
           <Tab eventKey={0} title={<TabTitleText>Progress</TabTitleText>}>
+            {run.warnings?.map((w, i) => (
+              <Alert
+                key={i}
+                variant="warning"
+                title={w.message}
+                isInline
+                style={{ marginTop: 16 }}
+              />
+            ))}
             <Card style={{ marginTop: 16 }}>
               <CardBody>
                 <PipelineStepperComponent steps={run.steps} />

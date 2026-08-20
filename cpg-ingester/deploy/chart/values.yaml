@@ -87,6 +87,7 @@ pods:
     env:
       sonataflowUrl: http://cpgingester:80
       minioEndpoint: http://minio:9000
+      acpWriterBffUrl: http://acp-writer-bff:8080
     secrets:
       minio: true
     resources:

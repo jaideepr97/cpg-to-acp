@@ -1,6 +1,7 @@
 """SonataFlow REST client and workflow state mapping for the BFF."""
 
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
@@ -8,6 +9,8 @@ from uuid import uuid4
 import requests
 
 logger = logging.getLogger(__name__)
+
+ACP_WRITER_BFF_URL = os.environ.get("ACP_WRITER_BFF_URL", "")
 
 WORKFLOW_NAME = "cpgingester"
 
@@ -26,6 +29,7 @@ _STATE_TO_RUN_STATUS = {
     "Assemble": "assembling",
     "Deliver": "delivering",
     "Done": "completed",
+    "Failed": "failed",
 }
 
 _REVIEW_GATE_MAP = {
@@ -210,6 +214,12 @@ def map_to_run_detail(instance: dict) -> dict[str, Any]:
         },
     }
 
+    warnings = []
+    if data.get("notificationWarning"):
+        warnings.append({"type": "notification", "message": data["notificationWarning"]})
+    if warnings:
+        detail["warnings"] = warnings
+
     review_type = _REVIEW_GATE_MAP.get(current_state)
     if review_type:
         detail["awaitingReview"] = review_type
@@ -283,13 +293,16 @@ class SonataFlowClient:
         return resp.json()
 
     def start_workflow(self, pdf_ref: str, cpg_name: str) -> dict:
+        payload = {
+            "pdf_ref": pdf_ref,
+            "cpg_name": cpg_name,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if ACP_WRITER_BFF_URL:
+            payload["acpWriterUrl"] = ACP_WRITER_BFF_URL
         resp = requests.post(
             f"{self.base_url}/{WORKFLOW_NAME}",
-            json={
-                "pdf_ref": pdf_ref,
-                "cpg_name": cpg_name,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            },
+            json=payload,
             headers={"Content-Type": "application/json"},
             timeout=10,
         )

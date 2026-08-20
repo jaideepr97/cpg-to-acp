@@ -145,6 +145,11 @@ export interface StepError {
   message: string;
 }
 
+export interface RunWarning {
+  type: string;
+  message: string;
+}
+
 export interface RunDetail {
   id: string;
   status: RunStatus;
@@ -162,4 +167,5 @@ export interface RunDetail {
   deliveryStatus?: DeliveryStatus;
   escalatedItems?: EscalatedItem[];
   errors?: StepError[];
+  warnings?: RunWarning[];
 }
