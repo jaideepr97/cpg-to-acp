@@ -25,6 +25,7 @@ import { useTheme } from "./ThemeProvider";
 export interface NavItemConfig {
   label: string;
   path: string;
+  icon?: React.ReactNode;
 }
 
 export interface AppShellProps {
@@ -50,7 +51,10 @@ export function AppShell({
             key={item.path}
             isActive={location.pathname === item.path}
           >
-            <NavLink to={item.path}>{item.label}</NavLink>
+            <NavLink to={item.path}>
+              {item.icon && <span style={{ marginRight: "0.5rem" }}>{item.icon}</span>}
+              {item.label}
+            </NavLink>
           </NavItem>
         ))}
       </NavList>

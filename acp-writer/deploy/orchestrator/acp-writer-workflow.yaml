@@ -33,6 +33,9 @@ spec:
       - name: reviewDone
         source: ""
         type: review-done
+      - name: careplanReviewed
+        source: ""
+        type: careplan-reviewed
     functions:
       # Sync functions (fast, <10s)
       - name: scanpatient
@@ -50,6 +53,9 @@ spec:
       - name: writefhir
         type: custom
         operation: rest:post:http://acp-fhir-server:8080/api/v1/write
+      - name: notifybffreview
+        type: custom
+        operation: rest:post:http://acp-bff:8080/api/v1/notify-review
       # Async functions (LLM-heavy, 30-120s)
       - name: composeplanasynch
         type: custom
@@ -199,14 +205,62 @@ spec:
         dataConditions:
           - name: Approved
             condition: '${ (.fhirReviewData.fhir_review_feedback == "") or (.fhirReviewData.fhir_review_feedback == null) }'
-            transition: WriteFHIR
+            transition: InitCarePlanReview
           - name: MaxReached
             condition: "${ .fhirReviewCount >= .maxFHIRReviews }"
-            transition: WriteFHIR
+            transition: InitCarePlanReview
         defaultCondition:
           transition: GenerateBundle
 
-      # --- Phase 4: Write to FHIR server (sync) ---
+      # --- Phase 4: Human review of care plan ---
+
+      - name: InitCarePlanReview
+        type: inject
+        data:
+          careplanReviewCount: 0
+        stateDataFilter:
+          output: "${ if .careplanReviewCount == null then . + {careplanReviewCount: 0} else . end }"
+        transition: ReviewCarePlan
+
+      - name: ReviewCarePlan
+        type: callback
+        timeouts:
+          eventTimeout: PT24H
+        action:
+          functionRef:
+            refName: notifybffreview
+            arguments:
+              process_instance_id: "$WORKFLOW.instanceId"
+              review_type: "careplan"
+              fhir_bundle_ref: "${ .fhirGenData.fhir_bundle_ref }"
+              planning_brief_ref: "${ .composerData.planning_brief_ref }"
+              review_iteration: "${ .careplanReviewCount }"
+              previous_feedback: "${ .careplanReview }"
+        eventRef: careplanReviewed
+        eventDataFilter:
+          toStateData: "${ .careplanReview }"
+        transition: IncrementCarePlanReview
+
+      - name: IncrementCarePlanReview
+        type: inject
+        data: {}
+        stateDataFilter:
+          output: "${ . + {careplanReviewCount: ((.careplanReviewCount // 0) + 1)} }"
+        transition: CheckCarePlanReview
+
+      - name: CheckCarePlanReview
+        type: switch
+        dataConditions:
+          - name: approved
+            condition: "${ .careplanReview.action == \"approve\" }"
+            transition: WriteFHIR
+          - name: changesRequested
+            condition: "${ .careplanReview.action == \"request_changes\" }"
+            transition: GenerateBundle
+        defaultCondition:
+          transition: WriteFHIR
+
+      # --- Phase 5: Write to FHIR server (sync) ---
 
       - name: WriteFHIR
         type: operation

@@ -28,6 +28,7 @@ const STATUS_LABEL: Record<RunStatus, { text: string; color: 'blue' | 'teal' | '
   delivering: { text: 'Delivering', color: 'purple' },
   completed: { text: 'Complete', color: 'green' },
   failed: { text: 'Failed', color: 'red' },
+  cancelled: { text: 'Cancelled', color: 'orange' },
 };
 
 export function DashboardPage() {
@@ -116,7 +117,7 @@ export function DashboardPage() {
                     </Td>
                     <Td dataLabel="Current Step">{run.currentStep}</Td>
                     <Td isActionCell>
-                      {(run.status === 'completed' || run.status === 'failed') && (
+                      {(run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled') && (
                         <Button
                           variant="plain"
                           aria-label="Rerun pipeline"

@@ -58,6 +58,10 @@ spec:
             - name: MINIO_ENDPOINT
               value: {{ $pod.env.minioEndpoint | quote }}
             {{- end }}
+            {{- if $pod.env.acpWriterBffUrl }}
+            - name: ACP_WRITER_BFF_URL
+              value: {{ $pod.env.acpWriterBffUrl | quote }}
+            {{- end }}
             {{- end }}
             {{- if $pod.secrets }}
             {{- if $pod.secrets.llm }}

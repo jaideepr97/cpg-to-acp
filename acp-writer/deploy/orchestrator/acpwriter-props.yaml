@@ -29,3 +29,5 @@ data:
     mp.messaging.incoming.generate-done.path=/wait-generate
     mp.messaging.incoming.review-done.connector=quarkus-http
     mp.messaging.incoming.review-done.path=/wait-review
+    mp.messaging.incoming.careplan-reviewed.connector=quarkus-http
+    mp.messaging.incoming.careplan-reviewed.path=/wait-careplan-review

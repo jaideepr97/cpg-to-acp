@@ -46,6 +46,7 @@ IMAGES=(
     "acp-writer-decision"
     "acp-writer-fhir-gen"
     "acp-writer-fhir-srv"
+    "acp-writer-bff"
     "acp-writer-ui"
     "acp-writer-mcp"
 )
@@ -113,6 +114,7 @@ create_bc "acp-writer-llm"          "acp-writer/deploy/pods/Containerfile.llm-re
 create_bc "acp-writer-decision"     "acp-writer/deploy/pods/Containerfile.decision-engine"
 create_bc "acp-writer-fhir-gen"     "acp-writer/deploy/pods/Containerfile.fhir-generation"
 create_bc "acp-writer-fhir-srv"     "acp-writer/deploy/pods/Containerfile.fhir-server"
+create_bc "acp-writer-bff"          "acp-writer/deploy/pods/Containerfile.bff"
 create_bc "acp-writer-ui"           "acp-writer/deploy/pods/Containerfile.ui"
 create_bc "acp-writer-mcp"          "acp-writer/deploy/pods/Containerfile.mcp"
 create_bc "decision-service"        "deploy/Containerfile" "2" "4Gi" "acp-writer/decision-service"

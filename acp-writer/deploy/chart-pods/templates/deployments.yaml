@@ -58,6 +58,22 @@ spec:
             - name: DECISION_ENGINE_URL
               value: {{ $pod.env.decisionEngineUrl | quote }}
             {{- end }}
+            {{- if $pod.env.sonataflowUrl }}
+            - name: SONATAFLOW_URL
+              value: {{ $pod.env.sonataflowUrl | quote }}
+            {{- end }}
+            {{- if $pod.env.minioEndpoint }}
+            - name: MINIO_ENDPOINT
+              value: {{ $pod.env.minioEndpoint | quote }}
+            {{- end }}
+            {{- if $pod.env.llmReasoningUrl }}
+            - name: LLM_REASONING_URL
+              value: {{ $pod.env.llmReasoningUrl | quote }}
+            {{- end }}
+            {{- if $pod.env.bffHost }}
+            - name: BFF_HOST
+              value: {{ $pod.env.bffHost | quote }}
+            {{- end }}
             {{- end }}
             {{- if $pod.secrets }}
             {{- if $pod.secrets.llm }}
@@ -68,6 +84,8 @@ spec:
                   key: LLM_API_KEY
             {{- end }}
             {{- if $pod.secrets.minio }}
+            - name: ARTIFACT_STORE_URL
+              value: "http://minio:9000"
             - name: ARTIFACT_STORE_ACCESS_KEY
               valueFrom:
                 secretKeyRef:

@@ -1,0 +1,30 @@
+# Build context is the REPO ROOT so the "@cpg-to-acp/ui-shared": "file:../../shared/ui"
+# workspace dependency resolves — the image mirrors the repo layout.
+#
+# UBI bases (not Docker Hub) so on-cluster OpenShift builds don't hit Docker Hub
+# unauthenticated pull-rate limits. Runtime + envsubst pattern mirrors cpg-ingester/ui.
+FROM registry.access.redhat.com/ubi9/nodejs-22 AS build
+USER 0
+WORKDIR /build
+
+# Build the shared UI package first (acp-writer/ui depends on it via file:../../shared/ui)
+COPY shared/ui/ shared/ui/
+RUN cd shared/ui && npm ci && npm run build
+
+# Build the acp-writer React UI
+COPY acp-writer/ui/ acp-writer/ui/
+RUN cd acp-writer/ui && npm ci && npm run build
+
+FROM registry.access.redhat.com/ubi9/nginx-124
+# SPA static content -> UBI nginx docroot
+COPY --from=build /build/acp-writer/ui/dist /opt/app-root/src
+# Location blocks as a template in the default server (envsubst ${BFF_HOST} at startup)
+COPY acp-writer/ui/nginx.conf /opt/app-root/etc/nginx.default.d/app.conf.template
+# UBI nginx runs scripts from /opt/app-root/src/nginx-start/ before starting nginx
+RUN mkdir -p /opt/app-root/src/nginx-start && \
+    printf '#!/bin/bash\nenvsubst "\\$BFF_HOST" < /opt/app-root/etc/nginx.default.d/app.conf.template > /opt/app-root/etc/nginx.default.d/app.conf\n' \
+    > /opt/app-root/src/nginx-start/50-envsubst.sh && \
+    chmod +x /opt/app-root/src/nginx-start/50-envsubst.sh
+ENV BFF_HOST=acp-bff:8080
+EXPOSE 8080
+CMD ["/usr/libexec/s2i/run"]

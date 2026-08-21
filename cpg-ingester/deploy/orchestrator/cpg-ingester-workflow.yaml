@@ -23,6 +23,9 @@ spec:
   flow:
     specVersion: "0.8"
     start: Parse
+    errors:
+      - name: notificationError
+        code: ".*"
     events:
       # Async pod callbacks
       - name: parseDone
@@ -62,7 +65,7 @@ spec:
       # Downstream consumer notification (conditional — only if URL configured)
       - name: notifyacpwriter
         type: custom
-        operation: rest:post:http://acp-writer:8082/api/v1/notifications/artifacts-available
+        operation: rest:post:http://acp-bff:8080/api/v1/notifications/artifacts-available
       # Review notification (BFF sets awaiting_review marker)
       - name: notifymanifetreview
         type: custom
@@ -89,7 +92,16 @@ spec:
           toStateData: "${ .parseResult }"
         stateDataFilter:
           output: "${ del(.pdf_ref) }"
-        transition: Analyze
+        transition: CheckParseCancelled
+
+      - name: CheckParseCancelled
+        type: switch
+        dataConditions:
+          - name: cancelled
+            condition: "${ .parseResult.cancelled == true }"
+            transition: Cancelled
+        defaultCondition:
+          transition: Analyze
 
       # --- Phase 2: LLM analysis (async callback — 2-30+ minutes) ---
 
@@ -115,6 +127,9 @@ spec:
       - name: ValidateAnalysisIteration
         type: switch
         dataConditions:
+          - name: cancelled
+            condition: "${ .analysisResult.cancelled == true }"
+            transition: Cancelled
           - name: iterationMatch
             condition: "${ (.analysisResult.iteration // 0) == (.manifestReviewCount // 0) }"
             transition: ReviewManifest
@@ -166,6 +181,9 @@ spec:
       - name: CheckManifestReview
         type: switch
         dataConditions:
+          - name: cancelled
+            condition: "${ .manifestReview.action == \"cancel\" }"
+            transition: Cancelled
           - name: approved
             condition: "${ .manifestReview.action == \"approve\" }"
             transition: Generate
@@ -199,6 +217,9 @@ spec:
       - name: ValidateGenerateIteration
         type: switch
         dataConditions:
+          - name: cancelled
+            condition: "${ .generateResult.cancelled == true }"
+            transition: Cancelled
           - name: iterationMatch
             condition: "${ (.generateResult.iteration // 0) == (.artifactReviewCount // 0) }"
             transition: ReviewArtifacts
@@ -250,6 +271,9 @@ spec:
       - name: CheckArtifactReview
         type: switch
         dataConditions:
+          - name: cancelled
+            condition: "${ .artifactsReview.action == \"cancel\" }"
+            transition: Cancelled
           - name: approved
             condition: "${ .artifactsReview.action == \"approve\" }"
             transition: Assemble
@@ -314,7 +338,22 @@ spec:
             actionDataFilter:
               results: "${ . }"
               toStateData: "${ .notificationResult }"
+        onErrors:
+          - errorRef: notificationError
+            transition: NotifyFailed
         transition: Done
+
+      - name: NotifyFailed
+        type: inject
+        data:
+          notificationWarning: "Downstream notification failed — published artifacts were not automatically loaded into the care plan writer. They can be loaded manually."
+        transition: Done
+
+      - name: Cancelled
+        type: inject
+        data:
+          status: "cancelled"
+        end: true
 
       - name: Done
         type: inject

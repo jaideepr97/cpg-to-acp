@@ -153,8 +153,9 @@ if not _mock_mode:
     @app.delete("/api/v1/runs/{run_id}")
     def cancel_run(run_id: str):
         try:
-            _sonataflow.abort_instance(run_id)
+            _sonataflow.cancel_instance(run_id)
         except Exception:
+            logger.exception("Failed to cancel run %s", run_id)
             return JSONResponse(status_code=404, content={"error": f"Run {run_id} not found"})
         return {"status": "cancelled"}
 

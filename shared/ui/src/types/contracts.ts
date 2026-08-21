@@ -163,26 +163,3 @@ export interface DecisionEvaluationResponse {
   model_id: string;
   outputs: Record<string, unknown>;
 }
-
-// --- API response types ---
-
-export interface CarePlanSummary {
-  id: string;
-  patient_reference: string;
-  title?: string;
-  status: "draft" | "active" | "entered-in-error";
-  generated_at: string;
-  decision_models_used?: string[];
-}
-
-export interface CarePlanStatusUpdate {
-  status: "active" | "entered-in-error";
-  clinician?: string;
-  reason?: string;
-}
-
-export interface ServiceStatus {
-  version: string;
-  decision_engine: { available: boolean; models: number };
-  knowledge_base: { guidelines: number; recommendations: number };
-}

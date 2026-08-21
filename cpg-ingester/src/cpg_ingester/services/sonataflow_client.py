@@ -1,6 +1,7 @@
 """SonataFlow REST client and workflow state mapping for the BFF."""
 
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
@@ -8,6 +9,8 @@ from uuid import uuid4
 import requests
 
 logger = logging.getLogger(__name__)
+
+ACP_WRITER_BFF_URL = os.environ.get("ACP_WRITER_BFF_URL", "")
 
 WORKFLOW_NAME = "cpgingester"
 
@@ -26,6 +29,16 @@ _STATE_TO_RUN_STATUS = {
     "Assemble": "assembling",
     "Deliver": "delivering",
     "Done": "completed",
+    "Failed": "failed",
+    "Cancelled": "cancelled",
+}
+
+_CANCEL_EVENT = {
+    "Parse": ("parse-done", "wait-parse"),
+    "Analyze": ("analyze-done", "wait-analyze"),
+    "ReviewManifest": ("manifest-reviewed", "wait-manifest-review"),
+    "Generate": ("generate-done", "wait-generate"),
+    "ReviewArtifacts": ("artifacts-reviewed", "wait-artifact-review"),
 }
 
 _REVIEW_GATE_MAP = {
@@ -44,12 +57,31 @@ _REVIEW_WAIT_PATH = {
 }
 
 
+def _infer_cancelled_step(data: dict) -> str:
+    """Figure out which pipeline step was active when the run was cancelled."""
+    if data.get("artifactsReview", {}).get("action") == "cancel":
+        return "ReviewArtifacts"
+    if data.get("generateResult", {}).get("cancelled"):
+        return "Generate"
+    if data.get("manifestReview", {}).get("action") == "cancel":
+        return "ReviewManifest"
+    if data.get("analysisResult", {}).get("cancelled"):
+        return "Analyze"
+    if data.get("parseResult", {}).get("cancelled"):
+        return "Parse"
+    return "Parse"
+
+
 def infer_current_state(data: dict, instance_status: str) -> str:
     """Determine the active pipeline step from workflow data."""
+    if data.get("status") == "cancelled":
+        return "Cancelled"
     if instance_status == "COMPLETED" or data.get("status") == "completed":
         return "Done"
-    if instance_status in ("ERROR", "ABORTED"):
+    if instance_status == "ERROR":
         return "Failed"
+    if instance_status == "ABORTED":
+        return "Cancelled"
 
     if "deliveryResult" in data:
         return "Done"
@@ -134,13 +166,17 @@ def build_steps(current_state: str, data: dict | None = None, created_at: str = 
     manifest_count = d.get("manifestReviewCount", 0) or 0
     artifact_count = d.get("artifactReviewCount", 0) or 0
 
-    in_manifest_loop = current_state in ("Analyze", "ReviewManifest") and manifest_count > 0
-    in_artifact_loop = current_state in ("Generate", "ReviewArtifacts") and artifact_count > 0
+    effective_state = current_state
+    if current_state == "Cancelled":
+        effective_state = _infer_cancelled_step(d)
+
+    in_manifest_loop = effective_state in ("Analyze", "ReviewManifest") and manifest_count > 0
+    in_artifact_loop = effective_state in ("Generate", "ReviewArtifacts") and artifact_count > 0
 
     steps = []
     reached = False
     for name in PIPELINE_STEPS:
-        if name == current_state:
+        if name == effective_state:
             reached = True
             step: dict = {"name": name, "status": "active"}
         elif not reached:
@@ -168,6 +204,11 @@ def build_steps(current_state: str, data: dict | None = None, created_at: str = 
             if s["status"] == "active":
                 s["status"] = "failed"
                 break
+    if current_state == "Cancelled":
+        for s in steps:
+            if s["status"] == "active":
+                s["status"] = "cancelled"
+                break
     return steps
 
 
@@ -176,12 +217,16 @@ def map_to_run_summary(instance: dict) -> dict[str, Any]:
     data = instance.get("workflowdata", {})
     status = instance.get("status", "ACTIVE")
     current_state = infer_current_state(data, status)
+    display_step = current_state
+    if current_state == "Cancelled":
+        display_step = _infer_cancelled_step(data)
+
     return {
         "id": instance["id"],
         "status": _STATE_TO_RUN_STATUS.get(current_state, "parsing"),
         "cpgName": data.get("cpg_name", "Unknown CPG"),
         "createdAt": instance.get("startDate") or data.get("created_at", ""),
-        "currentStep": current_state,
+        "currentStep": display_step,
     }
 
 
@@ -209,6 +254,12 @@ def map_to_run_detail(instance: dict) -> dict[str, Any]:
             "deliveryResult": data.get("deliveryResult"),
         },
     }
+
+    warnings = []
+    if data.get("notificationWarning"):
+        warnings.append({"type": "notification", "message": data["notificationWarning"]})
+    if warnings:
+        detail["warnings"] = warnings
 
     review_type = _REVIEW_GATE_MAP.get(current_state)
     if review_type:
@@ -283,13 +334,16 @@ class SonataFlowClient:
         return resp.json()
 
     def start_workflow(self, pdf_ref: str, cpg_name: str) -> dict:
+        payload = {
+            "pdf_ref": pdf_ref,
+            "cpg_name": cpg_name,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if ACP_WRITER_BFF_URL:
+            payload["acpWriterUrl"] = ACP_WRITER_BFF_URL
         resp = requests.post(
             f"{self.base_url}/{WORKFLOW_NAME}",
-            json={
-                "pdf_ref": pdf_ref,
-                "cpg_name": cpg_name,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            },
+            json=payload,
             headers={"Content-Type": "application/json"},
             timeout=10,
         )
@@ -314,6 +368,43 @@ class SonataFlowClient:
         resp = requests.delete(
             f"{self.base_url}/{WORKFLOW_NAME}/{instance_id}",
             timeout=10,
+        )
+        resp.raise_for_status()
+
+    def cancel_instance(self, instance_id: str) -> None:
+        """Cancel a running workflow by sending a cancel event for the current state."""
+        instance = self.get_instance(instance_id)
+        data = instance.get("workflowdata", {})
+        status = instance.get("status", "ACTIVE")
+
+        if status != "ACTIVE":
+            return
+
+        current_state = infer_current_state(data, status)
+        cancel_info = _CANCEL_EVENT.get(current_state)
+        if not cancel_info:
+            self.abort_instance(instance_id)
+            return
+
+        event_type, wait_path = cancel_info
+        if current_state in ("ReviewManifest", "ReviewArtifacts"):
+            cancel_data = {"action": "cancel"}
+        else:
+            cancel_data = {"cancelled": True}
+
+        cloud_event = {
+            "specversion": "1.0",
+            "id": str(uuid4()),
+            "source": "bff",
+            "type": event_type,
+            "kogitoprocrefid": instance_id,
+            "data": cancel_data,
+        }
+        resp = requests.post(
+            f"{self.base_url}/{wait_path}",
+            json=cloud_event,
+            headers={"Content-Type": "application/cloudevents+json"},
+            timeout=60,
         )
         resp.raise_for_status()
 
