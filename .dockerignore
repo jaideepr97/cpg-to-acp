@@ -1,16 +1,18 @@
 # Keep the build context (and OpenShift binary upload) lean, and out of the image.
 # The UI Containerfile runs `npm ci` fresh, so installed deps/build output must not
 # be copied in.
+#
+# NOTE: this is a REPO-ROOT .dockerignore, so it applies to every image built from
+# the root context — not just the UI. Do NOT exclude sibling component source dirs
+# here (cpg-ingester/, mock-EHR/, automation/, platform/): those components build
+# from the root context (e.g. `COPY cpg-ingester/ ...`) and excluding them breaks
+# their builds with "no such file or directory (filtered out using .dockerignore)".
+# Only exclude things no root-context build needs.
 **/node_modules
 **/dist
 .git
 .claude
 **/*.log
 **/.DS_Store
-# other components not needed by the UI image (repo-root build context)
-automation/
-cpg-ingester/
-mock-EHR/
-platform/
 dev_docs/
 docs/
