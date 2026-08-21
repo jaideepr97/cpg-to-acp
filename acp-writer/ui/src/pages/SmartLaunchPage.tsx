@@ -7,8 +7,7 @@ import {
   Spinner,
 } from "@patternfly/react-core";
 import { ExclamationCircleIcon } from "@patternfly/react-icons";
-
-export const SMART_SESSION_KEY = "smart_ips_bundle";
+import { createRun } from "@app/services/api";
 
 async function getSmartConfig(): Promise<{
   clientId: string;
@@ -92,8 +91,8 @@ export function SmartLaunchPage() {
     resolveLaunch(iss, launch)
       .then(async ({ token, patientId }) => {
         const ipsBundle = await fetchIpsSummary(iss, token, patientId);
-        sessionStorage.setItem(SMART_SESSION_KEY, JSON.stringify(ipsBundle));
-        navigate("/");
+        const result = await createRun(ipsBundle);
+        navigate(`/runs/${result.runId}`);
       })
       .catch((err) => setError(String(err)));
   }, [searchParams, navigate]);

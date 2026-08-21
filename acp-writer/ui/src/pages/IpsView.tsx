@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Button,
@@ -24,7 +24,6 @@ import {
 } from "@patternfly/react-core";
 import { FhirJsonViewer } from "@app/components/FhirJsonViewer";
 import { createRun } from "@app/services/api";
-import { SMART_SESSION_KEY } from "@app/pages/SmartLaunchPage";
 
 interface FhirResource {
   resourceType: string;
@@ -127,25 +126,10 @@ function codingDisplay(r: FhirResource): { label: string; detail?: string } {
 
 export function IpsView() {
   const [bundle, setBundle] = useState<FhirBundle | null>(null);
-  const [smartLaunched, setSmartLaunched] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const stored = sessionStorage.getItem(SMART_SESSION_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as FhirBundle;
-        if (parsed.resourceType === "Bundle") {
-          setBundle(parsed);
-          setSmartLaunched(true);
-        }
-      } catch { /* ignore malformed data */ }
-      sessionStorage.removeItem(SMART_SESSION_KEY);
-    }
-  }, []);
 
   const handleFileUpload = async (_: unknown, file: File) => {
     setUploading(true);
@@ -200,30 +184,24 @@ export function IpsView() {
         >
           <FlexItem>
             <Title headingLevel="h1">Care Plan Generator</Title>
-            <p>
-              {smartLaunched
-                ? "Patient data loaded from EHR. Review the summary below and generate a care plan."
-                : "Upload a FHIR IPS Bundle to generate a patient-specific care plan."}
-            </p>
+            <p>Upload a FHIR IPS Bundle to generate a patient-specific care plan.</p>
           </FlexItem>
         </Flex>
       </PageSection>
 
       <PageSection isFilled>
-        {!smartLaunched && (
-          <Flex gap={{ default: "gapMd" }} alignItems={{ default: "alignItemsCenter" }} style={{ marginBottom: "1rem" }}>
-            <FlexItem grow={{ default: "grow" }}>
-              <FileUpload
-                id="ips-upload"
-                accept=".json"
-                filename={bundle ? "IPS Bundle loaded" : ""}
-                onFileInputChange={handleFileUpload}
-                isLoading={uploading}
-                browseButtonText="Upload IPS Bundle"
-              />
-            </FlexItem>
-          </Flex>
-        )}
+        <Flex gap={{ default: "gapMd" }} alignItems={{ default: "alignItemsCenter" }} style={{ marginBottom: "1rem" }}>
+          <FlexItem grow={{ default: "grow" }}>
+            <FileUpload
+              id="ips-upload"
+              accept=".json"
+              filename={bundle ? "IPS Bundle loaded" : ""}
+              onFileInputChange={handleFileUpload}
+              isLoading={uploading}
+              browseButtonText="Upload IPS Bundle"
+            />
+          </FlexItem>
+        </Flex>
         {error && <p style={{ color: "var(--pf-t--global--color--status--danger--default)" }}>{error}</p>}
 
         {bundle && (
