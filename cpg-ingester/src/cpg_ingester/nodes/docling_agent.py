@@ -135,6 +135,13 @@ def _extract_figures(doc, output_dir: str) -> tuple[list[dict], dict[str, str]]:
             "classification": classification,
             "confidence": round(confidence, 3) if confidence is not None else None,
             "caption": pic.caption_text(doc) or "",
+            # Stable reassembly anchor: the picture's docling reference
+            # (e.g. "#/pictures/0"). fig-NNN maps to the (NNN-1)th picture in
+            # docling_json.body.children reading order, so the figure
+            # interpreter (plan P5) can splice its output back at the right
+            # spot without re-deriving position from list order.
+            "self_ref": getattr(pic, "self_ref", None),
+            "reading_order_index": idx - 1,
         }
 
         pil = pic.get_image(doc)

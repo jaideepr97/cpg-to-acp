@@ -21,6 +21,7 @@ from fastapi import BackgroundTasks, FastAPI, Request
 
 from cpg_contracts import get_artifact_store, post_callback, resolve_ref, store_artifact
 from cpg_ingester.nodes.content_filter import content_filter
+from cpg_ingester.nodes.figure_interpreter import figure_interpreter
 from cpg_ingester.nodes.item_identifier import item_identifier
 from cpg_ingester.nodes.classification_reviewer import classification_reviewer
 from cpg_ingester.nodes.metadata_extractor import metadata_extractor
@@ -52,9 +53,11 @@ def _do_analyze(data: dict) -> dict:
     if isinstance(parse_result, dict) and "markdown" in parse_result:
         markdown = parse_result["markdown"]
         docling_json = parse_result.get("docling_json", {})
+        figures = parse_result.get("figures", []) or []
     else:
         markdown = data.get("markdown", "")
         docling_json = data.get("docling_json", {})
+        figures = data.get("figures", []) or []
 
     review_feedback = data.get("review_feedback")
     review_comment = data.get("review_comment")
@@ -64,6 +67,7 @@ def _do_analyze(data: dict) -> dict:
         state = {
             "markdown": markdown,
             "docling_json": docling_json,
+            "figures": figures,
             "output_dir": output_dir,
             "litellm_url": LITELLM_URL,
             "llm_model": LLM_MODEL,
@@ -73,6 +77,14 @@ def _do_analyze(data: dict) -> dict:
         if review_feedback and review_iteration:
             state["review_feedback"] = review_feedback
             state["review_comment"] = review_comment
+
+        # Interpret figures first so the enriched markdown (Mermaid + figure
+        # descriptions inlined at each figure's location) flows into structure
+        # analysis and everything downstream. Kept as a decoupled agent (plan
+        # P5) so it can move to its own pod later.
+        updates = figure_interpreter(state)
+        state.update(updates)
+        markdown = state["markdown"]
 
         updates = structure_analyzer(state)
         state.update(updates)

@@ -154,6 +154,25 @@ cp .../report.md .../report-ocr.md
 > when `likely_scanned` and keeps whichever pass extracts more text — the
 > `--ocr` flag here forces it unconditionally purely for measurement.
 
+### Figure interpretation (`--interpret`) — LIVE, opt-in (plan P5)
+
+`--interpret` measures figure *content* recovery, not just detection: it runs
+the **production** `figure_interpreter` node (via `interpret_metrics.py`) over
+each PDF's figures and scores node/edge recovery + Mermaid validity against the
+per-figure ground truth. Because interpreting a figure calls a vision model,
+this is **off by default** (the plain `--synthetic` run stays offline/CI-safe)
+and requires the LLM env. Example against direct OpenAI:
+
+```bash
+LITELLM_URL=https://api.openai.com LLM_MODEL=gpt-5.6 LLM_API_KEY=$OPENAI_API_KEY \
+  ./cpg-ingester/tests/benchmarks/parsing/run-benchmark.sh --synthetic --interpret
+```
+
+The report gains a "Figure interpretation" table (per figure: Mermaid validity,
+node match/gt, edge rec/gt, and which ground-truth block it was scored against).
+Unlike `metrics.py`, `interpret_metrics.py` intentionally imports production code
+(`docling_agent` + `figure_interpreter`) — the point is to score the real node.
+
 ## Metrics — what they mean
 
 | Metric | Meaning |

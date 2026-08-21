@@ -143,6 +143,11 @@ class TestMultiFigurePlacement:
             # fig-001 is on page 1 (Algorithm A), fig-002 on page 2 (Algorithm B).
             assert figs[0]["page"] == 1
             assert figs[1]["page"] == 2
+            # Reassembly anchors (plan P5b): explicit self_ref + reading-order
+            # index so the interpreter needn't re-derive position from list order.
+            assert figs[0]["self_ref"] == "#/pictures/0"
+            assert figs[1]["self_ref"] == "#/pictures/1"
+            assert [f["reading_order_index"] for f in figs] == [0, 1]
 
     def test_pictures_anchored_between_correct_headings(self):
         # The stable anchor is body reading order: picture 0 falls after the

@@ -60,6 +60,71 @@ def _run_set(label: str, pairs, *, classify: bool, do_ocr: bool) -> list[dict]:
     return rows
 
 
+def _llm_cfg_from_env():
+    """LLM config for figure interpretation (plan P5b). Direct-OpenAI example:
+
+        LITELLM_URL=https://api.openai.com LLM_MODEL=gpt-5.6 \\
+        LLM_API_KEY=$OPENAI_API_KEY  run-benchmark.sh --synthetic --interpret
+    """
+    import os
+
+    return {
+        "litellm_url": os.environ.get("LITELLM_URL", "http://localhost:4000"),
+        "llm_model": os.environ.get("LLM_MODEL", "default"),
+        "llm_api_key": os.environ.get("LLM_API_KEY")
+        or os.environ.get("OPENAI_API_KEY", "sk-change-me"),
+    }
+
+
+def _run_interpret(label: str, pairs) -> list[dict]:
+    """Interpret figures (live vision call) and score vs. ground truth (P5b)."""
+    import interpret_metrics  # noqa: E402 — lazy: pulls in cpg_ingester + LLM
+
+    llm_cfg = _llm_cfg_from_env()
+    out = []
+    for pdf, gt in pairs:
+        print(f"[{label}] interpreting figures in {pdf.name} ...", flush=True)
+        try:
+            r = interpret_metrics.score_figures(pdf, str(gt) if gt else None, llm_cfg)
+            r["set"] = label
+            r["error"] = None
+        except Exception as exc:  # keep the run resilient
+            r = {"pdf": pdf.name, "set": label, "figures": [], "error": repr(exc)}
+        out.append(r)
+    return out
+
+
+def _interpret_report(interp_rows: list[dict]) -> str:
+    lines = [
+        "## Figure interpretation (plan P5)",
+        "",
+        "Live vision-model recovery of figure *content* (node/edge recovery + "
+        "Mermaid validity), scored against the per-figure ground truth. Only "
+        "present when run with `--interpret`.",
+        "",
+        "| set | pdf | figure | class | mermaid | nodes (match/gt) | edges (rec/gt) | ground truth |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for r in interp_rows:
+        if r.get("error"):
+            lines.append(f"| {r.get('set','-')} | {r['pdf']} | ERROR | - | - | - | - | `{r['error']}` |")
+            continue
+        if not r.get("figures"):
+            lines.append(f"| {r.get('set','-')} | {r['pdf']} | (no flowchart figures) | - | - | - | - | - |")
+            continue
+        for f in r["figures"]:
+            lines.append(
+                f"| {r.get('set','-')} | {r['pdf']} | {f.get('id')} | "
+                f"{_fmt(f.get('classification'))} | "
+                f"{'valid' if f.get('mermaid_valid') else 'INVALID'} | "
+                f"{f.get('node_label_matches')}/{f.get('gt_node_count')} | "
+                f"{f.get('recovered_edge_count')}/{f.get('gt_edge_count')} | "
+                f"{_fmt(f.get('groundtruth_source'))} |"
+            )
+    lines.append("")
+    return "\n".join(lines)
+
+
 def _fmt(v):
     return "-" if v is None else v
 
@@ -160,6 +225,12 @@ def main() -> int:
         help="force RapidOCR on for every PDF (plan P4). Baseline runs keep OCR "
              "off; use this to measure the OCR recovery on scanned fixtures.",
     )
+    ap.add_argument(
+        "--interpret", action="store_true",
+        help="LIVE: interpret figures with a vision model and score content "
+             "recovery (plan P5). Needs LITELLM_URL/LLM_MODEL/LLM_API_KEY. Off by "
+             "default so the synthetic run stays offline/CI-safe.",
+    )
     args = ap.parse_args()
     classify = not args.no_classify
 
@@ -184,17 +255,29 @@ def main() -> int:
         else:
             rows += _run_set("real", pairs_real, classify=classify, do_ocr=args.ocr)
 
+    interp_rows: list[dict] = []
+    if args.interpret:
+        if args.synthetic or args.all:
+            interp_rows += _run_interpret("synthetic", pairs_synth)
+        if (args.real or args.all) and pairs_real:
+            interp_rows += _run_interpret("real", pairs_real)
+
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     generated_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
     report_json = {
         "generated_at": generated_at,
         "ocr": args.ocr,
+        "interpret": args.interpret,
         "likely_scanned_threshold_cpp": metrics_mod.LIKELY_SCANNED_CPP,
         "results": rows,
+        "interpretation": interp_rows,
     }
     (REPORTS_DIR / "report.json").write_text(json.dumps(report_json, indent=2) + "\n")
-    (REPORTS_DIR / "report.md").write_text(_markdown_report(rows, generated_at, ocr=args.ocr))
+    md = _markdown_report(rows, generated_at, ocr=args.ocr)
+    if args.interpret:
+        md += "\n" + _interpret_report(interp_rows)
+    (REPORTS_DIR / "report.md").write_text(md)
 
     print(f"\nWrote:\n  {REPORTS_DIR / 'report.json'}\n  {REPORTS_DIR / 'report.md'}")
     return 0
