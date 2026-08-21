@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-import requests
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -297,26 +297,28 @@ class SonataFlowClient:
 
     Uses GraphQL (embedded Data Index) for queries so completed instances
     are included.  Uses REST for mutations (start, abort, send review).
+
+    All methods are async to avoid blocking the FastAPI event loop.
     """
 
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip("/")
+        self._client = httpx.AsyncClient(timeout=httpx.Timeout(10.0, connect=5.0))
 
-    def _graphql(self, query: str, variables: dict | None = None) -> dict:
+    async def _graphql(self, query: str, variables: dict | None = None) -> dict:
         payload: dict = {"query": query}
         if variables:
             payload["variables"] = variables
-        resp = requests.post(
+        resp = await self._client.post(
             f"{self.base_url}/graphql",
             json=payload,
             headers={"Content-Type": "application/json"},
-            timeout=10,
         )
         resp.raise_for_status()
         return resp.json()
 
-    def start_workflow(self, ips_ref: str, patient_name: str) -> dict:
-        resp = requests.post(
+    async def start_workflow(self, ips_ref: str, patient_name: str) -> dict:
+        resp = await self._client.post(
             f"{self.base_url}/{WORKFLOW_NAME}",
             json={
                 "ips_ref": ips_ref,
@@ -329,28 +331,29 @@ class SonataFlowClient:
         resp.raise_for_status()
         return resp.json()
 
-    def list_instances(self) -> list[dict]:
-        result = self._graphql(_GRAPHQL_LIST)
+    async def list_instances(self) -> list[dict]:
+        result = await self._graphql(_GRAPHQL_LIST)
         instances = result.get("data", {}).get("ProcessInstances", [])
         return [_graphql_to_instance(pi) for pi in instances]
 
-    def get_instance(self, instance_id: str) -> dict:
-        result = self._graphql(_GRAPHQL_GET, {"id": instance_id})
+    async def get_instance(self, instance_id: str) -> dict:
+        result = await self._graphql(_GRAPHQL_GET, {"id": instance_id})
         instances = result.get("data", {}).get("ProcessInstances", [])
         if not instances:
-            raise requests.HTTPError(
-                f"Run {instance_id} not found", response=type("R", (), {"status_code": 404})()
+            raise httpx.HTTPStatusError(
+                f"Run {instance_id} not found",
+                request=httpx.Request("POST", f"{self.base_url}/graphql"),
+                response=httpx.Response(404),
             )
         return _graphql_to_instance(instances[0])
 
-    def abort_instance(self, instance_id: str) -> None:
-        resp = requests.delete(
+    async def abort_instance(self, instance_id: str) -> None:
+        resp = await self._client.delete(
             f"{self.base_url}/{WORKFLOW_NAME}/{instance_id}",
-            timeout=10,
         )
         resp.raise_for_status()
 
-    def send_review(self, instance_id: str, gate: str, review_data: dict) -> None:
+    async def send_review(self, instance_id: str, gate: str, review_data: dict) -> None:
         event_type = _REVIEW_EVENT_TYPE[gate]
         wait_path = _REVIEW_WAIT_PATH[gate]
         review_data.setdefault("completed_at", datetime.now(timezone.utc).isoformat())
@@ -362,10 +365,13 @@ class SonataFlowClient:
             "kogitoprocrefid": instance_id,
             "data": review_data,
         }
-        resp = requests.post(
+        resp = await self._client.post(
             f"{self.base_url}/{wait_path}",
             json=cloud_event,
             headers={"Content-Type": "application/cloudevents+json"},
             timeout=60,
         )
         resp.raise_for_status()
+
+    async def close(self) -> None:
+        await self._client.aclose()

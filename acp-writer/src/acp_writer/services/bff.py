@@ -10,6 +10,7 @@ import logging
 import os
 from uuid import uuid4
 
+import httpx
 import mlflow
 import requests as http_requests
 from fastapi import FastAPI, Request
@@ -51,6 +52,7 @@ _sonataflow: SonataFlowClient | None = None
 if SONATAFLOW_URL:
     _sonataflow = SonataFlowClient(SONATAFLOW_URL)
 
+_http = httpx.AsyncClient(timeout=httpx.Timeout(10.0, connect=5.0))
 
 app = FastAPI(title="acp-writer-bff", version="0.1.0")
 
@@ -257,17 +259,17 @@ async def create_run(request: Request):
         ips_ref = _phi_store.put(f"{run_id}/ips_bundle.json", ips_bundle)
 
     if _sonataflow:
-        instance = _sonataflow.start_workflow(ips_ref or json.dumps(ips_bundle), patient_name)
+        instance = await _sonataflow.start_workflow(ips_ref or json.dumps(ips_bundle), patient_name)
         return {"runId": instance["id"], "status": "running"}
 
     return {"runId": run_id, "status": "running"}
 
 
 @app.get("/api/v1/runs")
-def list_runs(status: str | None = None, limit: int = 50):
+async def list_runs(status: str | None = None, limit: int = 50):
     if not _sonataflow:
         return []
-    instances = _sonataflow.list_instances()
+    instances = await _sonataflow.list_instances()
     summaries = [map_to_run_summary(inst) for inst in instances]
     if status:
         summaries = [s for s in summaries if s["status"] == status]
@@ -275,11 +277,11 @@ def list_runs(status: str | None = None, limit: int = 50):
 
 
 @app.get("/api/v1/runs/{run_id}")
-def get_run(run_id: str):
+async def get_run(run_id: str):
     if not _sonataflow:
         return JSONResponse(status_code=503, content={"message": "SonataFlow not configured"})
     try:
-        instance = _sonataflow.get_instance(run_id)
+        instance = await _sonataflow.get_instance(run_id)
     except Exception:
         return JSONResponse(status_code=404, content={"message": f"Run {run_id} not found"})
     detail = map_to_run_detail(instance)
@@ -295,7 +297,7 @@ async def submit_review(run_id: str, gate: str, request: Request):
         return JSONResponse(status_code=503, content={"message": "SonataFlow not configured"})
 
     try:
-        instance = _sonataflow.get_instance(run_id)
+        instance = await _sonataflow.get_instance(run_id)
     except Exception:
         return JSONResponse(status_code=404, content={"message": f"Run {run_id} not found"})
 
@@ -304,10 +306,10 @@ async def submit_review(run_id: str, gate: str, request: Request):
         return JSONResponse(status_code=409, content={"message": "Run is not awaiting careplan review"})
 
     review = await request.json()
-    _sonataflow.send_review(run_id, gate, review or {})
+    await _sonataflow.send_review(run_id, gate, review or {})
 
     try:
-        updated = _sonataflow.get_instance(run_id)
+        updated = await _sonataflow.get_instance(run_id)
         updated_detail = map_to_run_detail(updated)
         enriched = enrich_run_detail(updated_detail, _phi_store, _artifacts_store)
         return JSONResponse(status_code=202, content=enriched)
@@ -316,11 +318,11 @@ async def submit_review(run_id: str, gate: str, request: Request):
 
 
 @app.delete("/api/v1/runs/{run_id}")
-def cancel_run(run_id: str):
+async def cancel_run(run_id: str):
     if not _sonataflow:
         return JSONResponse(status_code=503, content={"message": "SonataFlow not configured"})
     try:
-        _sonataflow.abort_instance(run_id)
+        await _sonataflow.abort_instance(run_id)
     except Exception:
         return JSONResponse(status_code=404, content={"message": f"Run {run_id} not found"})
     return Response(status_code=204)
@@ -348,14 +350,14 @@ def get_artifact(run_id: str, path: str):
 # ---------------------------------------------------------------------------
 
 @app.get("/api/v1/careplans")
-def list_careplans(patient: str | None = None, status: str | None = None):
+async def list_careplans(patient: str | None = None, status: str | None = None):
     params = {}
     if patient:
         params["patient"] = patient
     if status:
         params["status"] = status
     try:
-        resp = http_requests.get(f"{FHIR_SERVER_URL}/api/v1/careplans", params=params, timeout=10)
+        resp = await _http.get(f"{FHIR_SERVER_URL}/api/v1/careplans", params=params)
         resp.raise_for_status()
         raw_plans = resp.json()
     except Exception as exc:
@@ -365,9 +367,9 @@ def list_careplans(patient: str | None = None, status: str | None = None):
 
 
 @app.get("/api/v1/careplans/{careplan_id}")
-def get_careplan(careplan_id: str):
+async def get_careplan(careplan_id: str):
     try:
-        resp = http_requests.get(f"{FHIR_SERVER_URL}/api/v1/careplans/{careplan_id}", timeout=10)
+        resp = await _http.get(f"{FHIR_SERVER_URL}/api/v1/careplans/{careplan_id}")
         resp.raise_for_status()
         raw = resp.json()
     except Exception as exc:
@@ -383,14 +385,14 @@ def get_careplan(careplan_id: str):
 # ---------------------------------------------------------------------------
 
 @app.get("/api/v1/status")
-def system_status():
+async def system_status():
     result: dict = {
         "version": "0.1.0",
         "decisionEngine": {"available": False, "modelsDeployed": 0},
         "knowledgeBase": {"available": False, "guidelines": 0, "recommendations": 0},
     }
     try:
-        resp = http_requests.get(f"{LLM_REASONING_URL}/api/v1/status", timeout=5)
+        resp = await _http.get(f"{LLM_REASONING_URL}/api/v1/status", timeout=5)
         if resp.status_code == 200:
             data = resp.json()
             de = data.get("decision_engine", {})
@@ -618,3 +620,10 @@ async def _on_startup():
         bool(SONATAFLOW_URL), bool(MINIO_ENDPOINT),
     )
     _reload_cpg_artifacts()
+
+
+@app.on_event("shutdown")
+async def _on_shutdown():
+    await _http.aclose()
+    if _sonataflow:
+        await _sonataflow.close()
