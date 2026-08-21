@@ -68,22 +68,21 @@ helm upgrade --install cpg-mock-ehr "$SCRIPT_DIR/chart" \
     --set medplumServer.image="${REGISTRY}/${NAMESPACE}/medplum-server-upstream:5.1.27" \
     --set medplumApp.image="${REGISTRY}/${NAMESPACE}/medplum-app-upstream:5.1.27" \
     --set mockEhrApp.image.tag="$IMAGE_TAG" \
-    --set ipsViewer.image.tag="$IMAGE_TAG" \
     --set loader.enabled="$LOADER_ENABLED" \
     --set loader.image.tag="$IMAGE_TAG" \
     --wait --timeout 300s || { log "ERROR: mock-EHR helm install failed"; exit 1; }
 log "  mock-EHR installed ($(( SECONDS - helm_start ))s)"
 
-# If the loader ran, restart the IPS Viewer to pick up the SMART credentials Secret
+# If the loader ran, restart the acp-writer UI to pick up the SMART credentials Secret
 if [ "$LOADER_ENABLED" = "true" ]; then
     log "Waiting for loader job to complete..."
     oc wait --for=condition=Complete job -l app.kubernetes.io/instance=cpg-mock-ehr -n "$NAMESPACE" --timeout=120s 2>/dev/null || true
     if oc get secret smart-client-credentials -n "$NAMESPACE" &>/dev/null; then
-        log "SMART credentials Secret found — restarting IPS Viewer"
-        oc rollout restart deployment/cpg-mock-ehr-ips-viewer -n "$NAMESPACE" 2>/dev/null || true
-        oc rollout status deployment/cpg-mock-ehr-ips-viewer -n "$NAMESPACE" --timeout=60s 2>/dev/null || true
+        log "SMART credentials Secret found — restarting acp-writer UI to mount credentials"
+        oc rollout restart deployment/acp-ui -n "$NAMESPACE" 2>/dev/null || true
+        oc rollout status deployment/acp-ui -n "$NAMESPACE" --timeout=60s 2>/dev/null || true
     else
-        log "WARNING: SMART credentials Secret not found after loader — IPS Viewer SMART launch will fail"
+        log "WARNING: SMART credentials Secret not found after loader — SMART launch will fail"
     fi
 fi
 

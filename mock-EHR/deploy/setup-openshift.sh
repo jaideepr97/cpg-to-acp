@@ -57,7 +57,7 @@ log "Registry: $REGISTRY"
 
 log ""
 log "=== Creating ImageStreams ==="
-for is in mock-ehr-app ips-viewer medplum-loader postgres-16 redis-7 medplum-server-upstream medplum-app-upstream; do
+for is in mock-ehr-app medplum-loader postgres-16 redis-7 medplum-server-upstream medplum-app-upstream; do
   oc create imagestream "$is" -n "$NAMESPACE" 2>/dev/null && log "  Created $is" || log "  $is already exists"
 done
 
@@ -100,7 +100,6 @@ EOF
 }
 
 create_bc "mock-ehr-app"    "mock-EHR/ui"          "Containerfile"
-create_bc "ips-viewer"      "mock-EHR/ips-viewer"  "Containerfile"
 create_bc "medplum-loader"  "mock-EHR"             "deploy/Containerfile.loader"
 
 # --- Step 3: Push public images to internal registry ---
@@ -141,13 +140,13 @@ push_image "docker.io/medplum/medplum-app:$MEDPLUM_VERSION"    "medplum-app-upst
 log ""
 log "=== Building custom images ==="
 
-for bc in mock-ehr-app ips-viewer medplum-loader; do
+for bc in mock-ehr-app medplum-loader; do
   log "  Starting build: $bc"
   oc start-build "$bc" -n "$NAMESPACE" 2>&1 | head -1
 done
 
 log "Waiting for builds (polling every 30s)..."
-for bc in mock-ehr-app ips-viewer medplum-loader; do
+for bc in mock-ehr-app medplum-loader; do
   local_start=$SECONDS
   for i in $(seq 1 60); do
     phase=$(oc get builds -n "$NAMESPACE" -l "openshift.io/build-config.name=$bc" -o jsonpath='{.items[-1].status.phase}' 2>/dev/null)
@@ -176,8 +175,8 @@ log "       --env='MEDPLUM_BASE_URL=http://cpg-mock-ehr-medplum-server:8103' \\"
 log "       --env='DATA_DIR=/data' \\"
 log "       -n $NAMESPACE"
 log ""
-log "  3. IPS Viewer SMART credentials are handled automatically: the loader"
-log "     job registers the SMART app in Medplum and writes the credentials to"
-log "     the 'smart-client-credentials' K8s Secret, which the IPS Viewer mounts."
-log "     If the loader ran before the IPS Viewer was up, restart it:"
-log "     oc rollout restart deployment/cpg-mock-ehr-ips-viewer -n $NAMESPACE"
+log "  3. SMART credentials are handled automatically: the loader job registers"
+log "     the SMART app in Medplum and writes the credentials to the"
+log "     'smart-client-credentials' K8s Secret, which the acp-writer UI mounts."
+log "     If the loader ran before the acp-writer UI was up, restart it:"
+log "     oc rollout restart deployment/acp-ui -n $NAMESPACE"

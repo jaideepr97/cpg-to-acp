@@ -17,7 +17,7 @@ set -euo pipefail
 MEDPLUM_BASE_URL="${MEDPLUM_BASE_URL:-http://localhost:8103}"
 DATA_DIR="${DATA_DIR:-/data}"
 ACP_WRITER_LAUNCH_URI="${ACP_WRITER_LAUNCH_URI:-http://localhost:3001/launch}"
-ACP_WRITER_REDIRECT_URI="${ACP_WRITER_REDIRECT_URI:-http://localhost:3001/app}"
+ACP_WRITER_REDIRECT_URI="${ACP_WRITER_REDIRECT_URI:-http://localhost:3001/}"
 
 CODE_CHALLENGE="mock_ehr_setup_challenge"
 
@@ -332,7 +332,7 @@ PYEOF
     fi
     case "$secret_code" in
       200|201) log "  Stored SMART credentials in Secret smart-client-credentials" ;;
-      *) log "  WARNING: Failed to store SMART credentials in Secret (HTTP $secret_code) — IPS Viewer SMART launch will fail" ;;
+      *) log "  WARNING: Failed to store SMART credentials in Secret (HTTP $secret_code) — SMART launch will fail" ;;
     esac
     unset SECRET_PAYLOAD K8S_TOKEN
   else
