@@ -465,11 +465,12 @@ def _to_careplan_detail(raw: dict) -> dict:
     if patient_name:
         summary["patientName"] = patient_name
 
+    patient = _extract_patient_from_bundle(bundle)
     goals, activities, conflicts = _extract_view_from_bundle(bundle)
 
     return {
         **summary,
-        "patient": None,
+        "patient": patient,
         "view": {
             "goals": goals,
             "activities": activities,
@@ -477,6 +478,39 @@ def _to_careplan_detail(raw: dict) -> dict:
             "fhirBundle": bundle if bundle.get("entry") else None,
         },
     }
+
+
+def _extract_patient_from_bundle(bundle: dict) -> dict | None:
+    """Extract PatientSummary from a stored FHIR care-plan bundle."""
+    for entry in bundle.get("entry", []):
+        resource = entry.get("resource", {})
+        if resource.get("resourceType") == "Patient":
+            name = ""
+            for n in resource.get("name", []):
+                if isinstance(n, dict):
+                    text = n.get("text")
+                    if text:
+                        name = text
+                        break
+                    parts = []
+                    if n.get("given"):
+                        parts.extend(n["given"])
+                    if n.get("family"):
+                        parts.append(n["family"])
+                    if parts:
+                        name = " ".join(parts)
+                        break
+            return {
+                "name": name,
+                "birthDate": resource.get("birthDate", ""),
+                "gender": resource.get("gender", ""),
+                "patientReference": "",
+                "conditions": [],
+                "medications": [],
+                "allergies": [],
+                "observations": [],
+            }
+    return None
 
 
 def _extract_view_from_bundle(bundle: dict) -> tuple[list, list, list]:
@@ -487,18 +521,21 @@ def _extract_view_from_bundle(bundle: dict) -> tuple[list, list, list]:
         for e in entries
     }
 
+    source_cpgs = _extract_source_cpgs(resources)
+
     goals = []
-    for r in resources.values():
+    for url, r in resources.items():
         if r.get("resourceType") == "Goal":
+            target_text = _format_goal_target(r.get("target", []))
             goals.append({
                 "id": r.get("id", ""),
                 "description": r.get("description", {}).get("text", ""),
-                "rationale": None,
-                "sourceCpgId": None,
+                "rationale": target_text or None,
+                "sourceCpgId": source_cpgs.get(url),
             })
 
     activities = []
-    for r in resources.values():
+    for url, r in resources.items():
         rt = r.get("resourceType")
         if rt == "MedicationRequest":
             activities.append({
@@ -527,6 +564,47 @@ def _extract_view_from_bundle(bundle: dict) -> tuple[list, list, list]:
             })
 
     return goals, activities, []
+
+
+def _format_goal_target(targets: list) -> str:
+    """Format Goal.target[] into a human-readable string."""
+    parts = []
+    for t in targets:
+        measure = t.get("measure", {}).get("text", "")
+        detail_range = t.get("detailRange", {})
+        low = detail_range.get("low", {})
+        high = detail_range.get("high", {})
+        if measure:
+            if high and low:
+                parts.append(f"Target {measure}: {low.get('value')}–{high.get('value')} {high.get('unit', '')}")
+            elif high:
+                parts.append(f"Target {measure}: < {high.get('value')} {high.get('unit', '')}")
+            elif low:
+                parts.append(f"Target {measure}: > {low.get('value')} {low.get('unit', '')}")
+            else:
+                parts.append(f"Target: {measure}")
+    return "; ".join(parts)
+
+
+def _extract_source_cpgs(resources: dict) -> dict:
+    """Map resource fullUrls to source CPG IDs from Provenance resources."""
+    cpg_map: dict[str, str] = {}
+    for r in resources.values():
+        if r.get("resourceType") != "Provenance":
+            continue
+        cpg_names = []
+        for entity in r.get("entity", []):
+            if entity.get("role") == "derivation":
+                display = entity.get("what", {}).get("display", "")
+                if display.startswith("CPG: "):
+                    cpg_names.append(display[5:])
+        if cpg_names:
+            cpg_str = ", ".join(cpg_names)
+            for target in r.get("target", []):
+                ref = target.get("reference", "")
+                if ref:
+                    cpg_map[ref] = cpg_str
+    return cpg_map
 
 
 # ---------------------------------------------------------------------------

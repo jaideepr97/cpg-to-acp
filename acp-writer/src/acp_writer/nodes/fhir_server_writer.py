@@ -15,6 +15,7 @@ import logging
 import os
 import time
 import uuid
+from datetime import datetime, timezone
 
 import mlflow
 import requests
@@ -137,6 +138,8 @@ def fhir_server_writer(state: CarePlanComposerState) -> dict:
         "bundle": bundle,
         "status": initial_status,
         "patient_reference": state.get("patient_reference", ""),
+        "patient_name": _extract_patient_name(bundle),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "server_ids": {},
     }
 
@@ -212,6 +215,25 @@ def fhir_server_writer(state: CarePlanComposerState) -> dict:
         }
 
 
+def _extract_patient_name(bundle: dict) -> str:
+    for entry in bundle.get("entry", []):
+        resource = entry.get("resource", {})
+        if resource.get("resourceType") == "Patient":
+            for name in resource.get("name", []):
+                if isinstance(name, dict):
+                    text = name.get("text")
+                    if text:
+                        return text
+                    parts = []
+                    if name.get("given"):
+                        parts.extend(name["given"])
+                    if name.get("family"):
+                        parts.append(name["family"])
+                    if parts:
+                        return " ".join(parts)
+    return ""
+
+
 def get_care_plan(careplan_id: str) -> dict | None:
     return _care_plans.get(careplan_id)
 
@@ -224,8 +246,10 @@ def list_care_plans(patient: str | None = None, status: str | None = None) -> li
         results = [cp for cp in results if cp.get("status") == status]
     return [{
         "id": cp["id"],
+        "patient_name": cp.get("patient_name", ""),
         "patient_reference": cp.get("patient_reference", ""),
         "status": cp.get("status", ""),
+        "generated_at": cp.get("generated_at"),
     } for cp in results]
 
 

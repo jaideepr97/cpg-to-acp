@@ -147,7 +147,7 @@ function PatientSummarySection({ patient }: { patient: NonNullable<RunDetail["pa
       isExpanded={expanded}
       onToggle={(_e, v) => setExpanded(v)}
     >
-      <Card isFlat>
+      <Card>
         <CardBody>
           <Stack hasGutter>
             <StackItem>
