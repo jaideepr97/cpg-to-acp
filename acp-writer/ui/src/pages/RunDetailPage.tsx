@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
+  Card,
+  CardBody,
+  DataList,
+  DataListCell,
+  DataListItem,
+  DataListItemCells,
+  DataListItemRow,
+  DescriptionList,
+  DescriptionListDescription,
+  DescriptionListGroup,
+  DescriptionListTerm,
+  ExpandableSection,
   Flex,
   FlexItem,
   PageSection,
@@ -9,7 +21,7 @@ import {
   Title,
 } from "@patternfly/react-core";
 import { PipelineStepper, useAdaptivePolling } from "@cpg-to-acp/ui-shared";
-import type { RunDetail, ReviewAction } from "@app/api/models";
+import type { CodedItem, RunDetail, ReviewAction } from "@app/api/models";
 import { getRunDetail, submitReview } from "@app/services/api";
 import { toPipelineSteps } from "@app/pipeline/steps";
 import { ReviewPanel } from "@app/components/ReviewPanel";
@@ -48,6 +60,8 @@ export function RunDetailPage() {
     setRefreshKey((k) => k + 1);
   };
 
+  const patient = run?.patient;
+
   if (!run) {
     return (
       <PageSection>
@@ -61,10 +75,15 @@ export function RunDetailPage() {
       <Flex direction={{ default: "column" }} gap={{ default: "gapLg" }}>
         <FlexItem>
           <Title headingLevel="h1">
-            Care Plan Run{run.patient?.name ? ` — ${run.patient.name}` : ""}
+            Care Plan Run{patient?.name ? ` — ${patient.name}` : ""}
           </Title>
           <p>Status: {run.status}</p>
         </FlexItem>
+        {patient && (
+          <FlexItem>
+            <PatientSummarySection patient={patient} />
+          </FlexItem>
+        )}
         <FlexItem>
           <Stack hasGutter>
             <StackItem>
@@ -94,5 +113,70 @@ export function RunDetailPage() {
         )}
       </Flex>
     </PageSection>
+  );
+}
+
+function CodedItemList({ title, items }: { title: string; items: CodedItem[] }) {
+  if (!items.length) return null;
+  return (
+    <StackItem>
+      <strong>{title}</strong>
+      <DataList aria-label={title} isCompact>
+        {items.map((item, i) => (
+          <DataListItem key={i}>
+            <DataListItemRow>
+              <DataListItemCells
+                dataListCells={[
+                  <DataListCell key="display">{item.display}</DataListCell>,
+                  item.code ? <DataListCell key="code">{item.code}</DataListCell> : null,
+                ].filter(Boolean)}
+              />
+            </DataListItemRow>
+          </DataListItem>
+        ))}
+      </DataList>
+    </StackItem>
+  );
+}
+
+function PatientSummarySection({ patient }: { patient: NonNullable<RunDetail["patient"]> }) {
+  const [expanded, setExpanded] = useState(true);
+  return (
+    <ExpandableSection
+      toggleText={expanded ? "Hide patient summary" : "Show patient summary"}
+      isExpanded={expanded}
+      onToggle={(_e, v) => setExpanded(v)}
+    >
+      <Card isFlat>
+        <CardBody>
+          <Stack hasGutter>
+            <StackItem>
+              <DescriptionList isHorizontal>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Name</DescriptionListTerm>
+                  <DescriptionListDescription>{patient.name || "Unknown"}</DescriptionListDescription>
+                </DescriptionListGroup>
+                {patient.birthDate && (
+                  <DescriptionListGroup>
+                    <DescriptionListTerm>Date of Birth</DescriptionListTerm>
+                    <DescriptionListDescription>{patient.birthDate}</DescriptionListDescription>
+                  </DescriptionListGroup>
+                )}
+                {patient.gender && (
+                  <DescriptionListGroup>
+                    <DescriptionListTerm>Gender</DescriptionListTerm>
+                    <DescriptionListDescription>{patient.gender}</DescriptionListDescription>
+                  </DescriptionListGroup>
+                )}
+              </DescriptionList>
+            </StackItem>
+            <CodedItemList title="Conditions" items={patient.conditions ?? []} />
+            <CodedItemList title="Medications" items={patient.medications ?? []} />
+            <CodedItemList title="Allergies" items={patient.allergies ?? []} />
+            <CodedItemList title="Observations" items={patient.observations ?? []} />
+          </Stack>
+        </CardBody>
+      </Card>
+    </ExpandableSection>
   );
 }
