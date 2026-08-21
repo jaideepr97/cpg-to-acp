@@ -465,9 +465,7 @@ def _to_careplan_detail(raw: dict) -> dict:
     if patient_name:
         summary["patientName"] = patient_name
 
-    goals = raw.get("goals", [])
-    activities = raw.get("activities", [])
-    conflicts = raw.get("conflicts", [])
+    goals, activities, conflicts = _extract_view_from_bundle(bundle)
 
     return {
         **summary,
@@ -479,6 +477,56 @@ def _to_careplan_detail(raw: dict) -> dict:
             "fhirBundle": bundle if bundle.get("entry") else None,
         },
     }
+
+
+def _extract_view_from_bundle(bundle: dict) -> tuple[list, list, list]:
+    """Extract goals, activities, and conflicts from a FHIR CarePlan bundle."""
+    entries = bundle.get("entry", [])
+    resources = {
+        e.get("fullUrl", ""): e.get("resource", {})
+        for e in entries
+    }
+
+    goals = []
+    for r in resources.values():
+        if r.get("resourceType") == "Goal":
+            goals.append({
+                "id": r.get("id", ""),
+                "description": r.get("description", {}).get("text", ""),
+                "rationale": None,
+                "sourceCpgId": None,
+            })
+
+    activities = []
+    for r in resources.values():
+        rt = r.get("resourceType")
+        if rt == "MedicationRequest":
+            activities.append({
+                "id": r.get("id", ""),
+                "description": r.get("medicationCodeableConcept", {}).get("text", ""),
+                "goalId": None,
+                "detail": "; ".join(d.get("text", "") for d in r.get("dosageInstruction", [])),
+            })
+        elif rt == "ServiceRequest":
+            activities.append({
+                "id": r.get("id", ""),
+                "description": r.get("code", {}).get("text", ""),
+                "goalId": None,
+                "detail": "; ".join(n.get("text", "") for n in r.get("note", [])),
+            })
+
+    careplan = next((r for r in resources.values() if r.get("resourceType") == "CarePlan"), {})
+    for act in careplan.get("activity", []):
+        detail = act.get("detail")
+        if detail and not act.get("reference"):
+            activities.append({
+                "id": detail.get("code", {}).get("text", "")[:8],
+                "description": detail.get("description", ""),
+                "goalId": None,
+                "detail": None,
+            })
+
+    return goals, activities, []
 
 
 # ---------------------------------------------------------------------------
