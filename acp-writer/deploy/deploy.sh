@@ -87,7 +87,19 @@ else
     log "Skipping builds (--skip-build)"
 fi
 
-# --- Step 2: Deploy Helm charts ---
+# --- Step 2: Create OpenShell sandboxes ---
+# Sandboxes must be running before the Helm chart deploys the BFF, because the
+# BFF's startup hook loads artifacts from MinIO and pushes them to the backend
+# sandboxes (llm-reasoning, decision-engine). If sandboxes aren't up yet, those
+# registrations silently fail with 404.
+
+if [ "$SKIP_OPENSHELL" = false ]; then
+    "$SCRIPT_DIR/openshell/deploy.sh" --config "$CONFIG_PATH" --tag "$IMAGE_TAG"
+else
+    log "Skipping OpenShell sandboxes (--skip-openshell)"
+fi
+
+# --- Step 3: Deploy Helm charts ---
 
 log_step "Deploying Helm charts"
 
@@ -123,7 +135,7 @@ helm upgrade --install acp "$SCRIPT_DIR/chart-pods" \
     --wait --timeout 120s || { log "ERROR: acp-writer helm install failed"; exit 1; }
 log "  acp-writer installed ($(( SECONDS - helm_start ))s)"
 
-# --- Step 3: Apply SonataFlow workflow ---
+# --- Step 4: Apply SonataFlow workflow ---
 
 log_step "Applying SonataFlow workflow"
 # Props MUST be applied before (or with) the CR: they map CloudEvent channels
@@ -133,7 +145,7 @@ oc apply -f "$SCRIPT_DIR/orchestrator/acpwriter-props.yaml" -n "$NAMESPACE" 2>/d
 oc apply -f "$SCRIPT_DIR/orchestrator/acp-writer-workflow.yaml" -n "$NAMESPACE" 2>/dev/null \
     || log "WARNING: SonataFlow workflow apply failed"
 
-# --- Step 4: Deploy MCP server ---
+# --- Step 5: Deploy MCP server ---
 
 log_step "Deploying MCP server"
 render_template "$SCRIPT_DIR/mcp/acp-writer-mcp.yaml.tmpl" "$REPO_ROOT/deploy/.rendered/acp-writer-mcp.yaml"
@@ -141,14 +153,6 @@ oc apply -f "$REPO_ROOT/deploy/.rendered/acp-writer-mcp.yaml" -n "$NAMESPACE" 2>
     || log "WARNING: MCP server deploy failed"
 oc apply -f "$SCRIPT_DIR/mcp/registration.yaml" -n "$NAMESPACE" 2>/dev/null \
     || log "WARNING: MCP registration apply failed"
-
-# --- Step 5: Create OpenShell sandboxes ---
-
-if [ "$SKIP_OPENSHELL" = false ]; then
-    "$SCRIPT_DIR/openshell/deploy.sh" --config "$CONFIG_PATH" --tag "$IMAGE_TAG"
-else
-    log "Skipping OpenShell sandboxes (--skip-openshell)"
-fi
 
 save_deploy_state "acp-writer" "$IMAGE_TAG"
 
