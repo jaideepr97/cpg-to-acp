@@ -32,15 +32,21 @@ export function CarePlanList() {
       <Table aria-label="Care plans">
         <Thead>
           <Tr>
+            <Th>Care Plan ID</Th>
             <Th>Patient</Th>
             <Th>Status</Th>
             <Th>Generated</Th>
-            <Th>Actions</Th>
+            <Th />
           </Tr>
         </Thead>
         <Tbody>
           {(plans ?? []).map((plan) => (
             <Tr key={plan.id}>
+              <Td>
+                <Button variant="link" onClick={() => navigate(`/careplans/${plan.id}`)}>
+                  {plan.id.length > 12 ? `${plan.id.slice(0, 12)}…` : plan.id}
+                </Button>
+              </Td>
               <Td>{plan.patientName ?? plan.patientReference ?? "Unknown patient"}</Td>
               <Td>
                 <Label color={statusColor[plan.status] ?? "blue"}>{plan.status}</Label>
@@ -55,7 +61,7 @@ export function CarePlanList() {
           ))}
           {plans && plans.length === 0 && (
             <Tr>
-              <Td colSpan={4}>No care plans generated yet.</Td>
+              <Td colSpan={5}>No care plans generated yet.</Td>
             </Tr>
           )}
         </Tbody>

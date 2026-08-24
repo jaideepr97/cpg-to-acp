@@ -1,6 +1,11 @@
 import { useCallback, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
+  Button,
+  DescriptionList,
+  DescriptionListDescription,
+  DescriptionListGroup,
+  DescriptionListTerm,
   Label,
   PageSection,
   Stack,
@@ -24,8 +29,15 @@ const statusColor: Record<string, "blue" | "green" | "red"> = {
   "entered-in-error": "red",
 };
 
+function formatDate(iso?: string): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
+}
+
 export function CarePlanDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
   const fetcher = useCallback(() => getCarePlan(id!), [id]);
   const { data: plan } = useAdaptivePolling<CarePlanDetailModel>({
@@ -46,15 +58,49 @@ export function CarePlanDetail() {
   const goals = view.goals ?? [];
   const activities = view.activities ?? [];
   const conflicts = view.conflicts ?? [];
+  const patient = plan.patient;
+  const patientName = patient?.name ?? plan.patientName ?? "Unknown patient";
 
   return (
     <>
       <PageSection>
-        <Title headingLevel="h1">Care Plan</Title>
-        <div>
-          Patient: {plan.patient?.name ?? plan.patientName ?? "Unknown patient"}{" "}
-          <Label color={statusColor[plan.status] ?? "blue"}>{plan.status}</Label>
-        </div>
+        <Title headingLevel="h1">Care Plan — {patientName}</Title>
+        <DescriptionList isHorizontal isCompact style={{ marginTop: "0.5rem" }}>
+          <DescriptionListGroup>
+            <DescriptionListTerm>Care Plan ID</DescriptionListTerm>
+            <DescriptionListDescription>{plan.id}</DescriptionListDescription>
+          </DescriptionListGroup>
+          <DescriptionListGroup>
+            <DescriptionListTerm>Status</DescriptionListTerm>
+            <DescriptionListDescription>
+              <Label color={statusColor[plan.status] ?? "blue"}>{plan.status}</Label>
+            </DescriptionListDescription>
+          </DescriptionListGroup>
+          {plan.generatedAt && (
+            <DescriptionListGroup>
+              <DescriptionListTerm>Generated</DescriptionListTerm>
+              <DescriptionListDescription>{formatDate(plan.generatedAt)}</DescriptionListDescription>
+            </DescriptionListGroup>
+          )}
+          <DescriptionListGroup>
+            <DescriptionListTerm>Patient</DescriptionListTerm>
+            <DescriptionListDescription>
+              {patientName}
+              {patient?.birthDate ? ` (DOB: ${patient.birthDate})` : ""}
+              {patient?.gender ? ` · ${patient.gender}` : ""}
+            </DescriptionListDescription>
+          </DescriptionListGroup>
+          {plan.runId && (
+            <DescriptionListGroup>
+              <DescriptionListTerm>Source Run</DescriptionListTerm>
+              <DescriptionListDescription>
+                <Button variant="link" isInline onClick={() => navigate(`/runs/${plan.runId}`)}>
+                  {plan.runId}
+                </Button>
+              </DescriptionListDescription>
+            </DescriptionListGroup>
+          )}
+        </DescriptionList>
       </PageSection>
       <PageSection isFilled>
         <Tabs activeKey={activeTab} onSelect={(_e, key) => setActiveTab(key as number)}>

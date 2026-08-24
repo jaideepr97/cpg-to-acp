@@ -129,9 +129,9 @@ pods:
     sandboxed: false
     image: acp-writer-ui
     tag: latest
-    port: 8082
+    port: 8080
     env:
-      bffHost: http://acp-writer-bff:8080
+      bffHost: acp-bff:8080
     route: true
     resources:
       requests:

@@ -33,10 +33,16 @@ network_policies:
       - path: "**"
   llm_inference:
     name: llm-inference
-    # LLM traffic routes through the MaaS gateway (in-cluster), not directly to OpenAI
+    # LLM traffic routes through the MaaS gateway (in-cluster)
     endpoints:
       - host: "**.svc.cluster.local"
         port: 443
+        enforcement: enforce
+        allowed_ips:
+          - "172.30.0.0/16"
+          - "10.128.0.0/14"
+      - host: "**.svc.cluster.local"
+        port: 80
         enforcement: enforce
         allowed_ips:
           - "172.30.0.0/16"

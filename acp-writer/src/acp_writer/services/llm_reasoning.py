@@ -11,6 +11,7 @@ import logging
 import os
 from uuid import uuid4
 
+import requests as http_requests
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 
 from cpg_contracts import (
@@ -46,6 +47,33 @@ LLM_API_KEY = os.environ.get("LLM_API_KEY", "sk-change-me")
 @app.get("/health")
 def health():
     return {"status": "UP", "service": "llm-reasoning"}
+
+
+DECISION_ENGINE_URL = os.environ.get("DECISION_ENGINE_URL", "http://acp-decision-engine:8080")
+
+
+@app.get("/api/v1/status")
+def status():
+    de_status = "unavailable"
+    models_deployed = 0
+    try:
+        resp = http_requests.get(f"{DECISION_ENGINE_URL}/api/v1/decisions/models", timeout=5)
+        if resp.status_code == 200:
+            models_deployed = len(resp.json())
+            de_status = "healthy"
+    except Exception:
+        pass
+    return {
+        "decision_engine": {
+            "status": de_status,
+            "models_deployed": models_deployed,
+        },
+        "knowledge_base": {
+            "status": "healthy" if _guidelines_store.count() > 0 else "empty",
+            "guidelines_registered": _guidelines_store.count(),
+            "recommendations_ingested": _vector_store.count(),
+        },
+    }
 
 
 # --- CPG artifact management (used by cpg-ingester Delivery) ---
