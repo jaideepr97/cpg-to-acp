@@ -7,6 +7,8 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/component: fhir-server
     app.kubernetes.io/part-of: cpg-to-acp
+  annotations:
+    haproxy.openshift.io/timeout: 3m
 spec:
   to:
     kind: Service

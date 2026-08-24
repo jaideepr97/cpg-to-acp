@@ -38,7 +38,10 @@ export function RunDetailPage() {
     () => getRunDetail(runId!),
     [runId, refreshKey],
   );
-  const isComplete = useCallback((r: RunDetail) => r.status !== "running", []);
+  const isComplete = useCallback(
+    (r: RunDetail) => r.status === "completed" || r.status === "failed" || r.status === "cancelled",
+    [],
+  );
   const { data: run } = useAdaptivePolling<RunDetail>({
     fetcher,
     isComplete,
