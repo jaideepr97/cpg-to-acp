@@ -76,9 +76,9 @@ def infer_current_state(data: dict, instance_status: str) -> str:
         return "Done"
 
     careplan_review = data.get("careplanReview", {})
-    if careplan_review.get("action") == "approve":
+    if careplan_review.get("decision") == "approve":
         return "WriteFHIR"
-    if careplan_review.get("action") == "request_changes":
+    if careplan_review.get("decision") == "request_changes":
         review_at = careplan_review.get("completed_at", "")
         gen_at = data.get("fhirGenData", {}).get("completed_at", "")
         if gen_at and gen_at > review_at:
@@ -249,7 +249,7 @@ def map_to_run_detail(instance: dict) -> dict[str, Any]:
         detail["awaitingReview"] = "careplan"
         detail["reviewIteration"] = data.get("careplanReviewCount", 0)
         prev = data.get("careplanReview")
-        if prev and prev.get("action") == "request_changes":
+        if prev and prev.get("decision") == "request_changes":
             detail["previousFeedback"] = {
                 "decision": "request_changes",
                 "clinician": prev.get("clinician"),

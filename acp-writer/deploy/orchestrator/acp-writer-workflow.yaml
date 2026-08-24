@@ -252,13 +252,15 @@ spec:
         type: switch
         dataConditions:
           - name: approved
-            condition: "${ .careplanReview.action == \"approve\" }"
+            condition: "${ .careplanReview.decision == \"approve\" }"
             transition: WriteFHIR
           - name: changesRequested
-            condition: "${ .careplanReview.action == \"request_changes\" }"
+            condition: "${ .careplanReview.decision == \"request_changes\" }"
             transition: GenerateBundle
+        # Fail closed: an unrecognized/missing decision must NOT auto-write the
+        # plan. Re-present the review gate instead of defaulting to WriteFHIR.
         defaultCondition:
-          transition: WriteFHIR
+          transition: ReviewCarePlan
 
       # --- Phase 5: Write to FHIR server (sync) ---
 
