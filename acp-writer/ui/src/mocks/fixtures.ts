@@ -125,6 +125,21 @@ export const carePlanDetail: CarePlanDetail = {
 
 export const systemHealth: SystemHealth = {
   version: "0.1.0",
-  decisionEngine: { available: true, modelsDeployed: 2 },
-  knowledgeBase: { available: true, guidelines: 1, recommendations: 12 },
+  decisionEngine: {
+    available: true,
+    modelsDeployed: 2,
+    decisions: [
+      { id: "hypertension-treatment-v1", name: "Hypertension Treatment", sourceCpg: "acc-aha-hbp-2017" },
+      { id: "diabetes-screening-v1", name: "Diabetes Screening", sourceCpg: "ada-diabetes-2024" },
+    ],
+  },
+  knowledgeBase: {
+    available: true,
+    guidelines: 2,
+    recommendations: 12,
+    cpgs: [
+      { cpgId: "acc-aha-hbp-2017", title: "ACC/AHA Guideline for High Blood Pressure", version: "2017", issuingBody: "ACC/AHA" },
+      { cpgId: "ada-diabetes-2024", title: "ADA Standards of Care in Diabetes", version: "2024", issuingBody: "American Diabetes Association" },
+    ],
+  },
 };

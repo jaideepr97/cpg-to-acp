@@ -284,11 +284,22 @@ export interface components {
             decisionEngine?: {
                 available?: boolean;
                 modelsDeployed?: number;
+                decisions?: {
+                    id: string;
+                    name: string;
+                    sourceCpg?: string | null;
+                }[];
             };
             knowledgeBase?: {
                 available?: boolean;
                 guidelines?: number;
                 recommendations?: number;
+                cpgs?: {
+                    cpgId: string;
+                    title: string;
+                    version?: string | null;
+                    issuingBody?: string | null;
+                }[];
             };
         };
         Error: {

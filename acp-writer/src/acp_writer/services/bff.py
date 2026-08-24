@@ -508,8 +508,8 @@ async def get_careplan(careplan_id: str):
 async def system_status():
     result: dict = {
         "version": "0.1.0",
-        "decisionEngine": {"available": False, "modelsDeployed": 0},
-        "knowledgeBase": {"available": False, "guidelines": 0, "recommendations": 0},
+        "decisionEngine": {"available": False, "modelsDeployed": 0, "decisions": []},
+        "knowledgeBase": {"available": False, "guidelines": 0, "recommendations": 0, "cpgs": []},
     }
     try:
         resp = await _http.get(f"{LLM_REASONING_URL}/api/v1/status", timeout=5)
@@ -520,14 +520,37 @@ async def system_status():
             result["decisionEngine"] = {
                 "available": de.get("status") == "healthy",
                 "modelsDeployed": de.get("models_deployed", 0),
+                "decisions": [],
             }
             result["knowledgeBase"] = {
                 "available": kb.get("status") == "healthy",
                 "guidelines": kb.get("guidelines_registered", 0),
                 "recommendations": kb.get("recommendations_ingested", 0),
+                "cpgs": [],
             }
     except Exception:
         pass
+
+    try:
+        resp = http_requests.get(f"{LLM_REASONING_URL}/api/v1/decisions/models", timeout=5)
+        if resp.status_code == 200:
+            result["decisionEngine"]["decisions"] = [
+                {"id": m.get("id", ""), "name": m.get("name", ""), "sourceCpg": m.get("source_cpg")}
+                for m in resp.json()
+            ]
+    except Exception:
+        pass
+
+    try:
+        resp = http_requests.get(f"{LLM_REASONING_URL}/api/v1/guidelines", timeout=5)
+        if resp.status_code == 200:
+            result["knowledgeBase"]["cpgs"] = [
+                {"cpgId": g.get("cpg_id", ""), "title": g.get("title", ""), "version": g.get("version"), "issuingBody": g.get("issuing_body")}
+                for g in resp.json()
+            ]
+    except Exception:
+        pass
+
     return result
 
 
