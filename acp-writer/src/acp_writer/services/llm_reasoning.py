@@ -139,6 +139,42 @@ async def execute_dmn(request: Request):
     return {"dmn_results": result.get("dmn_results", [])}
 
 
+@app.post("/api/v1/execute-dmn-async")
+async def execute_dmn_async(request: Request, background_tasks: BackgroundTasks):
+    """Async version: accept immediately, run DMN execution in background, POST callback."""
+    data = await request.json()
+    callback_url = data.pop("callback_url", "")
+    process_instance_id = data.pop("process_instance_id", "")
+    background_tasks.add_task(_run_execute_dmn_background, data, callback_url, process_instance_id)
+    return {"status": "accepted"}
+
+
+def _run_execute_dmn_background(data: dict, callback_url: str, process_instance_id: str):
+    try:
+        ips_bundle = resolve_ref(data, "ips_bundle", _phi_store)
+        state = {
+            "ips_bundle": ips_bundle,
+            "applicable_dmn_models": data.get("applicable_dmn_models", []),
+            "dmn_dependency_graph": data.get("dmn_dependency_graph", []),
+            "litellm_url": LITELLM_URL,
+            "llm_model": LLM_MODEL,
+            "llm_api_key": LLM_API_KEY,
+        }
+
+        import os
+        decision_url = os.environ.get("DECISION_ENGINE_URL", "http://acp-decision-engine:8080")
+        state["decision_engine_url"] = decision_url
+
+        from acp_writer.nodes.dmn_executor import dmn_executor
+        result = dmn_executor(state)
+        result = {"dmn_results": result.get("dmn_results", [])}
+    except Exception as e:
+        logger.error("Execute-DMN background task failed: %s", e)
+        result = {"error": str(e), "dmn_results": []}
+
+    post_callback(callback_url, process_instance_id, "execute-dmn-done", result)
+
+
 # --- Pipeline execution endpoints ---
 
 
@@ -160,6 +196,37 @@ async def resolve(request: Request):
     }
 
 
+@app.post("/api/v1/resolve-async")
+async def resolve_async(request: Request, background_tasks: BackgroundTasks):
+    """Async version: accept immediately, run resolve in background, POST callback."""
+    data = await request.json()
+    callback_url = data.pop("callback_url", "")
+    process_instance_id = data.pop("process_instance_id", "")
+    background_tasks.add_task(_run_resolve_background, data, callback_url, process_instance_id)
+    return {"status": "accepted"}
+
+
+def _run_resolve_background(data: dict, callback_url: str, process_instance_id: str):
+    try:
+        state = {
+            "condition_codes": data.get("condition_codes", []),
+            "litellm_url": LITELLM_URL,
+            "llm_model": LLM_MODEL,
+            "llm_api_key": LLM_API_KEY,
+        }
+        result = guideline_resolver(state)
+        result = {
+            "applicable_cpgs": result.get("applicable_cpgs", []),
+            "applicable_dmn_models": result.get("applicable_dmn_models", []),
+            "dmn_dependency_graph": result.get("dmn_dependency_graph", []),
+        }
+    except Exception as e:
+        logger.error("Resolve background task failed: %s", e)
+        result = {"error": str(e)}
+
+    post_callback(callback_url, process_instance_id, "resolve-done", result)
+
+
 @app.post("/api/v1/retrieve")
 async def retrieve(request: Request):
     """Retrieve recommendations from vector store."""
@@ -176,6 +243,38 @@ async def retrieve(request: Request):
     if ref:
         return {"recommendations_ref": ref}
     return {"recommendations": recs}
+
+
+@app.post("/api/v1/retrieve-async")
+async def retrieve_async(request: Request, background_tasks: BackgroundTasks):
+    """Async version: accept immediately, run retrieve in background, POST callback."""
+    data = await request.json()
+    callback_url = data.pop("callback_url", "")
+    process_instance_id = data.pop("process_instance_id", "")
+    background_tasks.add_task(_run_retrieve_background, data, callback_url, process_instance_id)
+    return {"status": "accepted"}
+
+
+def _run_retrieve_background(data: dict, callback_url: str, process_instance_id: str):
+    try:
+        state = {
+            "condition_codes": data.get("condition_codes", []),
+            "dmn_results": data.get("dmn_results", []),
+            "applicable_cpgs": data.get("applicable_cpgs", []),
+        }
+        result = recommendation_retriever(state)
+        recs = result.get("recommendations", [])
+
+        _, ref = store_artifact(_store, f"{uuid4()}/recommendations.json", recs)
+        if ref:
+            result = {"recommendations_ref": ref}
+        else:
+            result = {"recommendations": recs}
+    except Exception as e:
+        logger.error("Retrieve background task failed: %s", e)
+        result = {"error": str(e)}
+
+    post_callback(callback_url, process_instance_id, "retrieve-done", result)
 
 
 @app.post("/api/v1/compose")

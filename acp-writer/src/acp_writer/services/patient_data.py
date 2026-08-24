@@ -7,9 +7,9 @@ Produces: ips_bundle_ref (stores original bundle for downstream use by ExecuteDM
 import logging
 from uuid import uuid4
 
-from fastapi import FastAPI, Request
+from fastapi import BackgroundTasks, FastAPI, Request
 
-from cpg_contracts import get_phi_store, resolve_ref, store_artifact
+from cpg_contracts import get_phi_store, post_callback, resolve_ref, store_artifact
 from acp_writer.nodes.condition_scanner import condition_scanner
 
 logger = logging.getLogger(__name__)
@@ -37,3 +37,30 @@ async def scan(request: Request):
         result["ips_bundle_ref"] = ref
 
     return result
+
+
+@app.post("/api/v1/scan-async")
+async def scan_async(request: Request, background_tasks: BackgroundTasks):
+    """Async version: accept immediately, run scan in background, POST callback."""
+    data = await request.json()
+    callback_url = data.pop("callback_url", "")
+    process_instance_id = data.pop("process_instance_id", "")
+    background_tasks.add_task(_run_scan_background, data, callback_url, process_instance_id)
+    return {"status": "accepted"}
+
+
+def _run_scan_background(data: dict, callback_url: str, process_instance_id: str):
+    try:
+        ips_bundle = resolve_ref(data, "ips_bundle", _phi_store)
+        if not ips_bundle and "ips_ref" in data:
+            ips_bundle = _phi_store.get(data["ips_ref"]) if _phi_store else {}
+        result = condition_scanner({"ips_bundle": ips_bundle})
+
+        _, ref = store_artifact(_phi_store, f"{uuid4()}/ips_bundle.json", ips_bundle)
+        if ref:
+            result["ips_bundle_ref"] = ref
+    except Exception as e:
+        logger.error("Scan background task failed: %s", e)
+        result = {"error": str(e)}
+
+    post_callback(callback_url, process_instance_id, "scan-done", result)

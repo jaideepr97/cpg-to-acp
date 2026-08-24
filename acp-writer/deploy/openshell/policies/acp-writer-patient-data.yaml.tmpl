@@ -25,6 +25,17 @@ network_policies:
         enforcement: enforce
     binaries:
       - path: "**"
+  callback:
+    name: sonataflow-callback
+    endpoints:
+      - host: "acpwriter"
+        port: 80
+        enforcement: enforce
+        allowed_ips:
+          - "172.30.0.0/16"
+          - "10.128.0.0/14"
+    binaries:
+      - path: "**"
   minio:
     name: artifact-store
     endpoints:
