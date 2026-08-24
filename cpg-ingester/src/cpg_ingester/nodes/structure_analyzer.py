@@ -94,12 +94,33 @@ def _build_section_page_ranges(sections: list[dict], total_pages: int) -> list[d
 
 
 def _parse_llm_json(text: str) -> dict | list:
-    """Parse JSON from LLM response, stripping markdown fences if present."""
+    """Parse JSON from an LLM response, tolerating fences and surrounding prose.
+
+    Strips a leading/trailing markdown fence, then tries a plain ``json.loads``.
+    If that fails (the model wrapped the JSON in prose, e.g. "Here you go: {…}"),
+    it locates the first ``{`` or ``[`` and uses ``raw_decode`` to read exactly
+    one JSON value from there — which correctly ignores braces inside string
+    values (a naive brace-counter does not). Raises ``ValueError`` if no JSON
+    value can be found, so callers can degrade rather than crash.
+    """
     cleaned = text.strip()
     if cleaned.startswith("```"):
         cleaned = re.sub(r"^```\w*\n?", "", cleaned)
         cleaned = re.sub(r"\n?```$", "", cleaned)
-    return json.loads(cleaned.strip())
+    cleaned = cleaned.strip()
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
+    starts = [i for i in (cleaned.find("{"), cleaned.find("[")) if i >= 0]
+    if starts:
+        try:
+            value, _ = json.JSONDecoder().raw_decode(cleaned[min(starts):])
+            return value
+        except json.JSONDecodeError:
+            pass
+    raise ValueError("no JSON value found in model reply")
 
 
 @mlflow.trace(name="structure_analyzer")

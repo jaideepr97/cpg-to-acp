@@ -21,6 +21,7 @@ from fastapi import BackgroundTasks, FastAPI, Request
 
 from cpg_contracts import get_artifact_store, post_callback, resolve_ref, store_artifact
 from cpg_ingester.nodes.content_filter import content_filter
+from cpg_ingester.nodes.figure_interpreter import figure_interpreter
 from cpg_ingester.nodes.item_identifier import item_identifier
 from cpg_ingester.nodes.classification_reviewer import classification_reviewer
 from cpg_ingester.nodes.metadata_extractor import metadata_extractor
@@ -43,6 +44,30 @@ def health():
     return {"status": "UP", "service": "llm-analysis"}
 
 
+_PARSE_SUFFIX = "parse_result.json"
+_ENRICHED_SUFFIX = "parse_result_enriched.json"
+
+
+def _enriched_ref(parse_result_ref: str | None) -> str | None:
+    """Derive the enriched-parse cache ref from the parse_result ref.
+
+    Replaces the trailing ``parse_result.json`` with
+    ``parse_result_enriched.json`` so the enriched output lands in the same
+    ``{prefix}/`` directory that already holds ``figures/``. Returns ``None`` if
+    the ref is absent or not the expected shape (nothing to cache against).
+    """
+    if not parse_result_ref or not parse_result_ref.endswith(_PARSE_SUFFIX):
+        return None
+    return parse_result_ref[: -len(_PARSE_SUFFIX)] + _ENRICHED_SUFFIX
+
+
+def _ref_key(ref: str) -> str:
+    """Object-key portion of a ``bucket:key`` ref (or the ref itself if plain)."""
+    if ":" in ref and not ref.startswith("s3://"):
+        return ref.split(":", 1)[1]
+    return ref
+
+
 def _do_analyze(data: dict) -> dict:
     """Run structure analysis: classify sections, build manifest, extract metadata.
 
@@ -52,9 +77,11 @@ def _do_analyze(data: dict) -> dict:
     if isinstance(parse_result, dict) and "markdown" in parse_result:
         markdown = parse_result["markdown"]
         docling_json = parse_result.get("docling_json", {})
+        figures = parse_result.get("figures", []) or []
     else:
         markdown = data.get("markdown", "")
         docling_json = data.get("docling_json", {})
+        figures = data.get("figures", []) or []
 
     review_feedback = data.get("review_feedback")
     review_comment = data.get("review_comment")
@@ -64,6 +91,7 @@ def _do_analyze(data: dict) -> dict:
         state = {
             "markdown": markdown,
             "docling_json": docling_json,
+            "figures": figures,
             "output_dir": output_dir,
             "litellm_url": LITELLM_URL,
             "llm_model": LLM_MODEL,
@@ -73,6 +101,45 @@ def _do_analyze(data: dict) -> dict:
         if review_feedback and review_iteration:
             state["review_feedback"] = review_feedback
             state["review_comment"] = review_comment
+
+        # Interpret figures first so the enriched markdown (Mermaid + figure
+        # descriptions inlined at each figure's location) flows into structure
+        # analysis and everything downstream. Kept as a decoupled agent so it
+        # can move to its own pod later.
+        #
+        # Review rounds must make ZERO vision calls: the enriched parse
+        # is cached next to the parse result under a ref derived from
+        # parse_result_ref. On a cache hit we reuse it verbatim and skip the
+        # interpreter entirely, so round-2+ markdown is byte-identical to round
+        # 1's — the interpretation never re-runs nondeterministically. A miss is
+        # the normal first-round case (silent-cheap). Re-uploading the CPG mints
+        # a fresh per-run prefix → fresh ref → cache miss → fresh interpretation,
+        # so the "re-upload to fix" remediation still works.
+        enriched_ref = _enriched_ref(data.get("parse_result_ref")) if _store else None
+        cached = None
+        if enriched_ref:
+            try:
+                cached = _store.get(enriched_ref)
+            except Exception:  # noqa: BLE001 — a miss is the normal first round
+                cached = None
+
+        if isinstance(cached, dict) and "markdown" in cached:
+            logger.info("Using cached figure interpretations from %s", enriched_ref)
+            state["markdown"] = cached["markdown"]
+            state["figures"] = cached.get("figures", figures)
+        else:
+            updates = figure_interpreter(state)
+            state.update(updates)
+            if enriched_ref:
+                try:
+                    store_artifact(
+                        _store,
+                        _ref_key(enriched_ref),
+                        {"markdown": state["markdown"], "figures": state.get("figures", [])},
+                    )
+                except Exception as e:  # noqa: BLE001 — caching is best-effort
+                    logger.warning("Failed to cache enriched parse at %s: %s", enriched_ref, e)
+        markdown = state["markdown"]
 
         updates = structure_analyzer(state)
         state.update(updates)

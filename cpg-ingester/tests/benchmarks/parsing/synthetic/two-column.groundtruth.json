@@ -1,0 +1,18 @@
+{
+  "archetype": "two-column-dense",
+  "born_digital": true,
+  "flowchart_edges": [],
+  "flowchart_nodes": [],
+  "headings": [
+    "Abstract",
+    "Introduction",
+    "Methods",
+    "Evidence Synthesis",
+    "Recommendation Statements",
+    "Discussion"
+  ],
+  "name": "two-column.pdf",
+  "page_count": 4,
+  "table_cells": 0,
+  "tables": []
+}

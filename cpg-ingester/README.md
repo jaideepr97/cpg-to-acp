@@ -52,6 +52,18 @@ Environment variables (alternative to CLI flags):
 - `LLM_MODEL` — Model name (default: `default`)
 - `LITELLM_API_KEY` — API key (default: `sk-change-me`)
 
+Docling / figure knobs (all optional; blank or unset means the default):
+- `INGESTION_OCR_ENABLED` — run the conditional OCR re-parse for scanned/image-only
+  PDFs (default: `true`). Set falsey (`0`/`false`/`no`/`off`) to skip it, e.g. where
+  the RapidOCR models are not available in the image.
+- `FIGURE_INTERPRETATION_ENABLED` — run vision interpretation of extracted figures
+  (flowcharts → Mermaid + description; other figures → description) (default: `true`).
+  Set falsey for a cost-sensitive or offline run; figures are then left as-is.
+- `FIGURE_INTERPRETATION_MAX_FIGURES` — ceiling on vision calls per document so a
+  figure compendium can't fan out into hundreds of frontier-model calls
+  (default: `100`). Trivial figures (logos/stamps/…) get a cheap label and don't
+  count against this budget.
+
 ### Output artifacts
 
 Each run writes to an output directory (`output/<run-id>/`):

@@ -49,6 +49,11 @@ POLICY_DIR="$RENDERED_POLICY_DIR"
 LLM_BASE_URL="${MAAS_GATEWAY_URL}/${MAAS_ROUTE_SEGMENT}"
 LLM_MODEL="${CPG_INGESTER_LLM_MODEL:-$LLM_MODEL_DEFAULT}"
 
+# Docling/figure knobs (defaults match the code; override via cluster.env).
+INGESTION_OCR_ENABLED="${CPG_INGESTER_OCR_ENABLED:-true}"
+FIGURE_INTERPRETATION_ENABLED="${CPG_INGESTER_FIGURE_INTERPRETATION_ENABLED:-true}"
+FIGURE_INTERPRETATION_MAX_FIGURES="${CPG_INGESTER_FIGURE_MAX:-100}"
+
 { set +x; } 2>/dev/null
 LLM_API_KEY=$(read_secret llm-credentials LLM_API_KEY)
 MINIO_ACCESS=$(read_secret minio-credentials ARTIFACT_STORE_ACCESS_KEY)
@@ -108,7 +113,8 @@ deploy_sandboxes() {
         "DOCLING_LOG_LEVEL=DEBUG" \
         "PYTHONUNBUFFERED=1" \
         "HF_HUB_OFFLINE=1" \
-        "DOCLING_ARTIFACTS_PATH=/app/.cache/docling/models"
+        "DOCLING_ARTIFACTS_PATH=/app/.cache/docling/models" \
+        "INGESTION_OCR_ENABLED=${INGESTION_OCR_ENABLED}"
 
     # LLM Analysis
     create_ing_sandbox "sb-llm-analysis" "cpg-ingester-llm" "cpg-ingester-llm.yaml" \
@@ -118,7 +124,9 @@ deploy_sandboxes() {
         "PYTHONPATH=/app/src" \
         "LITELLM_URL=${LLM_BASE_URL}" \
         "LLM_MODEL=${LLM_MODEL}" \
-        "LLM_API_KEY=${LLM_API_KEY}"
+        "LLM_API_KEY=${LLM_API_KEY}" \
+        "FIGURE_INTERPRETATION_ENABLED=${FIGURE_INTERPRETATION_ENABLED}" \
+        "FIGURE_INTERPRETATION_MAX_FIGURES=${FIGURE_INTERPRETATION_MAX_FIGURES}"
 
     # Assembly
     create_ing_sandbox "sb-assembly" "cpg-ingester-assembly" "cpg-ingester-assembly.yaml" \

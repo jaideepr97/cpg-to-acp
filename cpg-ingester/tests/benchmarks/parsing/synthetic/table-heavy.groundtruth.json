@@ -1,0 +1,26 @@
+{
+  "archetype": "table-heavy",
+  "born_digital": true,
+  "flowchart_edges": [],
+  "flowchart_nodes": [],
+  "headings": [
+    "Dosing Recommendations",
+    "Monitoring Schedule",
+    "Notes"
+  ],
+  "name": "table-heavy.pdf",
+  "page_count": 1,
+  "table_cells": 50,
+  "tables": [
+    {
+      "cells": 25,
+      "cols": 5,
+      "rows": 5
+    },
+    {
+      "cells": 25,
+      "cols": 5,
+      "rows": 5
+    }
+  ]
+}

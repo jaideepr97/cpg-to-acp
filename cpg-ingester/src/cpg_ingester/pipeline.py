@@ -18,6 +18,7 @@ from cpg_ingester.nodes.classification_reviewer import classification_reviewer
 from cpg_ingester.nodes.content_filter import content_filter
 from cpg_ingester.nodes.delivery import delivery
 from cpg_ingester.nodes.docling_agent import docling_agent
+from cpg_ingester.nodes.figure_interpreter import figure_interpreter
 from cpg_ingester.nodes.item_identifier import item_identifier
 from cpg_ingester.nodes.metadata_extractor import metadata_extractor
 from cpg_ingester.nodes.structure_analyzer import structure_analyzer
@@ -48,6 +49,7 @@ def build_pipeline() -> StateGraph:
 
     # Phase 1: Analysis (sequential with classification review loop)
     graph.add_node("docling_agent", docling_agent)
+    graph.add_node("figure_interpreter", figure_interpreter)
     graph.add_node("structure_analyzer", structure_analyzer)
     graph.add_node("content_filter", content_filter)
     graph.add_node("item_identifier", item_identifier)
@@ -61,7 +63,8 @@ def build_pipeline() -> StateGraph:
 
     # Phase 1 edges
     graph.add_edge(START, "docling_agent")
-    graph.add_edge("docling_agent", "structure_analyzer")
+    graph.add_edge("docling_agent", "figure_interpreter")
+    graph.add_edge("figure_interpreter", "structure_analyzer")
     graph.add_edge("structure_analyzer", "content_filter")
     graph.add_edge("content_filter", "item_identifier")
     graph.add_edge("item_identifier", "classification_reviewer")

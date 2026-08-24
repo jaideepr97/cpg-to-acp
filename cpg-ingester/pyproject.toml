@@ -9,7 +9,15 @@ description = "Multi-agent pipeline: parse CPGs, extract DMN decision logic and 
 requires-python = ">=3.11"
 license = "Apache-2.0"
 dependencies = [
-    "docling>=2.0",
+    "docling==2.113.0",
+    "docling-core==2.87.1",
+    # Conditional-OCR re-parse: docling builds RapidOcrOptions when a
+    # PDF looks scanned. These must be real package deps — not just baked into
+    # Containerfile.ingestion — or a fresh `pip install .` (CI, a teammate's
+    # venv) crashes on the first scanned PDF. Models ship bundled in the wheel
+    # (offline; no system binary, no network).
+    "rapidocr-onnxruntime>=1.2,<2",
+    "onnxruntime>=1.19,<2",
     "openai>=1.0",
     "click>=8.0",
     "requests>=2.31",

@@ -1,0 +1,64 @@
+# Real-CPG benchmark manifest (RHAIENG-6461)
+# ==========================================================================
+# COPYRIGHT / COMMIT POLICY (read first):
+#   * NO real CPG PDF is ever committed to this repository. Uniform rule, no
+#     per-document license adjudication. This manifest and the fetch script are
+#     committed; the downloaded PDFs are NOT (they land in the gitignored
+#     working/benchmarks/parsing/real/ directory).
+#   * Seeds below are works of the U.S. federal government (CDC / NIH-NHLBI /
+#     USPSTF), which are in the public domain (17 U.S.C. sec. 105). We still do
+#     not commit them, to keep one simple rule.
+#   * sha256 guards against link-rot / silent content drift. Set to "TBD" when a
+#     hash has not yet been verified; fetch-benchmark-cpgs.sh computes and prints
+#     the observed hash on download so you can pin it here. Do NOT fabricate
+#     hashes.
+#
+# Fields per entry:
+#   name          short slug (also the local filename stem)
+#   publisher     issuing body
+#   source_url    direct PDF URL
+#   archetype_tag one of: single-column | two-column-dense | table-heavy |
+#                         flowchart-heavy | mixed
+#   license_note  copyright / public-domain note
+#   sha256        pinned content hash, or "TBD"
+#
+# NOTE: cdc.gov blocks non-browser (scripted) fetches with HTTP 403. The fetch
+# script detects this and prints a manual-fallback (open in browser, save to the
+# target path, re-run to record the sha256). NHLBI URLs download fine via script.
+# ==========================================================================
+
+cpgs:
+  - name: cdc-opioid-prescribing-2022
+    publisher: "CDC (MMWR Recommendations & Reports 71/3)"
+    source_url: "https://www.cdc.gov/mmwr/volumes/71/rr/pdfs/rr7103a1-H.pdf"
+    archetype_tag: two-column-dense
+    license_note: "U.S. federal government work (CDC/MMWR); public domain (17 USC 105)."
+    sha256: TBD
+
+  - name: cdc-sti-treatment-2021
+    publisher: "CDC (MMWR Recommendations & Reports 70/4)"
+    source_url: "https://www.cdc.gov/mmwr/volumes/70/rr/pdfs/rr7004a1-H.pdf"
+    archetype_tag: table-heavy
+    license_note: "U.S. federal government work (CDC/MMWR); public domain (17 USC 105)."
+    sha256: TBD
+
+  - name: nhlbi-jnc7-hypertension
+    publisher: "NIH / NHLBI (JNC 7 complete report)"
+    source_url: "https://www.nhlbi.nih.gov/files/docs/guidelines/jnc7full.pdf"
+    archetype_tag: mixed
+    license_note: "U.S. federal government work (NIH/NHLBI); public domain (17 USC 105)."
+    sha256: TBD
+
+  - name: nhlbi-epr3-asthma-qrg
+    publisher: "NIH / NHLBI (EPR-3 asthma quick reference guide)"
+    source_url: "https://www.nhlbi.nih.gov/files/docs/guidelines/asthma_qrg.pdf"
+    archetype_tag: flowchart-heavy
+    license_note: "U.S. federal government work (NIH/NHLBI); public domain (17 USC 105)."
+    sha256: TBD
+
+  - name: nhlbi-atp3-cholesterol
+    publisher: "NIH / NHLBI (ATP III executive summary)"
+    source_url: "https://www.nhlbi.nih.gov/files/docs/guidelines/atp3xsum.pdf"
+    archetype_tag: single-column
+    license_note: "U.S. federal government work (NIH/NHLBI); public domain (17 USC 105)."
+    sha256: TBD

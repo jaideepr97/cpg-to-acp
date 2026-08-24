@@ -1,0 +1,58 @@
+{
+  "archetype": "flowchart-heavy",
+  "born_digital": true,
+  "flowchart_edges": [
+    [
+      "start",
+      "d1",
+      ""
+    ],
+    [
+      "d1",
+      "a1",
+      "Yes"
+    ],
+    [
+      "d1",
+      "a2",
+      "No"
+    ],
+    [
+      "a1",
+      "d2",
+      ""
+    ],
+    [
+      "d2",
+      "a3",
+      "No"
+    ],
+    [
+      "d2",
+      "end",
+      "Yes"
+    ],
+    [
+      "a2",
+      "end",
+      ""
+    ]
+  ],
+  "flowchart_nodes": [
+    "Patient with Condition C",
+    "Symptoms severe?",
+    "Start first-line therapy",
+    "Lifestyle counseling",
+    "Response at 4 weeks?",
+    "Escalate to second-line",
+    "Continue and monitor"
+  ],
+  "headings": [
+    "Treatment Algorithm",
+    "Algorithm Notes"
+  ],
+  "name": "flowchart-heavy.pdf",
+  "page_count": 1,
+  "table_cells": 0,
+  "tables": []
+}

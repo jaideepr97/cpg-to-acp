@@ -6,7 +6,8 @@ from pathlib import Path
 
 import click
 import mlflow
-from docling.document_converter import DocumentConverter
+
+from cpg_ingester.docling_convert import build_converter
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,9 @@ def parse_pdf(input_path: Path, output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = input_path.stem
 
-    converter = DocumentConverter()
+    # Shared converter config (do_ocr=False) — single source of truth with the
+    # pipeline node. See cpg_ingester.docling_convert.
+    converter = build_converter(do_ocr=False)
     result = converter.convert(str(input_path))
 
     md_path = output_dir / f"{stem}.md"

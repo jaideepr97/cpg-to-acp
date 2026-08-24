@@ -97,8 +97,18 @@ class TestParseLLMJson:
         result = _parse_llm_json('```json\n{"key": "value"}\n```')
         assert result == {"key": "value"}
 
+    def test_parses_json_wrapped_in_prose(self):
+        # Vision/chat models sometimes prepend a sentence before the JSON.
+        result = _parse_llm_json('Here you go: {"a": 1} — hope that helps')
+        assert result == {"a": 1}
+
+    def test_braces_inside_string_values_do_not_confuse_parser(self):
+        # raw_decode reads one JSON value; braces inside strings must not break it.
+        result = _parse_llm_json('{"desc": "if {x} then {y}", "n": 2}')
+        assert result == {"desc": "if {x} then {y}", "n": 2}
+
     def test_raises_on_invalid(self):
-        with pytest.raises(json.JSONDecodeError):
+        with pytest.raises(ValueError):
             _parse_llm_json("not json at all")
 
 
