@@ -5,11 +5,14 @@ Each backend dependency is independently optional — the BFF
 degrades gracefully when SonataFlow or MinIO is not configured.
 """
 
+import asyncio
 import json
 import logging
 import os
+from datetime import datetime, timezone
 from uuid import uuid4
 
+import httpx
 import mlflow
 import requests as http_requests
 from fastapi import FastAPI, Request
@@ -51,6 +54,7 @@ _sonataflow: SonataFlowClient | None = None
 if SONATAFLOW_URL:
     _sonataflow = SonataFlowClient(SONATAFLOW_URL)
 
+_http = httpx.AsyncClient(timeout=httpx.Timeout(10.0, connect=5.0))
 
 app = FastAPI(title="acp-writer-bff", version="0.1.0")
 
@@ -233,16 +237,66 @@ def notify_review(payload: dict | None = None):
 
 
 # ---------------------------------------------------------------------------
-# Run management (SonataFlow-backed)
+# Run management (SonataFlow-backed, async start)
 # ---------------------------------------------------------------------------
+
+# Pending runs: BFF-generated ID → tracking state.  Entries are promoted
+# to SonataFlow-backed once the background start_workflow call returns.
+_pending_runs: dict[str, dict] = {}
+
+
+async def _start_workflow_background(run_id: str, ips_ref: str, patient_name: str) -> None:
+    """Start SonataFlow workflow in the background and update the pending-run mapping."""
+    try:
+        assert _sonataflow is not None
+        instance = await _sonataflow.start_workflow(ips_ref, patient_name, business_key=run_id)
+        _pending_runs[run_id]["sonataflow_id"] = instance["id"]
+        _pending_runs[run_id]["status"] = "running"
+        logger.info("Run %s → SonataFlow instance %s", run_id, instance["id"])
+    except Exception as exc:
+        _pending_runs[run_id]["status"] = "error"
+        _pending_runs[run_id]["error"] = str(exc)
+        logger.error("Failed to start workflow for run %s: %s", run_id, exc)
+
+
+def _pending_run_summary(pr: dict) -> dict:
+    return {
+        "runId": pr["run_id"],
+        "status": "starting" if pr["status"] == "starting" else pr["status"],
+        "patientName": pr.get("patient_name", "Unknown Patient"),
+        "patientReference": "",
+        "currentSteps": [],
+        "careplanId": None,
+        "createdAt": pr["created_at"],
+        "updatedAt": pr["created_at"],
+    }
+
+
+def _pending_run_detail(pr: dict) -> dict:
+    return {
+        "runId": pr["run_id"],
+        "status": "starting" if pr["status"] == "starting" else pr["status"],
+        "createdAt": pr["created_at"],
+        "updatedAt": pr["created_at"],
+        "currentSteps": [],
+        "steps": [],
+        "awaitingReview": None,
+        "carePlan": None,
+        "reviewIteration": 0,
+        "previousFeedback": None,
+        "careplanId": None,
+        "error": pr.get("error"),
+        "workflowData": None,
+    }
+
 
 @app.post("/api/v1/runs", status_code=202)
 @mlflow.trace(name="bff.create_run")
 async def create_run(request: Request):
     """Accept an IPS bundle, store in MinIO, and start a SonataFlow workflow.
 
-    Both the file-upload and SMART-launch UI paths converge here — the
-    client resolves the patient context and hands the IPS bundle to the BFF.
+    Returns immediately with a run ID. The SonataFlow workflow is started
+    in the background — the UI polls GET /runs/{id} for progress.
     """
     body = await request.json()
     ips_bundle = body.get("ipsBundle")
@@ -251,35 +305,97 @@ async def create_run(request: Request):
 
     patient_name = _extract_patient_name(ips_bundle)
     run_id = uuid4().hex[:12]
+    now = datetime.now(timezone.utc).isoformat()
 
     ips_ref = ""
     if _phi_store:
         ips_ref = _phi_store.put(f"{run_id}/ips_bundle.json", ips_bundle)
 
-    if _sonataflow:
-        instance = _sonataflow.start_workflow(ips_ref or json.dumps(ips_bundle), patient_name)
-        return {"runId": instance["id"], "status": "running"}
+    _pending_runs[run_id] = {
+        "run_id": run_id,
+        "status": "starting",
+        "sonataflow_id": None,
+        "patient_name": patient_name,
+        "ips_ref": ips_ref,
+        "created_at": now,
+        "error": None,
+    }
 
-    return {"runId": run_id, "status": "running"}
+    if _sonataflow:
+        asyncio.create_task(_start_workflow_background(run_id, ips_ref or json.dumps(ips_bundle), patient_name))
+
+    return {"runId": run_id, "status": "starting"}
+
+
+def _resolve_sonataflow_id(run_id: str) -> str | None:
+    """If run_id is a BFF pending-run ID, return its SonataFlow instance ID (if available)."""
+    pr = _pending_runs.get(run_id)
+    if pr:
+        return pr.get("sonataflow_id")
+    return None
 
 
 @app.get("/api/v1/runs")
-def list_runs(status: str | None = None, limit: int = 50):
-    if not _sonataflow:
-        return []
-    instances = _sonataflow.list_instances()
-    summaries = [map_to_run_summary(inst) for inst in instances]
+async def list_runs(status: str | None = None, limit: int = 50):
+    summaries: list[dict] = []
+    sf_ids_in_list: set[str] = set()
+
+    if _sonataflow:
+        instances = await _sonataflow.list_instances()
+        sf_ids_in_list = {inst["id"] for inst in instances}
+        for inst in instances:
+            summary = map_to_run_summary(inst)
+            # If this instance was started with a business key matching a pending run, use that ID
+            for pr in _pending_runs.values():
+                if pr.get("sonataflow_id") == inst["id"]:
+                    summary["runId"] = pr["run_id"]
+                    break
+            summaries.append(summary)
+
+    # Include pending runs not yet visible in SonataFlow
+    for pr in _pending_runs.values():
+        if not pr.get("sonataflow_id") or (pr.get("sonataflow_id") and _sonataflow and pr["sonataflow_id"] not in sf_ids_in_list):
+            summaries.append(_pending_run_summary(pr))
+
     if status:
         summaries = [s for s in summaries if s["status"] == status]
+    summaries.sort(key=lambda s: s.get("createdAt", ""), reverse=True)
     return summaries[:limit]
 
 
 @app.get("/api/v1/runs/{run_id}")
-def get_run(run_id: str):
+async def get_run(run_id: str):
+    # Check pending runs first
+    pr = _pending_runs.get(run_id)
+    if pr:
+        sf_id = pr.get("sonataflow_id")
+        if _sonataflow:
+            # Try direct ID lookup first, then business key for in-flight workflows
+            instance = None
+            if sf_id:
+                try:
+                    instance = await _sonataflow.get_instance(sf_id)
+                except Exception:
+                    pass
+            if not instance:
+                try:
+                    instance = await _sonataflow.get_instance_by_business_key(run_id)
+                except Exception:
+                    pass
+            if instance:
+                if not sf_id:
+                    pr["sonataflow_id"] = instance["id"]
+                    pr["status"] = "running"
+                detail = map_to_run_detail(instance)
+                detail["runId"] = run_id
+                return enrich_run_detail(detail, _phi_store, _artifacts_store)
+        return _pending_run_detail(pr)
+
+    # Fall through to direct SonataFlow lookup (for runs created before this change)
     if not _sonataflow:
         return JSONResponse(status_code=503, content={"message": "SonataFlow not configured"})
     try:
-        instance = _sonataflow.get_instance(run_id)
+        instance = await _sonataflow.get_instance(run_id)
     except Exception:
         return JSONResponse(status_code=404, content={"message": f"Run {run_id} not found"})
     detail = map_to_run_detail(instance)
@@ -294,8 +410,9 @@ async def submit_review(run_id: str, gate: str, request: Request):
     if not _sonataflow:
         return JSONResponse(status_code=503, content={"message": "SonataFlow not configured"})
 
+    sf_id = _resolve_sonataflow_id(run_id) or run_id
     try:
-        instance = _sonataflow.get_instance(run_id)
+        instance = await _sonataflow.get_instance(sf_id)
     except Exception:
         return JSONResponse(status_code=404, content={"message": f"Run {run_id} not found"})
 
@@ -304,11 +421,12 @@ async def submit_review(run_id: str, gate: str, request: Request):
         return JSONResponse(status_code=409, content={"message": "Run is not awaiting careplan review"})
 
     review = await request.json()
-    _sonataflow.send_review(run_id, gate, review or {})
+    await _sonataflow.send_review(sf_id, gate, review or {})
 
     try:
-        updated = _sonataflow.get_instance(run_id)
+        updated = await _sonataflow.get_instance(sf_id)
         updated_detail = map_to_run_detail(updated)
+        updated_detail["runId"] = run_id
         enriched = enrich_run_detail(updated_detail, _phi_store, _artifacts_store)
         return JSONResponse(status_code=202, content=enriched)
     except Exception:
@@ -316,13 +434,17 @@ async def submit_review(run_id: str, gate: str, request: Request):
 
 
 @app.delete("/api/v1/runs/{run_id}")
-def cancel_run(run_id: str):
+async def cancel_run(run_id: str):
     if not _sonataflow:
         return JSONResponse(status_code=503, content={"message": "SonataFlow not configured"})
+    sf_id = _resolve_sonataflow_id(run_id) or run_id
     try:
-        _sonataflow.abort_instance(run_id)
+        await _sonataflow.abort_instance(sf_id)
     except Exception:
         return JSONResponse(status_code=404, content={"message": f"Run {run_id} not found"})
+    pr = _pending_runs.get(run_id)
+    if pr:
+        pr["status"] = "cancelled"
     return Response(status_code=204)
 
 
@@ -348,14 +470,14 @@ def get_artifact(run_id: str, path: str):
 # ---------------------------------------------------------------------------
 
 @app.get("/api/v1/careplans")
-def list_careplans(patient: str | None = None, status: str | None = None):
+async def list_careplans(patient: str | None = None, status: str | None = None):
     params = {}
     if patient:
         params["patient"] = patient
     if status:
         params["status"] = status
     try:
-        resp = http_requests.get(f"{FHIR_SERVER_URL}/api/v1/careplans", params=params, timeout=10)
+        resp = await _http.get(f"{FHIR_SERVER_URL}/api/v1/careplans", params=params)
         resp.raise_for_status()
         raw_plans = resp.json()
     except Exception as exc:
@@ -365,9 +487,9 @@ def list_careplans(patient: str | None = None, status: str | None = None):
 
 
 @app.get("/api/v1/careplans/{careplan_id}")
-def get_careplan(careplan_id: str):
+async def get_careplan(careplan_id: str):
     try:
-        resp = http_requests.get(f"{FHIR_SERVER_URL}/api/v1/careplans/{careplan_id}", timeout=10)
+        resp = await _http.get(f"{FHIR_SERVER_URL}/api/v1/careplans/{careplan_id}")
         resp.raise_for_status()
         raw = resp.json()
     except Exception as exc:
@@ -383,14 +505,14 @@ def get_careplan(careplan_id: str):
 # ---------------------------------------------------------------------------
 
 @app.get("/api/v1/status")
-def system_status():
+async def system_status():
     result: dict = {
         "version": "0.1.0",
         "decisionEngine": {"available": False, "modelsDeployed": 0},
         "knowledgeBase": {"available": False, "guidelines": 0, "recommendations": 0},
     }
     try:
-        resp = http_requests.get(f"{LLM_REASONING_URL}/api/v1/status", timeout=5)
+        resp = await _http.get(f"{LLM_REASONING_URL}/api/v1/status", timeout=5)
         if resp.status_code == 200:
             data = resp.json()
             de = data.get("decision_engine", {})
@@ -618,3 +740,10 @@ async def _on_startup():
         bool(SONATAFLOW_URL), bool(MINIO_ENDPOINT),
     )
     _reload_cpg_artifacts()
+
+
+@app.on_event("shutdown")
+async def _on_shutdown():
+    await _http.aclose()
+    if _sonataflow:
+        await _sonataflow.close()

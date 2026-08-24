@@ -107,17 +107,9 @@ export function SmartLaunchPage() {
         const ipsBundle = await fetchIpsSummary(iss, token, patientId);
 
         setStep("starting_run");
-        try {
-          const result = await createRun(ipsBundle);
-          setStep("redirecting");
-          navigate(`/runs/${result.runId}`);
-          return;
-        } catch {
-          // Run likely started on the backend despite the timeout —
-          // redirect to the runs list so the user can find it.
-          navigate("/runs");
-          return;
-        }
+        const result = await createRun(ipsBundle);
+        setStep("redirecting");
+        navigate(`/runs/${result.runId}`);
       } catch (err) {
         setError(String(err));
       }
