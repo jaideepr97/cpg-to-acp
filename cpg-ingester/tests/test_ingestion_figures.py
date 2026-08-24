@@ -1,4 +1,4 @@
-"""Tests for figure persistence in the ingestion service (plan P3.3)."""
+"""Tests for figure persistence in the ingestion service."""
 
 import base64
 

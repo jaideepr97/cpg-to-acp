@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark runner (RHAIENG-6461 P1c).
+"""Benchmark runner (RHAIENG-6461).
 
 Runs ``metrics.score_pdf`` over a selected PDF set and writes both a
 machine-readable ``report.json`` and a human-readable ``report.md`` to
@@ -61,7 +61,7 @@ def _run_set(label: str, pairs, *, classify: bool, do_ocr: bool) -> list[dict]:
 
 
 def _llm_cfg_from_env():
-    """LLM config for figure interpretation (plan P5b). Direct-OpenAI example:
+    """LLM config for figure interpretation. Direct-OpenAI example:
 
         LITELLM_URL=https://api.openai.com LLM_MODEL=gpt-5.6 \\
         LLM_API_KEY=$OPENAI_API_KEY  run-benchmark.sh --synthetic --interpret
@@ -77,7 +77,7 @@ def _llm_cfg_from_env():
 
 
 def _run_interpret(label: str, pairs) -> list[dict]:
-    """Interpret figures (live vision call) and score vs. ground truth (P5b)."""
+    """Interpret figures (live vision call) and score vs. ground truth."""
     import interpret_metrics  # noqa: E402 — lazy: pulls in cpg_ingester + LLM
 
     llm_cfg = _llm_cfg_from_env()
@@ -96,7 +96,7 @@ def _run_interpret(label: str, pairs) -> list[dict]:
 
 def _interpret_report(interp_rows: list[dict]) -> str:
     lines = [
-        "## Figure interpretation (plan P5)",
+        "## Figure interpretation",
         "",
         "Live vision-model recovery of figure *content* (node/edge recovery + "
         "Mermaid validity), scored against the per-figure ground truth. Only "
@@ -134,7 +134,7 @@ def _markdown_report(rows: list[dict], generated_at: str, *, ocr: bool) -> str:
         "# CPG Docling Parse-Quality Benchmark Report",
         "",
         f"_Generated: {generated_at}_",
-        f"_OCR: {'ON (RapidOCR, forced full-page — plan P4)' if ocr else 'OFF (baseline)'}_",
+        f"_OCR: {'ON (RapidOCR, forced full-page)' if ocr else 'OFF (baseline)'}_",
         "",
         "Baseline metrics for the Docling parse stage (RHAIENG-6461). "
         "Ground-truth-dependent columns (heading/table recovery) are only "
@@ -185,10 +185,10 @@ def _markdown_report(rows: list[dict], generated_at: str, *, ocr: bool) -> str:
             notes.append(
                 f"flowchart ground truth: {r['flowchart_nodes_expected']} nodes / "
                 f"{r['flowchart_edges_expected']} edges (figure detected as "
-                f"{r.get('figure_count')} picture(s); interpretation is P5)"
+                f"{r.get('figure_count')} picture(s); content not yet interpreted)"
             )
         if r.get("likely_scanned"):
-            notes.append("LIKELY SCANNED (low text yield; OCR is P4)")
+            notes.append("LIKELY SCANNED (low text yield; triggers conditional OCR)")
         if notes:
             lines.append(f"- **{r['pdf']}**: " + "; ".join(notes))
     lines.append("")
@@ -201,9 +201,9 @@ def _markdown_report(rows: list[dict], generated_at: str, *, ocr: bool) -> str:
         "in the parse output.",
         "- **table cells** — detected structured cells vs. ground-truth cell count.",
         "- **figures** — picture regions Docling detected (content interpretation "
-        "is a later phase, P5).",
-        "- **scanned?** — heuristic low-yield flag (the trigger P4's conditional "
-        "OCR will consume).",
+        "is a separate, later stage).",
+        "- **scanned?** — heuristic low-yield flag (the trigger the conditional "
+        "OCR re-parse consumes).",
         "",
     ]
     return "\n".join(lines)
@@ -218,17 +218,17 @@ def main() -> int:
     ap.add_argument(
         "--no-classify", action="store_true",
         help="disable Docling picture classification (on by default to match the "
-             "production parser, which extracts + classifies figures — plan P3)",
+             "production parser, which extracts + classifies figures)",
     )
     ap.add_argument(
         "--ocr", action="store_true",
-        help="force RapidOCR on for every PDF (plan P4). Baseline runs keep OCR "
+        help="force RapidOCR on for every PDF. Baseline runs keep OCR "
              "off; use this to measure the OCR recovery on scanned fixtures.",
     )
     ap.add_argument(
         "--interpret", action="store_true",
         help="LIVE: interpret figures with a vision model and score content "
-             "recovery (plan P5). Needs LITELLM_URL/LLM_MODEL/LLM_API_KEY. Off by "
+             "recovery. Needs LITELLM_URL/LLM_MODEL/LLM_API_KEY. Off by "
              "default so the synthetic run stays offline/CI-safe.",
     )
     args = ap.parse_args()

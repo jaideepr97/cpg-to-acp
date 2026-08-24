@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fetch real CPGs listed in real-cpgs.manifest.yaml into the gitignored
-# working/benchmarks/parsing/real/ directory (RHAIENG-6461 P1b).
+# working/benchmarks/parsing/real/ directory (RHAIENG-6461).
 #
 # POLICY: real CPGs are NEVER committed. They are downloaded here for local
 # realism testing only. See real-cpgs.manifest.yaml for the full policy.

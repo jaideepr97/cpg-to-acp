@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Docling parse-quality metrics for the CPG benchmark (RHAIENG-6461 P1c).
+"""Docling parse-quality metrics for the CPG benchmark (RHAIENG-6461).
 
-Self-contained: this module builds its OWN Docling ``DocumentConverter`` inline
-and deliberately does NOT import anything from ``cpg_ingester`` production code,
-so the benchmark stays decoupled from (and can be run against) the production
-parser without a dependency edge.
+Measures the **production** parser: converter construction, the scanned-page
+threshold, and picture classification are all imported from ``cpg_ingester``
+rather than mirrored here, so the benchmark can never silently drift from what
+ships (the earlier "stay decoupled" copy had already drifted three ways —
+``images_scale``, the threshold constant, and the deprecated ``.annotations``
+read). ``interpret_metrics.py`` already imports the production node, so there is
+no dependency-edge purity left to protect.
 
 Public entry point:
     score_pdf(pdf_path, groundtruth_path=None, *, do_ocr=False,
@@ -31,31 +34,22 @@ import re
 from pathlib import Path
 from typing import Optional
 
-# Below this many characters per page a PDF is very likely scanned / image-only.
-# Chosen from observation: born-digital synthetic pages yield 1k-3k chars/page;
-# an image-only page (no OCR) yields ~0.
-LIKELY_SCANNED_CPP = 100
+# The scanned-page threshold and picture-classification logic come straight from
+# production so the benchmark measures exactly what ships.
+from cpg_ingester.docling_convert import build_converter
+from cpg_ingester.nodes.docling_agent import (
+    LIKELY_SCANNED_CHARS_PER_PAGE as LIKELY_SCANNED_CPP,
+    _picture_classification,
+)
 
 
 def _build_converter(do_ocr: bool = False, classify_pictures: bool = False):
-    """Construct a stand-alone Docling converter (no cpg_ingester import)."""
-    from docling.datamodel.base_models import InputFormat
-    from docling.datamodel.pipeline_options import PdfPipelineOptions, RapidOcrOptions
-    from docling.document_converter import DocumentConverter, PdfFormatOption
+    """Return the production Docling converter (see ``docling_convert``).
 
-    opts = PdfPipelineOptions(do_ocr=do_ocr)
-    if do_ocr:
-        # Mirror production (cpg_ingester.docling_convert): RapidOCR + full-page
-        # OCR, so benchmark OCR numbers reflect the real conditional-OCR path (P4).
-        opts.ocr_options = RapidOcrOptions(force_full_page_ocr=True)
-    # do_table_structure defaults on; keep it explicit for the benchmark.
-    opts.do_table_structure = True
-    if classify_pictures:
-        opts.generate_picture_images = True
-        opts.do_picture_classification = True
-    return DocumentConverter(
-        format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=opts)}
-    )
+    ``classify_pictures`` maps to production ``extract_figures`` (picture-image
+    generation + classification, at the production ``images_scale``).
+    """
+    return build_converter(do_ocr=do_ocr, extract_figures=classify_pictures)
 
 
 def _normalize(text: str) -> str:
@@ -87,14 +81,9 @@ def _figure_info(doc):
     pics = getattr(doc, "pictures", []) or []
     types: dict[str, int] = {}
     for p in pics:
-        # picture classification (when enabled) lives under annotations
-        cls = None
-        for ann in getattr(p, "annotations", []) or []:
-            preds = getattr(ann, "predicted_classes", None)
-            if preds:
-                top = max(preds, key=lambda c: getattr(c, "confidence", 0))
-                cls = getattr(top, "class_name", None)
-                break
+        # Same classification extraction production uses (non-deprecated
+        # get_annotations, same top-class selection).
+        cls, _conf = _picture_classification(p)
         types[cls or "unclassified"] = types.get(cls or "unclassified", 0) + 1
     return len(pics), types
 

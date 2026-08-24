@@ -74,12 +74,16 @@ spec:
         type: custom
         operation: rest:post:http://cpg-ingester-bff:8080/api/v1/notify-review
     states:
-      # --- Phase 1: PDF parsing (async callback — Docling ML, 30-120s) ---
-
+      # --- Phase 1: PDF parsing (async callback — Docling ML) ---
+      # A parse can now run TWO full conversions: the initial pass plus, when a
+      # PDF looks scanned, a second force_full_page_ocr RapidOCR pass on CPU,
+      # each with figure rasterization + classification. A large
+      # scanned CPG can exceed 10 min, so allow PT30M (matches the Analyze
+      # states) rather than aborting the instance and discarding the callback.
       - name: Parse
         type: callback
         timeouts:
-          eventTimeout: PT10M
+          eventTimeout: PT30M
         action:
           functionRef:
             refName: parsepdfasync

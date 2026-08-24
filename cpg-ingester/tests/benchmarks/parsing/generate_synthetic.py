@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the synthetic CPG benchmark corpus (RHAIENG-6461 P1a).
+"""Generate the synthetic CPG benchmark corpus (RHAIENG-6461).
 
 Produces 6 born-digital PDFs spanning CPG archetypes plus 1 image-only
 "scanned" variant, each with a ground-truth JSON sidecar. Output lands in
@@ -304,7 +304,7 @@ FLOWCHART_EDGES = [
 
 # A second, semantically DIFFERENT flowchart (same layout coordinates so the
 # drawing/determinism logic is reused, but distinct clinical text). Used by the
-# multi-figure fixture so a downstream figure interpreter (P5) must produce two
+# multi-figure fixture so a downstream figure interpreter must produce two
 # clearly different diagrams/descriptions — proving each is placed correctly.
 FLOWCHART_B_NODES = [
     {"id": "start", "kind": "start", "text": "New AFib diagnosis", "xy": (300, 40), "wh": (240, 50)},
@@ -526,7 +526,7 @@ def build_mixed(path: Path) -> dict:
 def build_multi_figure(path: Path) -> dict:
     """Two distinct flowcharts in reading order, each under its own heading.
 
-    Exists to verify figure↔location correlation once P5 interprets figures:
+    Exists to verify figure↔location correlation once figures are interpreted:
     because the two charts are semantically different, a correct implementation
     must emit two different diagrams/descriptions AND place each next to its own
     heading. Same-chart-twice would not prove placement — this does.

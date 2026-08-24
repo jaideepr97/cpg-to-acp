@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Benchmark runner wrapper (RHAIENG-6461 P1c).
+# Benchmark runner wrapper (RHAIENG-6461).
 #
 # Usage:
 #   ./run-benchmark.sh --synthetic   # CI-safe, no network

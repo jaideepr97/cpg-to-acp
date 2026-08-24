@@ -1,7 +1,7 @@
 # CPG Docling Parse-Quality Benchmark
 
 Objective yardstick for the Docling PDF-parse stage of `cpg-ingester`
-(RHAIENG-6461, plan §P1). It measures how well Docling recovers text,
+(RHAIENG-6461). It measures how well Docling recovers text,
 headings, tables, and figures from CPG PDFs so later phases (figure
 extraction/interpretation, OCR) can be proven to *improve* against a baseline.
 
@@ -35,7 +35,7 @@ cpg-ingester/tests/benchmarks/parsing/
 │   └── single-column-scanned.pdf + .groundtruth.json  (image-only; OCR fixture)
 ├── real-cpgs.manifest.yaml       # COMMITTED: manifest of real CPGs (URLs, no PDFs)
 ├── fetch-benchmark-cpgs.sh       # downloads real CPGs -> working/benchmarks/parsing/real/
-├── metrics.py                    # self-contained Docling parse + scoring
+├── metrics.py                    # scores the production Docling parser
 ├── run_benchmark.py              # runs metrics over a set, emits report.json + .md
 └── run-benchmark.sh              # thin wrapper (uses the cpg-ingester venv)
 ```
@@ -71,7 +71,7 @@ The `multi-figure.pdf` fixture embeds **two different** flowcharts (Condition C
 treatment vs. AFib anticoagulation), each under its own heading. It exists to
 verify figure↔location correlation: Docling preserves reading order in
 `docling_json.body.children` (e.g. `…heading A → #/pictures/0 → heading B →
-#/pictures/1 → Notes`), so figure interpretation (P5) anchors on the picture's
+#/pictures/1 → Notes`), so figure interpretation anchors on the picture's
 `self_ref`/position, **not** the anonymous `<!-- image -->` markdown comment.
 Its sidecar adds a `figures[]` array with per-figure `index`, `heading`, and
 `flowchart_nodes/edges` for scoring placement (the top-level `flowchart_*` keys
@@ -133,10 +133,10 @@ Outputs `working/benchmarks/parsing/reports/report.json` (machine-readable) and
 beyond Docling's local model cache and is the intended CI target.
 
 Picture extraction + classification is **on by default** to match the production
-parser (plan P3). Pass `--no-classify` to measure the pre-P3 baseline (parse
+parser. Pass `--no-classify` to measure the pre-classification baseline (parse
 without the `picture_classifier` model), e.g. for a before/after comparison.
 
-Pass `--ocr` to force RapidOCR on for every PDF (plan P4), mirroring the OCR
+Pass `--ocr` to force RapidOCR on for every PDF, mirroring the OCR
 engine the production conditional re-parse uses. Baseline runs keep OCR off;
 use `--ocr` to measure the recovery on scanned fixtures. The report header
 records the OCR mode, so preserve baseline vs. OCR runs under distinct names
@@ -154,7 +154,7 @@ cp .../report.md .../report-ocr.md
 > when `likely_scanned` and keeps whichever pass extracts more text — the
 > `--ocr` flag here forces it unconditionally purely for measurement.
 
-### Figure interpretation (`--interpret`) — LIVE, opt-in (plan P5)
+### Figure interpretation (`--interpret`) — LIVE, opt-in
 
 `--interpret` measures figure *content* recovery, not just detection: it runs
 the **production** `figure_interpreter` node (via `interpret_metrics.py`) over
@@ -181,8 +181,8 @@ Unlike `metrics.py`, `interpret_metrics.py` intentionally imports production cod
 | **total_chars / page_count** | Raw extracted markdown length and page count. |
 | **heading_recovery** | Fraction of ground-truth section headings found in output (synthetic only). |
 | **table_recovery** | Detected structured table cells vs. ground-truth cell count (synthetic only). |
-| **figure_count / figure_types** | Picture regions detected + their predicted classes (classification on by default; use `--no-classify` to skip). Figure *content* interpretation is a later phase (P5) — this only measures detection. |
-| **likely_scanned** | Heuristic low-yield flag; the trigger the conditional-OCR phase (P4) will consume. |
+| **figure_count / figure_types** | Picture regions detected + their predicted classes (classification on by default; use `--no-classify` to skip). Figure *content* interpretation is a separate, later stage — this only measures detection. |
+| **likely_scanned** | Heuristic low-yield flag; the trigger the conditional-OCR re-parse consumes. |
 | **ocr_used** | Whether OCR was enabled for this parse (baseline: false). |
 
 ### Interpreting the baseline
@@ -191,14 +191,16 @@ Unlike `metrics.py`, `interpret_metrics.py` intentionally imports production cod
   healthy text yield.
 - The **scanned** variant should show `text_yield ≈ 0`, `likely_scanned = true`,
   and 0% heading recovery — this is the OCR-gap the harness is meant to expose.
-  It is expected to fail at baseline and to recover once OCR (P4) lands.
+  It is expected to fail at baseline and to recover once OCR is enabled.
 - Flowchart docs detect the flowchart as **1 picture** but recover none of its
-  node/edge structure as text — the figure-interpretation gap (P5).
+  node/edge structure as text — the figure-interpretation gap.
 
 ## Notes / caveats
 
-- `metrics.py` builds its own Docling `DocumentConverter` inline and does **not**
-  import `cpg_ingester` — the harness is decoupled from production code.
+- `metrics.py` imports the **production** parser from `cpg_ingester`
+  (`docling_convert.build_converter`, the `LIKELY_SCANNED_CHARS_PER_PAGE`
+  threshold, and `_picture_classification`) so the benchmark measures exactly
+  what ships and can never silently drift from it.
 - Heading recovery uses normalized substring matching (case-, numbering-, and
   punctuation-insensitive), so it is a recall proxy rather than an exact match.
 - Table recovery is capped at 100% per doc (`min(detected, expected)`), so it

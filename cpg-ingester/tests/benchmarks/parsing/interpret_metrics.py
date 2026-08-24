@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Figure-interpretation metrics for the CPG benchmark (RHAIENG-6461 P5b-local.6).
+"""Figure-interpretation metrics for the CPG benchmark (RHAIENG-6461).
 
-Unlike ``metrics.py`` (which is decoupled from production code to measure the
-*parser*), this module deliberately imports the production figure pipeline —
-``docling_agent`` + ``figure_interpreter`` — because the thing we want to measure
-IS the production interpreter's output. Re-implementing the vision call here
-would score a different thing.
+Like ``metrics.py`` (which imports the production *parser*), this module imports
+the production figure pipeline — ``docling_agent`` + ``figure_interpreter`` —
+because the thing we want to measure IS the production interpreter's output.
+Re-implementing the vision call here would score a different thing.
 
 It is **live and opt-in**: interpreting a figure calls a vision LLM, so this
 runs only when the benchmark is invoked with ``--interpret`` and the LLM env

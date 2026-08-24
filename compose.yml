@@ -205,6 +205,10 @@ services:
     environment:
       - ACP_WRITER_URL=http://acp-writer:8082
       - MLFLOW_TRACKING_URI=http://mlflow:5000
+      # Docling/figure knobs (defaults shown; blank/unset also = default).
+      - INGESTION_OCR_ENABLED=true            # conditional OCR re-parse for scanned PDFs
+      - FIGURE_INTERPRETATION_ENABLED=true    # vision figure interpretation
+      - FIGURE_INTERPRETATION_MAX_FIGURES=100 # vision-call budget per document
     profiles:
       - ingester
 
@@ -216,6 +220,8 @@ services:
       dockerfile: cpg-ingester/deploy/pods/Containerfile.ingestion
     ports:
       - "8090:8080"
+    environment:
+      - INGESTION_OCR_ENABLED=true  # conditional OCR re-parse for scanned PDFs
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
       interval: 5s
@@ -234,6 +240,9 @@ services:
     environment:
       - LITELLM_URL=http://litellm:4000
       - MLFLOW_TRACKING_URI=http://mlflow:5000
+      # Vision figure interpretation runs in this (LLM-egress) pod.
+      - FIGURE_INTERPRETATION_ENABLED=true    # vision figure interpretation
+      - FIGURE_INTERPRETATION_MAX_FIGURES=100  # vision-call budget per document
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
       interval: 5s

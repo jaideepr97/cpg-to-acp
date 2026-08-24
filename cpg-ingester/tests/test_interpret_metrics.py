@@ -1,4 +1,4 @@
-"""Offline tests for the figure-interpretation benchmark scorer (P5b-local.6).
+"""Offline tests for the figure-interpretation benchmark scorer.
 
 Only the pure scoring helpers are exercised here — ``score_figures`` itself is
 live (docling + vision LLM) and runs via ``run_benchmark.py --interpret``.

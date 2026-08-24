@@ -3,7 +3,7 @@
 import base64
 import io
 import logging
-import os
+import threading
 from pathlib import Path
 
 import mlflow
@@ -16,39 +16,50 @@ from docling_core.types.doc import (
 
 from cpg_contracts import SourceLocation
 from cpg_ingester.docling_convert import build_converter
+from cpg_ingester.env_utils import env_flag
 from cpg_ingester.output import write_artifact
 
 logger = logging.getLogger(__name__)
 
 # Below this many characters of extracted text per page, a PDF is likely
-# scanned/image-only and needs OCR. Drives the conditional-OCR re-parse (plan
-# P4): a first pass runs without OCR, and if the yield is below this threshold
+# scanned/image-only and needs OCR. Drives the conditional-OCR re-parse:
+# a first pass runs without OCR, and if the yield is below this threshold
 # the node re-parses with OCR on and keeps whichever result has more text.
 LIKELY_SCANNED_CHARS_PER_PAGE = 100
 
 
 def _ocr_enabled() -> bool:
-    """Whether the conditional OCR re-parse (plan P4) may run.
+    """Whether the conditional OCR re-parse may run.
 
     On by default; set ``INGESTION_OCR_ENABLED`` to a falsey value
     (``0``/``false``/``no``/``off``) to skip it — e.g. where the RapidOCR
-    models are not available in the image.
+    models are not available in the image. Empty/unset → default (on).
     """
-    return os.environ.get("INGESTION_OCR_ENABLED", "true").strip().lower() not in (
-        "0",
-        "false",
-        "no",
-        "off",
-    )
+    return env_flag("INGESTION_OCR_ENABLED", default=True)
 
 
+# Docling's DocumentConverter is cached (build_converter → lru_cache) so its
+# models load once, but it is not documented thread-safe. Ingestion parses run
+# in a FastAPI threadpool (sync endpoint + BackgroundTasks), so two parses can
+# overlap in one process — serialize the actual convert() with a process-wide
+# lock. Parsing is CPU-bound, so serializing costs no real throughput.
+_CONVERT_LOCK = threading.Lock()
+
+
+@mlflow.trace(name="docling_convert")
 def _convert(pdf_path, *, do_ocr: bool):
-    """Run Docling over ``pdf_path`` and return the parsed document."""
-    return build_converter(do_ocr=do_ocr).convert(str(pdf_path)).document
+    """Run Docling over ``pdf_path`` and return the parsed document.
+
+    Uses the cached converter and serializes ``convert()`` under
+    ``_CONVERT_LOCK`` (see the note above).
+    """
+    converter = build_converter(do_ocr=do_ocr)
+    with _CONVERT_LOCK:
+        return converter.convert(str(pdf_path)).document
 
 
 def _parse_telemetry(doc, markdown: str, page_count: int) -> dict:
-    """Compute parse-quality telemetry for observability (plan P2.2).
+    """Compute parse-quality telemetry for observability.
 
     Log-only for now — does not alter the node's return contract.
     """
@@ -93,8 +104,8 @@ def _extract_source_location(item: DocItem) -> SourceLocation | None:
 def _picture_classification(pic: PictureItem) -> tuple[str | None, float | None]:
     """Return the top predicted class name + confidence, or (None, None).
 
-    Populated when the converter runs with ``do_picture_classification`` (plan
-    P3). Uses ``get_annotations()`` (the ``.annotations`` attribute is
+    Populated when the converter runs with ``do_picture_classification``.
+    Uses ``get_annotations()`` (the ``.annotations`` attribute is
     deprecated in docling-core).
     """
     best_name, best_conf = None, None
@@ -106,6 +117,7 @@ def _picture_classification(pic: PictureItem) -> tuple[str | None, float | None]
     return best_name, best_conf
 
 
+@mlflow.trace(name="extract_figures")
 def _extract_figures(doc, output_dir: str) -> tuple[list[dict], dict[str, str]]:
     """Pull each picture's bitmap, class, and provenance out of the document.
 
@@ -113,8 +125,8 @@ def _extract_figures(doc, output_dir: str) -> tuple[list[dict], dict[str, str]]:
     (``id``, ``page``, ``bbox``, ``classification``, ``confidence``, ``caption``,
     and a local ``image_filename`` when a bitmap was captured) and
     ``figure_images`` maps figure id → base64-PNG. The ingestion service moves
-    those bitmaps to the artifact store and records an ``image_ref`` (plan P3.3);
-    the interpreter (plan P5) consumes the index.
+    those bitmaps to the artifact store and records an ``image_ref``;
+    the figure interpreter consumes the index.
 
     Requires the converter to have run with ``extract_figures=True`` so picture
     images are generated; without it ``get_image`` returns ``None`` and only
@@ -135,11 +147,12 @@ def _extract_figures(doc, output_dir: str) -> tuple[list[dict], dict[str, str]]:
             "classification": classification,
             "confidence": round(confidence, 3) if confidence is not None else None,
             "caption": pic.caption_text(doc) or "",
-            # Stable reassembly anchor: the picture's docling reference
-            # (e.g. "#/pictures/0"). fig-NNN maps to the (NNN-1)th picture in
-            # docling_json.body.children reading order, so the figure
-            # interpreter (plan P5) can splice its output back at the right
-            # spot without re-deriving position from list order.
+            # Reassembly verification anchor: the picture's docling reference
+            # (e.g. "#/pictures/0"). The figure interpreter splices
+            # positionally against the markdown placeholders, but cross-checks
+            # this self_ref against docling_json.body.children picture order
+            # before trusting that splice — a mismatch triggers the appendix
+            # fallback (see figure_interpreter._inline_interpretations).
             "self_ref": getattr(pic, "self_ref", None),
             "reading_order_index": idx - 1,
         }
@@ -187,7 +200,7 @@ def docling_agent(state: dict) -> dict:
     telemetry = _parse_telemetry(doc, markdown, page_count)
     ocr_used = False
 
-    # Conditional OCR re-parse (plan P4): a low text yield means the PDF is
+    # Conditional OCR re-parse: a low text yield means the PDF is
     # scanned/image-only (no text layer). Re-parse with OCR on and keep
     # whichever pass extracted more text — OCR can underperform on born-digital
     # pages, so we never blindly trust it.
@@ -223,7 +236,7 @@ def docling_agent(state: dict) -> dict:
         )
     telemetry["ocr_used"] = ocr_used
 
-    # Figure extraction (plan P3): pull each picture's bitmap, class, and
+    # Figure extraction: pull each picture's bitmap, class, and
     # provenance out of the chosen doc BEFORE stripping images, so get_image()
     # still resolves.
     figures, figure_images = _extract_figures(doc, output_dir)

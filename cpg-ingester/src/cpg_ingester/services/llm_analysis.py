@@ -44,6 +44,30 @@ def health():
     return {"status": "UP", "service": "llm-analysis"}
 
 
+_PARSE_SUFFIX = "parse_result.json"
+_ENRICHED_SUFFIX = "parse_result_enriched.json"
+
+
+def _enriched_ref(parse_result_ref: str | None) -> str | None:
+    """Derive the enriched-parse cache ref from the parse_result ref.
+
+    Replaces the trailing ``parse_result.json`` with
+    ``parse_result_enriched.json`` so the enriched output lands in the same
+    ``{prefix}/`` directory that already holds ``figures/``. Returns ``None`` if
+    the ref is absent or not the expected shape (nothing to cache against).
+    """
+    if not parse_result_ref or not parse_result_ref.endswith(_PARSE_SUFFIX):
+        return None
+    return parse_result_ref[: -len(_PARSE_SUFFIX)] + _ENRICHED_SUFFIX
+
+
+def _ref_key(ref: str) -> str:
+    """Object-key portion of a ``bucket:key`` ref (or the ref itself if plain)."""
+    if ":" in ref and not ref.startswith("s3://"):
+        return ref.split(":", 1)[1]
+    return ref
+
+
 def _do_analyze(data: dict) -> dict:
     """Run structure analysis: classify sections, build manifest, extract metadata.
 
@@ -80,10 +104,41 @@ def _do_analyze(data: dict) -> dict:
 
         # Interpret figures first so the enriched markdown (Mermaid + figure
         # descriptions inlined at each figure's location) flows into structure
-        # analysis and everything downstream. Kept as a decoupled agent (plan
-        # P5) so it can move to its own pod later.
-        updates = figure_interpreter(state)
-        state.update(updates)
+        # analysis and everything downstream. Kept as a decoupled agent so it
+        # can move to its own pod later.
+        #
+        # Review rounds must make ZERO vision calls: the enriched parse
+        # is cached next to the parse result under a ref derived from
+        # parse_result_ref. On a cache hit we reuse it verbatim and skip the
+        # interpreter entirely, so round-2+ markdown is byte-identical to round
+        # 1's — the interpretation never re-runs nondeterministically. A miss is
+        # the normal first-round case (silent-cheap). Re-uploading the CPG mints
+        # a fresh per-run prefix → fresh ref → cache miss → fresh interpretation,
+        # so the "re-upload to fix" remediation still works.
+        enriched_ref = _enriched_ref(data.get("parse_result_ref")) if _store else None
+        cached = None
+        if enriched_ref:
+            try:
+                cached = _store.get(enriched_ref)
+            except Exception:  # noqa: BLE001 — a miss is the normal first round
+                cached = None
+
+        if isinstance(cached, dict) and "markdown" in cached:
+            logger.info("Using cached figure interpretations from %s", enriched_ref)
+            state["markdown"] = cached["markdown"]
+            state["figures"] = cached.get("figures", figures)
+        else:
+            updates = figure_interpreter(state)
+            state.update(updates)
+            if enriched_ref:
+                try:
+                    store_artifact(
+                        _store,
+                        _ref_key(enriched_ref),
+                        {"markdown": state["markdown"], "figures": state.get("figures", [])},
+                    )
+                except Exception as e:  # noqa: BLE001 — caching is best-effort
+                    logger.warning("Failed to cache enriched parse at %s: %s", enriched_ref, e)
         markdown = state["markdown"]
 
         updates = structure_analyzer(state)

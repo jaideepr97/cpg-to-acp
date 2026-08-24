@@ -11,6 +11,7 @@ import os
 import tempfile
 from uuid import uuid4
 
+import mlflow
 from fastapi import BackgroundTasks, FastAPI, File, Request, UploadFile
 
 from cpg_contracts import get_artifact_store, post_callback, store_artifact
@@ -85,10 +86,11 @@ def _do_parse_bytes(pdf_bytes: bytes, filename: str = "input.pdf") -> dict:
         return parse_output
 
 
+@mlflow.trace(name="persist_figures")
 def _persist_figures(
     figures: list[dict], figure_images: dict[str, str], prefix: str
 ) -> list[dict]:
-    """Move figure bitmaps to the artifact store; annotate the index (plan P3).
+    """Move figure bitmaps to the artifact store; annotate the index.
 
     Each figure's base64-PNG is uploaded as its own object and referenced by
     ``image_ref`` so parse_result.json stays lean. With no artifact store (local

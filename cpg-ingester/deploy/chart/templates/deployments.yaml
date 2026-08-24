@@ -62,6 +62,18 @@ spec:
             - name: ACP_WRITER_BFF_URL
               value: {{ $pod.env.acpWriterBffUrl | quote }}
             {{- end }}
+            {{- if hasKey $pod.env "ingestionOcrEnabled" }}
+            - name: INGESTION_OCR_ENABLED
+              value: {{ $pod.env.ingestionOcrEnabled | quote }}
+            {{- end }}
+            {{- if hasKey $pod.env "figureInterpretationEnabled" }}
+            - name: FIGURE_INTERPRETATION_ENABLED
+              value: {{ $pod.env.figureInterpretationEnabled | quote }}
+            {{- end }}
+            {{- if hasKey $pod.env "figureInterpretationMaxFigures" }}
+            - name: FIGURE_INTERPRETATION_MAX_FIGURES
+              value: {{ $pod.env.figureInterpretationMaxFigures | quote }}
+            {{- end }}
             {{- end }}
             {{- if $pod.secrets }}
             {{- if $pod.secrets.llm }}

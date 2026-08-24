@@ -129,8 +129,9 @@ class TestFigureExtraction:
 @pytest.mark.skipif(not MULTI_FIGURE_CPG.exists(), reason="Multi-figure PDF not found")
 class TestMultiFigurePlacement:
     """Two distinct figures must be extracted in reading order and each anchored
-    to its own document position — the invariant P5 relies on to place an
-    interpretation next to the right figure (not the anonymous <!-- image -->)."""
+    to its own document position — the invariant the figure interpreter relies on
+    to place an interpretation next to the right figure (not the anonymous
+    <!-- image -->)."""
 
     def test_extracts_two_figures_in_order(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -143,7 +144,7 @@ class TestMultiFigurePlacement:
             # fig-001 is on page 1 (Algorithm A), fig-002 on page 2 (Algorithm B).
             assert figs[0]["page"] == 1
             assert figs[1]["page"] == 2
-            # Reassembly anchors (plan P5b): explicit self_ref + reading-order
+            # Reassembly anchors: explicit self_ref + reading-order
             # index so the interpreter needn't re-derive position from list order.
             assert figs[0]["self_ref"] == "#/pictures/0"
             assert figs[1]["self_ref"] == "#/pictures/1"
@@ -176,7 +177,7 @@ class TestMultiFigurePlacement:
 
 
 class TestOcrEnabledFlag:
-    """The INGESTION_OCR_ENABLED gate for the conditional-OCR re-parse (P4)."""
+    """The INGESTION_OCR_ENABLED gate for the conditional-OCR re-parse."""
 
     def test_default_on(self, monkeypatch):
         monkeypatch.delenv("INGESTION_OCR_ENABLED", raising=False)
@@ -192,11 +193,18 @@ class TestOcrEnabledFlag:
         monkeypatch.setenv("INGESTION_OCR_ENABLED", val)
         assert _ocr_enabled() is True
 
+    @pytest.mark.parametrize("val", ["", "   ", "\t"])
+    def test_empty_or_whitespace_is_default(self, monkeypatch, val):
+        # `VAR: ""` is how a Helm/compose override blanks a var — it must mean
+        # "use the default" (on), not "enabled by accident" or "disabled".
+        monkeypatch.setenv("INGESTION_OCR_ENABLED", val)
+        assert _ocr_enabled() is True
+
 
 @pytest.mark.skipif(not SCANNED_CPG.exists(), reason="Scanned benchmark PDF not found")
 @pytest.mark.skipif(not _rapidocr_available(), reason="RapidOCR not installed")
 class TestConditionalOcr:
-    """P4: a scanned PDF triggers an OCR re-parse that recovers text."""
+    """A scanned PDF triggers an OCR re-parse that recovers text."""
 
     def test_ocr_recovers_scanned_text(self):
         # Without OCR this fixture yields ~0 chars/page (no text layer); the

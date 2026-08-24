@@ -14,6 +14,10 @@ pods:
     image: cpg-ingester-ingestion
     tag: latest
     port: 8080
+    env:
+      # Conditional OCR re-parse for scanned/image-only PDFs.
+      # Set to "false" if the RapidOCR models are unavailable in the image.
+      ingestionOcrEnabled: "true"
     secrets:
       minio: true
     resources:
@@ -35,6 +39,11 @@ pods:
       # Bare origin — get_llm() appends /v1. Deploy scripts override this.
       litellmUrl: http://localhost:4000
       llmModel: default
+      # Vision figure interpretation runs in this (LLM-egress) pod.
+      figureInterpretationEnabled: "true"
+      # Ceiling on vision calls per document — a figure compendium must not fan
+      # out into hundreds of frontier-model calls.
+      figureInterpretationMaxFigures: "100"
     secrets:
       llm: true
       minio: true

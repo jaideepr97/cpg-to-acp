@@ -1,6 +1,6 @@
-"""Prompt templates for the Figure Interpreter node (plan P5).
+"""Prompt templates for the Figure Interpreter node.
 
-Type-conditional (review §10 D4): flowcharts are transcribed into a Mermaid
+Type-conditional: flowcharts are transcribed into a Mermaid
 diagram plus a prose walkthrough; any other figure class gets a faithful prose
 description only. The prompts constrain the model to transcribe what is visible
 and never invent branches, thresholds, or drugs — clinical safety.
@@ -17,7 +17,7 @@ FLOWCHART_USER = """\
 This image is a clinical decision flowchart extracted from a Clinical Practice \
 Guideline. Return a single JSON object with EXACTLY these keys:
   - "mermaid": a Mermaid `flowchart TD` diagram that reproduces the chart. Use \
-`{{...}}` for decision/diamond nodes and `[...]` for action/step nodes. Put \
+`{...}` for decision/diamond nodes and `[...]` for action/step nodes. Put \
 Yes/No (or other) branch labels on the edges: `A -->|Yes| B`.
   - "description": a short prose walkthrough of the algorithm a clinician could \
 follow.
