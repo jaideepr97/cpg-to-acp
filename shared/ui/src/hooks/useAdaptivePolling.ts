@@ -54,6 +54,7 @@ export function useAdaptivePolling<T>({
 
       if (serialized !== lastDataRef.current) {
         lastDataRef.current = serialized;
+        startTimeRef.current = Date.now();
         setLastChanged(new Date());
       }
 
