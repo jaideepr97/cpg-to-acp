@@ -1,6 +1,6 @@
 {{- if .Values.loader.enabled }}
 {{- $clusterDomain := .Values.clusterDomain | default "apps.example.com" -}}
-{{- $ipsViewerRoute := printf "https://%s-ips-viewer-%s.%s" .Release.Name .Release.Namespace $clusterDomain -}}
+{{- $acpWriterUiRoute := printf "https://acp-ui-%s.%s" .Release.Namespace $clusterDomain -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -33,9 +33,9 @@ spec:
             - name: DATA_DIR
               value: /data
             - name: ACP_WRITER_LAUNCH_URI
-              value: {{ $ipsViewerRoute }}/launch
+              value: {{ $acpWriterUiRoute }}/launch
             - name: ACP_WRITER_REDIRECT_URI
-              value: {{ $ipsViewerRoute }}/app
+              value: {{ $acpWriterUiRoute }}/
             - name: MEDPLUM_SUPERADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:

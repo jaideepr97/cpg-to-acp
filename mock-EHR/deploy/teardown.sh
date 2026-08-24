@@ -31,7 +31,7 @@ oc delete -f "$REPO_ROOT/deploy/.rendered/mock-ehr-mcp.yaml" -n "$NAMESPACE" 2>/
 
 # BuildConfigs
 log "Removing BuildConfigs..."
-for bc in mock-ehr-app ips-viewer medplum-loader; do
+for bc in mock-ehr-app medplum-loader; do
     oc delete bc "$bc" -n "$NAMESPACE" 2>/dev/null || true
 done
 prune_builds "mock-ehr"

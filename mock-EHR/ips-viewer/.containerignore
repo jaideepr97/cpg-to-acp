@@ -1,6 +1,0 @@
-node_modules
-dist
-# Prevent stale local credentials from being baked into the image.
-# On the cluster, smart-config.json is mounted from a K8s Secret
-# created by the Medplum loader job.
-public/smart-config.json

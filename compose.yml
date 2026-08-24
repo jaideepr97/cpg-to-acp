@@ -95,12 +95,12 @@ services:
     environment:
       MEDPLUM_BASE_URL: "http://medplum-server:8103"
       DATA_DIR: "/data"
-      SMART_CONFIG_DIR: "/config/ips-viewer"
+      SMART_CONFIG_DIR: "/config/acp-writer-ui"
       FHIR_ENV_DIR: "/config"
     volumes:
       - ./mock-EHR/deploy/load-medplum.sh:/load-medplum.sh:ro
       - ./mock-EHR/data:/data:ro
-      - ./mock-EHR/ips-viewer/public:/config/ips-viewer
+      - ./acp-writer/ui/public:/config/acp-writer-ui
       - ./.medplum:/config
     entrypoint: ["/bin/bash", "/load-medplum.sh"]
 
@@ -119,16 +119,6 @@ services:
       dockerfile: Containerfile
     ports:
       - "3000:8080"
-    depends_on:
-      medplum-server:
-        condition: service_healthy
-
-  ips-viewer:
-    build:
-      context: ./mock-EHR/ips-viewer
-      dockerfile: Containerfile
-    ports:
-      - "3001:8080"
     depends_on:
       medplum-server:
         condition: service_healthy
