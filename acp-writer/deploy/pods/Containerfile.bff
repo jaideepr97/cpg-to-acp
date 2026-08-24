@@ -3,7 +3,7 @@ USER 0
 WORKDIR /app
 COPY shared/ /app/shared/
 RUN pip install --no-cache-dir /app/shared/
-RUN pip install --no-cache-dir fastapi uvicorn boto3 requests mlflow
+RUN pip install --no-cache-dir fastapi uvicorn boto3 requests httpx mlflow
 COPY acp-writer/src/ /app/src/
 ENV PYTHONPATH=/app/src
 RUN chmod -R g=u /app

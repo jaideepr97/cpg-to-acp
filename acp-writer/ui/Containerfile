@@ -7,13 +7,17 @@ FROM registry.access.redhat.com/ubi9/nodejs-22 AS build
 USER 0
 WORKDIR /build
 
-# Build the shared UI package first (acp-writer/ui depends on it via file:../../shared/ui)
-COPY shared/ui/ shared/ui/
-RUN cd shared/ui && npm ci && npm run build
+# Layer 1: install deps (cached unless lockfiles change)
+COPY shared/ui/package.json shared/ui/package-lock.json shared/ui/
+RUN cd shared/ui && npm ci
+COPY acp-writer/ui/package.json acp-writer/ui/package-lock.json acp-writer/ui/
+RUN cd acp-writer/ui && npm ci
 
-# Build the acp-writer React UI
+# Layer 2: build shared UI, then acp-writer UI
+COPY shared/ui/ shared/ui/
+RUN cd shared/ui && npm run build
 COPY acp-writer/ui/ acp-writer/ui/
-RUN cd acp-writer/ui && npm ci && npm run build
+RUN cd acp-writer/ui && npm run build
 
 FROM registry.access.redhat.com/ubi9/nginx-124
 # SPA static content -> UBI nginx docroot
