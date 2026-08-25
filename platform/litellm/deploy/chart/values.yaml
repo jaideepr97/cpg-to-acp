@@ -1,8 +1,8 @@
 image:
-  registry: image-registry.openshift-image-registry.svc:5000
-  namespace: sschifma-cpg-to-acp
+  registry: quay.io
+  namespace: cpgtoacp
   name: litellm
-  tag: phase2
+  tag: latest
 
 replicas: 1
 

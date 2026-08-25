@@ -2,18 +2,15 @@
 # One-time setup for deploying the mock-EHR to OpenShift.
 #
 # This script creates the resources that are NOT managed by Helm:
-#   1. ImageStreams for custom-built images
-#   2. BuildConfigs for building those images from Git
-#   3. ImageStreams + image imports for public Docker Hub images
-#      (pushed from local to avoid Docker Hub rate limits)
+#   1. ImageStreams for tracking build output
+#   2. BuildConfigs for building images from Git (push to quay.io/cpgtoacp)
 #
 # Run this ONCE before the first `helm install` of the mock-EHR chart.
 # After this, `deploy/install.sh` handles Helm deployments.
 #
 # Prerequisites:
 #   - Logged into OpenShift (`oc login`)
-#   - podman installed (for pulling/pushing public images)
-#   - The public images available locally or pullable from Docker Hub
+#   - quay.io/cpgtoacp push secret exists in namespace (cpgtoacp-cpgtoacpbot-pull-secret)
 #
 # Usage:
 #   bash mock-EHR/deploy/setup-openshift.sh [--namespace NAMESPACE] [--branch BRANCH] [--tag TAG]
@@ -45,19 +42,11 @@ log ""
 
 oc project "$NAMESPACE" 2>/dev/null || oc new-project "$NAMESPACE"
 
-REGISTRY=$(oc get route image-registry -n openshift-image-registry -o jsonpath='{.spec.host}' 2>/dev/null)
-if [ -z "$REGISTRY" ]; then
-  log "ERROR: No external registry route found. Expose the registry first:"
-  log "  oc patch configs.imageregistry.operator.openshift.io/cluster --type merge -p '{\"spec\":{\"defaultRoute\":true}}'"
-  exit 1
-fi
-log "Registry: $REGISTRY"
-
-# --- Step 1: Create ImageStreams ---
+# --- Step 1: Create ImageStreams (for build tracking only) ---
 
 log ""
 log "=== Creating ImageStreams ==="
-for is in mock-ehr-app medplum-loader postgres-16 redis-7 medplum-server-upstream medplum-app-upstream; do
+for is in mock-ehr-app medplum-loader; do
   oc create imagestream "$is" -n "$NAMESPACE" 2>/dev/null && log "  Created $is" || log "  $is already exists"
 done
 
@@ -87,8 +76,10 @@ spec:
       dockerfilePath: $containerfile
   output:
     to:
-      kind: ImageStreamTag
-      name: $name:$IMAGE_TAG
+      kind: DockerImage
+      name: quay.io/cpgtoacp/$name:$IMAGE_TAG
+    pushSecret:
+      name: cpgtoacp-cpgtoacpbot-pull-secret
   resources:
     limits:
       cpu: "1"
@@ -102,40 +93,7 @@ EOF
 create_bc "mock-ehr-app"    "mock-EHR/ui"          "Containerfile"
 create_bc "medplum-loader"  "mock-EHR"             "deploy/Containerfile.loader"
 
-# --- Step 3: Push public images to internal registry ---
-# Docker Hub rate-limits pulls from the cluster. We pull amd64 images
-# locally and push them to the internal registry.
-
-log ""
-log "=== Pushing public images to internal registry ==="
-log "  (Pulling amd64 images locally and pushing to $REGISTRY)"
-
-TOKEN=$(oc whoami -t)
-podman login "$REGISTRY" -u unused -p "$TOKEN" --tls-verify=false 2>/dev/null || {
-  log "ERROR: Failed to login to registry. Check your oc session."
-  exit 1
-}
-
-push_image() {
-  local src="$1" dest_is="$2" dest_tag="$3"
-  local dest="$REGISTRY/$NAMESPACE/$dest_is:$dest_tag"
-  local start_time=$SECONDS
-  log "  Pulling $src ..."
-  podman pull --platform linux/amd64 "$src" 2>/dev/null
-  local pull_time=$(( SECONDS - start_time ))
-  log "  Pulled in ${pull_time}s. Pushing -> $dest_is:$dest_tag ..."
-  podman tag "$src" "$dest"
-  podman push "$dest" --tls-verify=false 2>/dev/null
-  local total_time=$(( SECONDS - start_time ))
-  log "  ✓ $dest_is:$dest_tag done (${total_time}s)"
-}
-
-push_image "docker.io/library/postgres:16"                    "postgres-16"              "16"
-push_image "docker.io/library/redis:7"                        "redis-7"                  "7"
-push_image "docker.io/medplum/medplum-server:$MEDPLUM_VERSION" "medplum-server-upstream"  "$MEDPLUM_VERSION"
-push_image "docker.io/medplum/medplum-app:$MEDPLUM_VERSION"    "medplum-app-upstream"     "$MEDPLUM_VERSION"
-
-# --- Step 4: Build custom images ---
+# --- Step 3: Build custom images ---
 
 log ""
 log "=== Building custom images ==="
@@ -169,7 +127,7 @@ log "     helm upgrade --install cpg-mock-ehr ./mock-EHR/deploy/chart --namespac
 log ""
 log "  2. After Medplum server is healthy, run the data loader manually:"
 log "     oc run medplum-loader-init \\"
-log "       --image=$REGISTRY/$NAMESPACE/medplum-loader:$IMAGE_TAG \\"
+log "       --image=quay.io/cpgtoacp/medplum-loader:$IMAGE_TAG \\"
 log "       --restart=Never \\"
 log "       --env='MEDPLUM_BASE_URL=http://cpg-mock-ehr-medplum-server:8103' \\"
 log "       --env='DATA_DIR=/data' \\"

@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: mcp-server
-          image: image-registry.openshift-image-registry.svc:5000/${NAMESPACE}/acp-writer-mcp:${IMAGE_TAG}
+          image: quay.io/cpgtoacp/acp-writer-mcp:${IMAGE_TAG}
           imagePullPolicy: Always
           ports:
             - containerPort: 8090

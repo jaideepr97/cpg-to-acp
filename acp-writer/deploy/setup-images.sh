@@ -96,8 +96,10 @@ ${context_yaml}
       dockerfilePath: $containerfile
   output:
     to:
-      kind: ImageStreamTag
-      name: $name:$IMAGE_TAG
+      kind: DockerImage
+      name: quay.io/cpgtoacp/$name:$IMAGE_TAG
+    pushSecret:
+      name: cpgtoacp-cpgtoacpbot-pull-secret
   resources:
     limits:
       cpu: "$cpu_limit"

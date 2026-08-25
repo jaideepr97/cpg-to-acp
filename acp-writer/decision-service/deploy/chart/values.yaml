@@ -1,7 +1,6 @@
 image:
-  registry: image-registry.openshift-image-registry.svc:5000
-  # Namespace is overridden by deploy scripts (--set image.namespace=...)
-  namespace: default
+  registry: quay.io
+  namespace: cpgtoacp
   name: decision-service
   tag: latest
 
