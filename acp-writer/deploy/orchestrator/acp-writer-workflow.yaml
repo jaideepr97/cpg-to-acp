@@ -159,6 +159,10 @@ spec:
               dmn_results: "${ .dmnData.dmn_results }"
               recommendations_ref: "${ .recData.recommendations_ref }"
               applicable_cpgs: "${ .guidelineData.applicable_cpgs }"
+              # Clinician feedback from a prior care-plan review round. Empty on
+              # the first pass; on a request_changes loop it seeds the composer's
+              # reviewer feedback so goals/activities are actually revised.
+              careplan_feedback: '${ .careplanReview.comment // "" }'
         eventRef: composeDone
         eventDataFilter:
           toStateData: "${ .composerData }"
@@ -271,8 +275,12 @@ spec:
             condition: "${ .careplanReview.decision == \"approve\" }"
             transition: WriteFHIR
           - name: changesRequested
+            # Loop back to ComposePlan (not GenerateBundle): goals/activities are
+            # decided in the planning brief, so re-composing with the clinician's
+            # feedback is what actually revises the plan. GenerateBundle only
+            # serializes an existing brief and cannot change clinical content.
             condition: "${ .careplanReview.decision == \"request_changes\" }"
-            transition: GenerateBundle
+            transition: ComposePlan
         # Fail closed: an unrecognized/missing decision must NOT auto-write the
         # plan. Re-present the review gate instead of defaulting to WriteFHIR.
         defaultCondition:

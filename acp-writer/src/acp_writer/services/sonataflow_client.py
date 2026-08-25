@@ -79,11 +79,17 @@ def infer_current_state(data: dict, instance_status: str) -> str:
     if careplan_review.get("decision") == "approve":
         return "WriteFHIR"
     if careplan_review.get("decision") == "request_changes":
+        # request_changes loops back through ComposePlan -> GenerateBundle ->
+        # ReviewFHIR -> ReviewCarePlan. Locate the active step by comparing each
+        # stage's completed_at against when the review was submitted.
         review_at = careplan_review.get("completed_at", "")
         gen_at = data.get("fhirGenData", {}).get("completed_at", "")
+        compose_at = data.get("composerData", {}).get("completed_at", "")
         if gen_at and gen_at > review_at:
             return "ReviewCarePlan"
-        return "GenerateBundle"
+        if compose_at and compose_at > review_at:
+            return "GenerateBundle"
+        return "ComposePlan"
 
     if "fhirReviewData" in data:
         return "ReviewCarePlan"

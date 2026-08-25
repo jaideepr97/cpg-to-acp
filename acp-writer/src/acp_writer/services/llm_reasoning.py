@@ -277,6 +277,25 @@ def _run_retrieve_background(data: dict, callback_url: str, process_instance_id:
     post_callback(callback_url, process_instance_id, "retrieve-done", result)
 
 
+def _seed_feedback(careplan_feedback: str) -> str:
+    """Turn clinician care-plan review feedback into initial composer feedback.
+
+    When a clinician requests changes, the workflow re-enters ComposePlan with
+    their comment in ``careplan_feedback``. Seeding it as the composer's initial
+    ``brief_review_feedback`` makes ``plan_composer`` address it on the first
+    pass (it renders under "Reviewer Feedback (address these issues)"), so the
+    regenerated planning brief actually reflects the requested changes. Empty
+    on the initial run — normal composition, no seeded feedback.
+    """
+    careplan_feedback = (careplan_feedback or "").strip()
+    if not careplan_feedback:
+        return ""
+    return (
+        "A clinician reviewed the previous care plan and requested the "
+        f"following changes. Revise the plan to address them:\n{careplan_feedback}"
+    )
+
+
 @app.post("/api/v1/compose")
 async def compose(request: Request):
     """Run Plan Composer with Brief Reviewer loop."""
@@ -295,7 +314,7 @@ async def compose(request: Request):
         "llm_model": LLM_MODEL,
         "llm_api_key": LLM_API_KEY,
         "brief_review_count": 0,
-        "brief_review_feedback": "",
+        "brief_review_feedback": _seed_feedback(data.get("careplan_feedback", "")),
     }
 
     for _ in range(MAX_BRIEF_REVIEWS + 1):
@@ -343,7 +362,7 @@ def _run_compose_background(data: dict, callback_url: str, process_instance_id: 
             "llm_model": LLM_MODEL,
             "llm_api_key": LLM_API_KEY,
             "brief_review_count": 0,
-            "brief_review_feedback": "",
+            "brief_review_feedback": _seed_feedback(data.get("careplan_feedback", "")),
         }
 
         for _ in range(MAX_BRIEF_REVIEWS + 1):

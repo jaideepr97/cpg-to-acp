@@ -5,6 +5,11 @@ field. The workflow switch and this mapper must key on `decision` — an earlier
 `action` mismatch made every review fall through to the default (WriteFHIR),
 so rejecting a plan silently wrote it. See CheckCarePlanReview in
 acp-writer-workflow.yaml.
+
+request_changes loops back to ComposePlan (not GenerateBundle): goals and
+activities are decided in the planning brief, so the plan is only actually
+revised by re-composing with the clinician's feedback. These tests pin the
+mapper's view of where the loop is.
 """
 
 from acp_writer.services.sonataflow_client import (
@@ -18,10 +23,24 @@ def test_approve_routes_to_write_fhir():
     assert infer_current_state(data, "ACTIVE") == "WriteFHIR"
 
 
-def test_request_changes_loops_back_to_generate_bundle():
-    # Feedback just submitted; bundle not yet regenerated -> loop, don't write.
+def test_request_changes_loops_back_to_compose_plan():
+    # Feedback just submitted; nothing regenerated yet. request_changes must loop
+    # back to ComposePlan (goals/activities live in the planning brief) so the
+    # clinician's feedback can actually revise the plan -- not straight to
+    # GenerateBundle, which only re-serializes an unchanged brief.
     data = {
         "careplanReview": {"decision": "request_changes", "completed_at": "2026-01-01T02:00:00Z"},
+        "composerData": {"completed_at": "2026-01-01T00:30:00Z"},
+        "fhirGenData": {"completed_at": "2026-01-01T01:00:00Z"},
+    }
+    assert infer_current_state(data, "ACTIVE") == "ComposePlan"
+
+
+def test_request_changes_after_recompose_is_generating_bundle():
+    # Plan re-composed (composer newer than review) but bundle not yet regenerated.
+    data = {
+        "careplanReview": {"decision": "request_changes", "completed_at": "2026-01-01T02:00:00Z"},
+        "composerData": {"completed_at": "2026-01-01T02:30:00Z"},
         "fhirGenData": {"completed_at": "2026-01-01T01:00:00Z"},
     }
     assert infer_current_state(data, "ACTIVE") == "GenerateBundle"
