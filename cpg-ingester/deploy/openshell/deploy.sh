@@ -40,7 +40,7 @@ load_config "$CONFIG_PATH"
 preflight
 preflight_openshell
 
-REGISTRY="image-registry.openshift-image-registry.svc:5000"
+IMAGE_REGISTRY="quay.io/cpgtoacp"
 
 RENDERED_POLICY_DIR="$REPO_ROOT/deploy/.rendered/cpg-ingester-policies"
 render_templates_dir "$SCRIPT_DIR/policies" "$RENDERED_POLICY_DIR"
@@ -87,7 +87,7 @@ deploy_sandboxes() {
         log "Creating $name from ${image}:${IMAGE_TAG}..."
         local args=(
             --name "$name"
-            --from "${REGISTRY}/${NAMESPACE}/${image}:${IMAGE_TAG}"
+            --from "${IMAGE_REGISTRY}/${image}:${IMAGE_TAG}"
             --policy "${POLICY_DIR}/${policy}"
         )
         for e in "${env_args[@]}"; do

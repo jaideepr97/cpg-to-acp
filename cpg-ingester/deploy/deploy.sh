@@ -77,7 +77,6 @@ helm_start=$SECONDS
 helm upgrade --install cpg-ingester "$SCRIPT_DIR/chart" \
     -n "$NAMESPACE" \
     --set openshellMode="$OPENSHELL_MODE" \
-    --set image.namespace="$NAMESPACE" \
     --set mlflow.trackingUri="$MLFLOW_TRACKING_URI" \
     --set pods.ingestion.tag="$IMAGE_TAG" \
     --set pods.llm-analysis.tag="$IMAGE_TAG" \

@@ -108,7 +108,6 @@ log "Installing decision-service chart (timeout 120s)..."
 helm_start=$SECONDS
 helm upgrade --install cpg-decision-svc "$SCRIPT_DIR/../decision-service/deploy/chart" \
     -n "$NAMESPACE" \
-    --set image.namespace="$NAMESPACE" \
     --set image.tag="$IMAGE_TAG" \
     --wait --timeout 300s || { log "ERROR: decision-service helm install failed"; exit 1; }
 log "  decision-service installed ($(( SECONDS - helm_start ))s)"
@@ -119,7 +118,6 @@ helm_start=$SECONDS
 helm upgrade --install acp "$SCRIPT_DIR/chart-pods" \
     -n "$NAMESPACE" \
     --set openshellMode="$OPENSHELL_MODE" \
-    --set image.namespace="$NAMESPACE" \
     --set mlflow.trackingUri="$MLFLOW_TRACKING_URI" \
     --set pods.patient-data.tag="$IMAGE_TAG" \
     --set pods.llm-reasoning.tag="$IMAGE_TAG" \
