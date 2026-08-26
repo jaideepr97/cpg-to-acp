@@ -12,7 +12,7 @@ Before deploying, ensure:
 | `helm` CLI installed | `helm version` |
 | `envsubst` available | `which envsubst` (part of `gettext`) |
 | `python3` available | `python3 --version` |
-| `podman` installed (for mock-EHR image push) | `podman --version` |
+| `quay.io/cpgtoacp` push secret in namespace | `oc get secret cpgtoacp-cpgtoacpbot-pull-secret` |
 | `openshell` CLI installed | `openshell --version` |
 | MaaS gateway available | `oc get svc maas-default-gateway-openshift-default -n openshift-ingress` |
 
@@ -250,13 +250,20 @@ mock-EHR/deploy/deploy.sh [--skip-build] [--tag <sha>]
 acp-writer/deploy/deploy.sh --skip-build --tag <old-sha>
 ```
 
+## Container Registry
+
+All container images are hosted on **quay.io/cpgtoacp**. This includes both project-built images (acp-writer, cpg-ingester, mock-EHR) and mirrored vendor images (postgres, redis, medplum, node, nginx). Using a single external registry makes images portable across clusters and available for local development without cluster access.
+
+- **BuildConfigs** push to `quay.io/cpgtoacp` via `DockerImage` output (not ImageStreamTags). They require a push secret named `cpgtoacp-cpgtoacpbot-pull-secret` in the namespace.
+- **Helm chart values** default to `quay.io/cpgtoacp` — deploy scripts no longer override `image.namespace` with the OpenShift namespace.
+- **compose.yml** and **Containerfile base images** also pull from `quay.io/cpgtoacp`.
+
 ## Image Tagging
 
 Images are tagged with the git SHA (`git rev-parse --short HEAD`). Mutable tags (`:phase3`, `:latest`) are not used in deploy paths.
 
 - `imagePullPolicy: Always` in all templates
 - Override with `--tag <sha>` on any deploy command
-- ImageStream tags are pruned to the last 5 SHAs per image
 - **Never use `--skip-build` without `--tag`** — without `--tag`, IMAGE_TAG defaults to git HEAD, which may not match the built images (e.g. after a deploy-script-only commit). This causes `ImagePullBackOff`.
 
 ### `--skip-openshell` mode
@@ -305,7 +312,7 @@ acp-writer/deploy/
 │   ├── deploy.sh         # OpenShell sandbox management
 │   ├── policies/         # Security policies
 │   └── router-fragment.conf.tmpl  # nginx routing fragment
-├── setup-images.sh       # ImageStreams + BuildConfigs
+├── setup-images.sh       # BuildConfigs (push to quay.io/cpgtoacp)
 ├── deploy.sh             # Full component deploy
 ├── verify.sh             # Post-deploy verification
 └── teardown.sh           # Component teardown
@@ -392,7 +399,7 @@ The deploy scripts apply these automatically (`cpgingester-props.yaml` and `acpw
 - The MaaS ExternalName service (`maas-model-*-backend:443`) does not work from pods (TLS/SNI failure). All traffic uses the MaaS gateway URL.
 - `etcd` encryption at rest is not verified for this cluster. K8s Secrets may be stored in plaintext.
 - **Delivery/notification not wired:** cpg-ingester publishes artifacts to MinIO but does not notify acp-writer. Use `deploy/load-published-artifacts.sh` as a stopgap.
-- **mock-EHR Docker Hub base images:** `mock-EHR/ui/Containerfile` and `mock-EHR/ips-viewer/Containerfile` still pull from Docker Hub (`node:22-alpine`, `nginxinc/nginx-unprivileged:alpine`). These are subject to rate limits on shared cluster egress IPs. cpg-ingester's UI has been migrated to UBI base images; mock-EHR migration is pending.
+- **quay.io push secret required:** BuildConfigs push to `quay.io/cpgtoacp` and require a `cpgtoacp-cpgtoacpbot-pull-secret` in the namespace. This must be created before running `setup-images.sh`.
 
 ## Test Coverage
 
