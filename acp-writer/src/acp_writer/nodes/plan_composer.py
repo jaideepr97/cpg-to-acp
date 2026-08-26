@@ -97,6 +97,23 @@ def _sanitize_conflicts(brief_data: dict) -> None:
     brief_data["conflicts"] = cleaned
 
 
+def _sanitize_provenance(brief_data: dict, default_cpg: str) -> None:
+    """Default null/missing source_cpg on goals & activities to the run's CPG.
+
+    source_cpg is a required string on PlanGoal / PlanActivity, but the LLM
+    routinely emits ``source_cpg: null`` for lifestyle/general items that aren't
+    tied to a specific recommendation. A single null makes the whole
+    PlanningBrief fail validation, so plan_composer falls back to an EMPTY plan
+    (0 goals / 0 activities) — which surfaces as a blank care plan, especially
+    on a request_changes regeneration. Coerce nulls to the applicable CPG so
+    provenance stays meaningful and the item survives validation.
+    """
+    for key in ("goals", "activities"):
+        for item in brief_data.get(key) or []:
+            if isinstance(item, dict) and not item.get("source_cpg"):
+                item["source_cpg"] = default_cpg
+
+
 def _parse_brief_from_response(content: str) -> dict[str, Any]:
     """Extract JSON from LLM response, handling markdown code blocks."""
     text = content.strip()
@@ -174,6 +191,7 @@ def plan_composer(state: CarePlanComposerState) -> dict:
     try:
         brief_data = _parse_brief_from_response(content_to_text(response.content))
         _sanitize_conflicts(brief_data)
+        _sanitize_provenance(brief_data, cpg_ids[0] if cpg_ids else "unspecified")
         brief = PlanningBrief.model_validate(brief_data)
         brief_dict = brief.model_dump(mode="json")
 
