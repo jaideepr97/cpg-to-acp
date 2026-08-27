@@ -126,6 +126,7 @@ deploy_sandboxes() {
         "LITELLM_URL=${LLM_BASE_URL}" \
         "LLM_MODEL=${LLM_MODEL}" \
         "LLM_API_KEY=${LLM_API_KEY}" \
+        "LLM_REQUEST_TIMEOUT=${LLM_REQUEST_TIMEOUT:-600}" \
         "DECISION_ENGINE_URL=http://acp-decision-engine:8080"
 
     # Decision Engine (thin Kogito wrapper — deliberately NO LLM credentials)
@@ -144,7 +145,8 @@ deploy_sandboxes() {
         "PYTHONPATH=/app/src" \
         "LITELLM_URL=${LLM_BASE_URL}" \
         "LLM_MODEL=${LLM_MODEL}" \
-        "LLM_API_KEY=${LLM_API_KEY}"
+        "LLM_API_KEY=${LLM_API_KEY}" \
+        "LLM_REQUEST_TIMEOUT=${LLM_REQUEST_TIMEOUT:-600}"
 
     # FHIR Server
     create_acp_sandbox "sb-fhir-server" "acp-writer-fhir-srv" "acp-writer-fhir-srv.yaml" \

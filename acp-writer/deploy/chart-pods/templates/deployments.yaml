@@ -46,6 +46,10 @@ spec:
             - name: LLM_MODEL
               value: {{ $pod.env.llmModel | quote }}
             {{- end }}
+            {{- if $pod.env.llmRequestTimeout }}
+            - name: LLM_REQUEST_TIMEOUT
+              value: {{ $pod.env.llmRequestTimeout | quote }}
+            {{- end }}
             {{- if $pod.env.kogitoUrl }}
             - name: KOGITO_URL
               value: {{ $pod.env.kogitoUrl | quote }}

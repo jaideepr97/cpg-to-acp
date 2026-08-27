@@ -123,10 +123,12 @@ helm upgrade --install acp "$SCRIPT_DIR/chart-pods" \
     --set pods.llm-reasoning.tag="$IMAGE_TAG" \
     --set pods.llm-reasoning.env.litellmUrl="$LLM_BASE_URL" \
     --set pods.llm-reasoning.env.llmModel="$LLM_MODEL" \
+    --set pods.llm-reasoning.env.llmRequestTimeout="${LLM_REQUEST_TIMEOUT:-600}" \
     --set pods.decision-engine.tag="$IMAGE_TAG" \
     --set pods.fhir-generation.tag="$IMAGE_TAG" \
     --set pods.fhir-generation.env.litellmUrl="$LLM_BASE_URL" \
     --set pods.fhir-generation.env.llmModel="$LLM_MODEL" \
+    --set pods.fhir-generation.env.llmRequestTimeout="${LLM_REQUEST_TIMEOUT:-600}" \
     --set pods.fhir-server.tag="$IMAGE_TAG" \
     --set pods.bff.tag="$IMAGE_TAG" \
     --set pods.ui.tag="$IMAGE_TAG" \
