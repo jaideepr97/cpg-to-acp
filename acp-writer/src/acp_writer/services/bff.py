@@ -114,7 +114,7 @@ async def artifacts_available(request: Request):
                 results["registered"].append({"type": "metadata", "ref": ref})
 
             elif art_type == "dmn":
-                _register_dmn_model(ref, artifact.get("name", "unknown"))
+                _register_dmn_model(ref, artifact.get("name", "unknown"), cpg_id)
                 results["registered"].append({"type": "dmn", "ref": ref, "name": artifact.get("name")})
 
             elif art_type == "recommendations":
@@ -149,19 +149,22 @@ def _register_metadata(ref: str) -> None:
     logger.info("Registered CPG metadata: %s", metadata.get("cpg_id", "?"))
 
 
-def _register_dmn_model(ref: str, name: str) -> None:
+def _register_dmn_model(ref: str, name: str, cpg_id: str | None = None) -> None:
     """Pull DMN XML from MinIO and deploy to the decision-engine pod."""
     if not _artifacts_store:
         raise RuntimeError("No artifact store configured")
     dmn_xml = _artifacts_store.get_raw(ref)
+    url = f"{DECISION_ENGINE_URL}/api/v1/decisions/models"
+    if cpg_id:
+        url += f"?source_cpg={cpg_id}"
     resp = http_requests.post(
-        f"{DECISION_ENGINE_URL}/api/v1/decisions/models",
+        url,
         data=dmn_xml,
         headers={"Content-Type": "application/xml"},
         timeout=10,
     )
     resp.raise_for_status()
-    logger.info("Registered DMN model: %s", name)
+    logger.info("Registered DMN model: %s (source_cpg=%s)", name, cpg_id)
 
 
 def _register_recommendations(ref: str, cpg_id: str) -> int:

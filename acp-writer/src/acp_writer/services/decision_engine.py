@@ -27,10 +27,12 @@ def health():
 
 
 @app.post("/api/v1/decisions/models", status_code=201)
-async def deploy_decision_model(request: Request):
+async def deploy_decision_model(request: Request, source_cpg: str | None = None):
     body = await request.body()
     dmn_xml = body.decode("utf-8")
     summary = _parse_dmn_metadata(dmn_xml)
+    if source_cpg:
+        summary.source_cpg = source_cpg
     _dynamic_models[summary.id] = {"summary": summary, "dmn_xml": dmn_xml}
     return summary.model_dump(mode="json")
 
