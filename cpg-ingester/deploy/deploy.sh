@@ -82,6 +82,7 @@ helm upgrade --install cpg-ingester "$SCRIPT_DIR/chart" \
     --set pods.llm-analysis.tag="$IMAGE_TAG" \
     --set pods.llm-analysis.env.litellmUrl="$LLM_BASE_URL" \
     --set pods.llm-analysis.env.llmModel="$LLM_MODEL" \
+    --set pods.llm-analysis.env.llmRequestTimeout="${LLM_REQUEST_TIMEOUT:-600}" \
     --set pods.assembly.tag="$IMAGE_TAG" \
     --set pods.delivery.tag="$IMAGE_TAG" \
     --set pods.bff.tag="$IMAGE_TAG" \

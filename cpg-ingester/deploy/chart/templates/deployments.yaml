@@ -46,6 +46,10 @@ spec:
             - name: LLM_MODEL
               value: {{ $pod.env.llmModel | quote }}
             {{- end }}
+            {{- if $pod.env.llmRequestTimeout }}
+            - name: LLM_REQUEST_TIMEOUT
+              value: {{ $pod.env.llmRequestTimeout | quote }}
+            {{- end }}
             {{- if $pod.env.bffHost }}
             - name: BFF_HOST
               value: {{ $pod.env.bffHost | quote }}

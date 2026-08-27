@@ -1,9 +1,11 @@
 """Shared LLM client factory with retry and timeout configuration."""
 
+import os
+
 from langchain_openai import ChatOpenAI
 
-LLM_MAX_RETRIES = 5
-LLM_REQUEST_TIMEOUT = 120
+LLM_MAX_RETRIES = int(os.environ.get("LLM_MAX_RETRIES", "5"))
+LLM_REQUEST_TIMEOUT = int(os.environ.get("LLM_REQUEST_TIMEOUT", "600"))
 
 
 def get_llm(state: dict) -> ChatOpenAI:

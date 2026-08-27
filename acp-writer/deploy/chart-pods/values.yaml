@@ -32,6 +32,7 @@ pods:
     env:
       litellmUrl: http://localhost:4000
       llmModel: default
+      llmRequestTimeout: "600"
       decisionEngineUrl: http://acp-decision-engine:8080
     secrets:
       llm: true
@@ -71,6 +72,7 @@ pods:
     env:
       litellmUrl: http://localhost:4000
       llmModel: default
+      llmRequestTimeout: "600"
     secrets:
       llm: true
       minio: true
