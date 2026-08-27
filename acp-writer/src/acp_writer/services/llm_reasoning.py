@@ -76,6 +76,24 @@ def status():
     }
 
 
+# --- Read endpoints (consumed by BFF /api/v1/status) ---
+
+
+@app.get("/api/v1/decisions/models")
+def list_decision_models():
+    try:
+        resp = http_requests.get(f"{DECISION_ENGINE_URL}/api/v1/decisions/models", timeout=5)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception:
+        return []
+
+
+@app.get("/api/v1/guidelines")
+def list_guidelines():
+    return [g.model_dump(mode="json") for g in _guidelines_store.list_all()]
+
+
 # --- CPG artifact management (used by cpg-ingester Delivery) ---
 
 
