@@ -139,21 +139,25 @@ cp deploy/config/cluster.env.template deploy/config/cluster.env
 # 2. Create namespace
 oc new-project <namespace>
 
-# 3. Provision OpenShell + SonataFlow (one-time per namespace, requires cluster-admin)
+# 3. Install the Quay robot push secret (one-time per namespace)
+# See "Container Registry" below for how to obtain the secret from Quay.
+oc apply -f /secure/path/cpgtoacp-cpgtoacpbot-pull-secret.yaml -n <namespace>
+
+# 4. Provision OpenShell + SonataFlow (one-time per namespace, requires cluster-admin)
 ./deploy/setup/setup-openshell.sh --config deploy/config/cluster.env
 
-# 4. Create secrets (one-time)
+# 5. Create application secrets (one-time)
 cp deploy/config/secrets.env.template deploy/config/secrets.env
 # Edit secrets.env: set OPENAI_API_KEY, MINIO_ROOT_PASSWORD, optionally Medplum creds
 ./deploy/setup/setup-secrets.sh --from-env deploy/config/secrets.env
 
-# 5. Set up shared infrastructure (MinIO, router, MCP gateway)
+# 6. Set up shared infrastructure (MinIO, router, MCP gateway)
 ./deploy/setup/setup-namespace.sh --config deploy/config/cluster.env
 
-# 6. Deploy all components
+# 7. Deploy all components
 ./deploy/deploy-all.sh --config deploy/config/cluster.env
 
-# 7. Verify
+# 8. Verify
 ./deploy/verify-all.sh --config deploy/config/cluster.env --e2e
 ```
 
@@ -253,6 +257,37 @@ acp-writer/deploy/deploy.sh --skip-build --tag <old-sha>
 ## Container Registry
 
 All container images are hosted on **quay.io/cpgtoacp**. This includes both project-built images (acp-writer, cpg-ingester, mock-EHR) and mirrored vendor images (postgres, redis, medplum, node, nginx). Using a single external registry makes images portable across clusters and available for local development without cluster access.
+
+### Install the Quay robot push secret
+
+OpenShift BuildConfigs need credentials to push project-built images to `quay.io/cpgtoacp`. The application secret setup script does **not** create this registry credential; install it separately in every deployment namespace and again after a `--full-wipe`.
+
+1. Ask a `cpgtoacp` Quay organization administrator for access to the `cpgtoacp+cpgtoacpbot` robot account. The robot must have write access to the project-built image repositories.
+2. In the Quay UI, open the `cpgtoacp` organization, select **Robot Accounts**, open `cpgtoacpbot`, and download its **Kubernetes Secret**. If you cannot access the organization, ask an administrator to securely provide the downloaded manifest.
+3. Confirm that the downloaded manifest has `metadata.name: cpgtoacp-cpgtoacpbot-pull-secret`. BuildConfigs reference that exact name.
+4. Apply the manifest to the target namespace:
+
+   ```bash
+   oc apply \
+     -f /secure/path/cpgtoacp-cpgtoacpbot-pull-secret.yaml \
+     -n <namespace>
+   ```
+
+5. Verify the secret type and the presence of its Docker configuration without printing the credential:
+
+   ```bash
+   oc get secret cpgtoacp-cpgtoacpbot-pull-secret \
+     -n <namespace> \
+     -o jsonpath='{.type}{"\n"}'
+   # Expected: kubernetes.io/dockerconfigjson
+
+   oc get secret cpgtoacp-cpgtoacpbot-pull-secret \
+     -n <namespace> \
+     -o jsonpath='{.data.\.dockerconfigjson}' \
+     | grep -q . && echo "Quay credentials are present"
+   ```
+
+The downloaded YAML contains a registry credential. Store and transfer it securely, never commit it, and delete the local copy when it is no longer needed.
 
 - **BuildConfigs** push to `quay.io/cpgtoacp` via `DockerImage` output (not ImageStreamTags). They require a push secret named `cpgtoacp-cpgtoacpbot-pull-secret` in the namespace.
 - **Helm chart values** default to `quay.io/cpgtoacp` — deploy scripts no longer override `image.namespace` with the OpenShift namespace.
