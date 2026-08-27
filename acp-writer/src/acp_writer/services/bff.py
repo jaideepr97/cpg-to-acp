@@ -217,7 +217,7 @@ def _reload_cpg_artifacts() -> None:
             for obj in dmn_resp.get("Contents", []):
                 key = obj["Key"]
                 name = key.rsplit("/", 1)[-1].removesuffix(".dmn")
-                _register_dmn_model(f"cpg-artifacts:{key}", name)
+                _register_dmn_model(f"cpg-artifacts:{key}", name, cpg_id)
         except Exception as exc:
             logger.warning("Failed to reload DMN models for %s: %s", cpg_id, exc)
 
