@@ -19,13 +19,18 @@ from acp_writer.nodes.fhir_server_writer import _care_plans
 from acp_writer.pipeline import build_pipeline
 from acp_writer.store.embedding import FakeEmbeddingProvider
 
-LITELLM_URL = os.environ.get("LITELLM_URL")
-pytestmark = pytest.mark.skipif(not LITELLM_URL, reason="LITELLM_URL not set")
+# Prefer LLM_BASE_URL per the no-tech-specific-names convention; fall back to
+# the legacy LITELLM_URL. The state key remains ``litellm_url`` (get_llm reads it).
+LITELLM_URL = os.environ.get("LLM_BASE_URL") or os.environ.get("LITELLM_URL")
+pytestmark = pytest.mark.skipif(
+    not LITELLM_URL, reason="LLM_BASE_URL (or legacy LITELLM_URL) not set"
+)
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 DATA_DIR = PROJECT_ROOT / "mock-EHR" / "data"
 DMN_DIR = PROJECT_ROOT / "cpg-ingester" / "data" / "golden"
 FIXTURES = PROJECT_ROOT / "shared" / "tests" / "fixtures"
+INT_FIXTURES = PROJECT_ROOT / "tests" / "integration" / "fixtures"
 
 
 def _load_bundle(name: str) -> dict:
@@ -56,6 +61,26 @@ def _setup_hypertension_scenario():
 
     bundle = RecommendationBundle.model_validate(data["recommendation_bundle"])
     api_module._vector_store.add_batch(bundle.recommendations)
+
+
+def _ingest_cpg_fixture(name: str):
+    """Register CPG metadata + ingest its recommendations from the repo-root
+    integration fixtures (tests/integration/fixtures)."""
+    from cpg_contracts import CPGMetadata, RecommendationBundle
+
+    data = json.loads((INT_FIXTURES / name).read_text())
+    metadata = CPGMetadata.model_validate(data["metadata"])
+    api_module._guidelines_store.register(metadata)
+    bundle = RecommendationBundle.model_validate(data["recommendation_bundle"])
+    api_module._vector_store.add_batch(bundle.recommendations)
+
+
+def _setup_conflicting_scenario():
+    """Register + ingest BOTH the hypertension and diabetes fixture CPGs, which
+    are deliberately engineered to conflict (overlapping diet advice, divergent
+    BP targets, and opposite lisinopril titration directives)."""
+    _ingest_cpg_fixture("htn-cpg.json")
+    _ingest_cpg_fixture("diabetes-cpg.json")
 
 
 @pytest.fixture(autouse=True)
@@ -162,6 +187,56 @@ class TestEndToEnd:
         fhir_bundle = result.get("fhir_bundle", {})
         assert fhir_bundle["resourceType"] == "Bundle"
         assert len(fhir_bundle["entry"]) > 0
+
+    def test_comprehensive_patient_surfaces_conflicts(self, tmp_path):
+        """Full-pipeline smoke for issue #169: the comprehensive multimorbidity
+        patient, run against two deliberately-conflicting CPGs, must yield a
+        bundle carrying at least one conflict Provenance and the CarePlan
+        conflict marker extension."""
+        from acp_writer.services.ai_transparency import is_conflict_provenance
+
+        _setup_conflicting_scenario()
+        bundle = _load_bundle("patient-bundle-comprehensive.json")
+
+        graph = build_pipeline()
+        compiled = graph.compile()
+
+        result = compiled.invoke({
+            "ips_bundle": bundle,
+            "run_id": "e2e-conflict-001",
+            "output_dir": str(tmp_path),
+            "litellm_url": LITELLM_URL,
+            "llm_model": os.environ.get("LLM_MODEL", "default"),
+            "llm_api_key": os.environ.get("LLM_API_KEY", "sk-change-me"),
+        })
+
+        # Both CPGs should match the patient's conditions and be retrieved.
+        cpg_ids = {c.get("cpg_id") for c in result.get("applicable_cpgs", [])}
+        assert {"SYN-HTN-2026-001", "SYN-DM2-2026-001"} <= cpg_ids, (
+            f"expected both fixture CPGs to match, got {cpg_ids}"
+        )
+
+        conflicts = result.get("planning_brief", {}).get("conflicts", [])
+        assert conflicts, "conflict_analyst flagged no conflicts on a conflicting plan"
+
+        fhir_bundle = result.get("fhir_bundle", {})
+
+        # (a) at least one conflict Provenance (identified by the conflict-id ext)
+        conflict_provs = [
+            p for p in _find_resources(fhir_bundle, "Provenance")
+            if is_conflict_provenance(p)
+        ]
+        assert conflict_provs, "no conflict Provenance in the generated bundle"
+
+        # (b) exactly one CarePlan marker extension
+        careplans = _find_resources(fhir_bundle, "CarePlan")
+        assert len(careplans) == 1
+        markers = [
+            e for e in careplans[0].get("extension", [])
+            if e.get("url", "").endswith("/careplan-conflict-detected")
+        ]
+        assert len(markers) == 1, f"expected exactly one conflict marker, got {len(markers)}"
+        assert markers[0].get("valueBoolean") is True
 
     def test_pipeline_without_registered_guidelines(self, tmp_path):
         """Pipeline should complete even with no registered guidelines."""

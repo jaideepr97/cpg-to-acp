@@ -16,12 +16,17 @@ import os
 import time
 import uuid
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 import mlflow
 import requests
 
 from acp_writer.output import write_artifact
+from acp_writer.services.ai_transparency import apply_approval_transition
 from acp_writer.state import CarePlanComposerState
+
+if TYPE_CHECKING:
+    from acp_writer.services.reviewer import ReviewerContext
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +136,11 @@ def fhir_server_writer(state: CarePlanComposerState) -> dict:
     initial_status = "active" if state.get("approved", False) else "draft"
 
     if initial_status == "active":
-        _apply_active_tags(bundle)
+        # Deployed (SonataFlow) approval lands here with approved=True. Apply the
+        # SAME full transition the monolith approve endpoint uses so the split
+        # path also records the human verifier and acknowledges conflicts — not
+        # just the security-tag swap it did before (issue #169 F1).
+        apply_approval_transition(bundle, _state_reviewer(state))
 
     _care_plans[careplan_id] = {
         "id": careplan_id,
@@ -253,60 +262,54 @@ def list_care_plans(patient: str | None = None, status: str | None = None) -> li
     } for cp in results]
 
 
-CLINAST_AIRPT_SECURITY = {
-    "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationValue",
-    "code": "CLINAST_AIRPT",
-    "display": "clinician asserted from AI reported",
-}
+def _state_reviewer(state: CarePlanComposerState) -> "ReviewerContext":
+    """Reviewer for a writer-node approval — from state, else the config default.
+
+    The deployed WriteFHIR path threads the approving clinician through
+    ``state["reviewer"]`` (a ``ReviewerContext`` or its dict form); absent that
+    we fall back to the configured demo reviewer.
+    """
+    from acp_writer.services.reviewer import ReviewerContext, default_reviewer
+
+    reviewer = state.get("reviewer")
+    if isinstance(reviewer, ReviewerContext):
+        return reviewer
+    if isinstance(reviewer, dict) and reviewer:
+        return ReviewerContext(**reviewer)
+    return default_reviewer()
 
 
-def _apply_active_tags(bundle: dict) -> None:
-    """Set CarePlan status to active and swap AIAST → CLINAST_AIRPT security tags."""
+def _find_careplan_resource(bundle: dict) -> dict | None:
     for entry in bundle.get("entry", []):
         resource = entry.get("resource", {})
-        security = resource.get("meta", {}).get("security", [])
-        for i, sec in enumerate(security):
-            if sec.get("code") == "AIAST":
-                security[i] = CLINAST_AIRPT_SECURITY
         if resource.get("resourceType") == "CarePlan":
-            resource["status"] = "active"
+            return resource
+    return None
 
 
-def approve_care_plan(careplan_id: str, clinician: str | None = None) -> dict | None:
-    """Approve a care plan: status→active, AIAST→CLINAST_AIRPT, update on FHIR server."""
+def approve_care_plan(
+    careplan_id: str,
+    reviewer: "ReviewerContext | None" = None,
+) -> dict | None:
+    """Approve a care plan: full approval transition + update on FHIR server.
+
+    ``reviewer`` is a ``ReviewerContext`` (defaults to the configured reviewer).
+    The transition itself — AIAST→CLINAST_AIRPT, CarePlan→active, verifier
+    Humanagent on every AI-Provenance, conflicts→acknowledged — is delegated to
+    ``apply_approval_transition`` so this path and the deployed WriteFHIR path
+    stay identical (issue #169 F1).
+    """
+    from acp_writer.services.reviewer import default_reviewer
+
     cp = _care_plans.get(careplan_id)
     if not cp:
         return None
 
     cp["status"] = "active"
     bundle = cp.get("bundle", {})
+    apply_approval_transition(bundle, reviewer or default_reviewer())
 
-    careplan_resource = None
-    for entry in bundle.get("entry", []):
-        resource = entry.get("resource", {})
-        security = resource.get("meta", {}).get("security", [])
-        for i, sec in enumerate(security):
-            if sec.get("code") == "AIAST":
-                security[i] = CLINAST_AIRPT_SECURITY
-
-        if resource.get("resourceType") == "CarePlan":
-            resource["status"] = "active"
-            careplan_resource = resource
-
-        if resource.get("resourceType") == "Provenance":
-            profiles = resource.get("meta", {}).get("profile", [])
-            if any("AI-Provenance" in p for p in profiles):
-                agents = resource.get("agent", [])
-                agents.append({
-                    "type": {
-                        "coding": [{
-                            "system": "http://terminology.hl7.org/CodeSystem/provenance-participant-type",
-                            "code": "verifier",
-                        }],
-                    },
-                    "who": {"display": clinician or "Clinician"},
-                })
-
+    careplan_resource = _find_careplan_resource(bundle)
     server_ref = _find_careplan_server_id(cp.get("server_ids", {}))
     if server_ref and careplan_resource:
         _update_on_server(server_ref, careplan_resource)

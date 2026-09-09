@@ -2,10 +2,15 @@
 
 Two-phase architecture:
   Phase 1 (Clinical Reasoning): condition_scanner → guideline_resolver →
-    dmn_executor → recommendation_retriever → plan_composer → brief_reviewer
+    dmn_executor → recommendation_retriever → plan_composer → brief_reviewer →
+    conflict_analyst
   Phase 2 (FHIR Generation): fhir_bundle_generator →
     [terminology_validator ∥ fhir_syntax_validator] →
     fhir_semantic_reviewer → fhir_server_writer
+
+conflict_analyst runs once, after the brief-review loop converges (approved or
+exhausted) and before FHIR generation. The FHIR-review loop
+(fhir_semantic_reviewer → fhir_bundle_generator) does NOT pass back through it.
 """
 
 import logging
@@ -14,6 +19,7 @@ from langgraph.graph import END, START, StateGraph
 
 from acp_writer.nodes.brief_reviewer import brief_reviewer
 from acp_writer.nodes.condition_scanner import condition_scanner
+from acp_writer.nodes.conflict_analyst import conflict_analyst
 from acp_writer.nodes.dmn_executor import dmn_executor
 from acp_writer.nodes.fhir_bundle_generator import fhir_bundle_generator
 from acp_writer.nodes.fhir_semantic_reviewer import fhir_semantic_reviewer
@@ -42,10 +48,10 @@ MAX_FHIR_REVIEWS = 4
 def _route_after_brief_review(state: CarePlanComposerState) -> str:
     feedback = state.get("brief_review_feedback")
     if not feedback:
-        return "fhir_bundle_generator"
+        return "conflict_analyst"
     if state.get("brief_review_count", 0) >= MAX_BRIEF_REVIEWS:
         logger.warning("Brief review exhausted after %d iterations", MAX_BRIEF_REVIEWS)
-        return "fhir_bundle_generator"
+        return "conflict_analyst"
     return "plan_composer"
 
 
@@ -73,6 +79,7 @@ def build_pipeline() -> StateGraph:
     graph.add_node("recommendation_retriever", recommendation_retriever)
     graph.add_node("plan_composer", plan_composer)
     graph.add_node("brief_reviewer", brief_reviewer)
+    graph.add_node("conflict_analyst", conflict_analyst)
 
     # Phase 2: FHIR Generation
     graph.add_node("fhir_bundle_generator", fhir_bundle_generator)
@@ -92,10 +99,11 @@ def build_pipeline() -> StateGraph:
         "brief_reviewer",
         _route_after_brief_review,
         {
-            "fhir_bundle_generator": "fhir_bundle_generator",
+            "conflict_analyst": "conflict_analyst",
             "plan_composer": "plan_composer",
         },
     )
+    graph.add_edge("conflict_analyst", "fhir_bundle_generator")
 
     # Phase 2 edges (validators in parallel, then FHIR review loop)
     graph.add_edge("fhir_bundle_generator", "terminology_validator")

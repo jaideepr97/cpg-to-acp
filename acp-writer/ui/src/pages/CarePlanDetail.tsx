@@ -20,7 +20,7 @@ import type { CarePlanDetail as CarePlanDetailModel } from "@app/api/models";
 import { getCarePlan } from "@app/services/api";
 import { GoalCard } from "@app/components/GoalCard";
 import { ActivityCard } from "@app/components/ActivityCard";
-import { ConflictAlert } from "@app/components/ConflictAlert";
+import { ConflictAlert, conflictCountLabel, orderConflicts } from "@app/components/ConflictAlert";
 import { FhirJsonViewer } from "@app/components/FhirJsonViewer";
 
 const statusColor: Record<string, "blue" | "green" | "red"> = {
@@ -122,12 +122,12 @@ export function CarePlanDetail() {
               )}
             </Stack>
           </Tab>
-          <Tab eventKey={2} title={<TabTitleText>Conflicts ({conflicts.length})</TabTitleText>}>
+          <Tab eventKey={2} title={<TabTitleText>{conflictCountLabel(conflicts)}</TabTitleText>}>
             <Stack hasGutter style={{ paddingTop: "1rem" }}>
               {conflicts.length === 0 ? (
                 <StackItem><p>No conflicts detected.</p></StackItem>
               ) : (
-                conflicts.map((c) => <StackItem key={c.id}><ConflictAlert conflict={c} /></StackItem>)
+                orderConflicts(conflicts).map((c) => <StackItem key={c.id}><ConflictAlert conflict={c} /></StackItem>)
               )}
             </Stack>
           </Tab>

@@ -38,6 +38,10 @@ def fhir_bundle_generator(state: CarePlanComposerState) -> dict:
     try:
         brief = PlanningBrief.model_validate(brief_dict)
     except Exception as e:
+        # PlanningBrief coerces loose conflicts before validation (see its
+        # _coerce_conflicts_field validator), so reaching here means the goals/
+        # activities themselves are invalid. Surface it — an empty bundle must
+        # not masquerade as a successful generation.
         logger.error("Invalid Planning Brief: %s", e)
         return {
             "fhir_bundle": {
@@ -45,9 +49,21 @@ def fhir_bundle_generator(state: CarePlanComposerState) -> dict:
                 "type": "transaction",
                 "entry": [],
             },
+            "fhir_generation_error": f"Invalid Planning Brief: {e}",
         }
 
-    bundle = build_fhir_bundle(brief, patient_demographics=state.get("patient_demographics"))
+    prompts: dict[str, str] = {}
+    if state.get("plan_composer_prompt"):
+        prompts["plan_composer"] = state["plan_composer_prompt"]
+    if state.get("conflict_prompt"):
+        prompts["conflict_analyst"] = state["conflict_prompt"]
+
+    bundle = build_fhir_bundle(
+        brief,
+        patient_demographics=state.get("patient_demographics"),
+        model_id=state.get("llm_model"),
+        prompts=prompts,
+    )
 
     resource_types: dict[str, int] = {}
     for entry in bundle.get("entry", []):

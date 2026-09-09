@@ -4,6 +4,7 @@ Checks goal-activity consistency, medication dose reasonableness,
 AI Transparency completeness. APPROVE/REVISE protocol, max 2 loops.
 """
 
+import copy
 import json
 import logging
 import time
@@ -11,6 +12,7 @@ import time
 import mlflow
 from cpg_contracts import content_to_text, get_llm
 
+from acp_writer.llm_json import loads_json
 from acp_writer.output import write_artifact
 from acp_writer.prompts.fhir_semantic_reviewer import (
     FHIR_SEMANTIC_REVIEWER_SYSTEM,
@@ -21,12 +23,27 @@ from acp_writer.state import CarePlanComposerState
 logger = logging.getLogger(__name__)
 
 
-def _parse_review_response(content: str) -> dict:
-    text = content.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-    return json.loads(text)
+def _bundle_for_review(bundle: dict) -> dict:
+    """Copy of the bundle with DocumentReference attachment payloads stripped.
+
+    The captured-prompt / model-card DocumentReferences carry base64
+    ``attachment.data`` (whole prompts, model cards) that bloats the reviewer
+    prompt and burns tokens without adding clinical signal (F10). We drop the
+    payload on a shallow-then-targeted copy so the original bundle in state is
+    untouched.
+    """
+    sanitized = copy.deepcopy(bundle)
+    for entry in sanitized.get("entry", []):
+        resource = entry.get("resource", {})
+        if resource.get("resourceType") != "DocumentReference":
+            continue
+        for content in resource.get("content", []):
+            attachment = content.get("attachment")
+            if isinstance(attachment, dict) and "data" in attachment:
+                size = len(attachment["data"]) if isinstance(attachment["data"], str) else 0
+                attachment.pop("data", None)
+                attachment["_dataOmitted"] = f"{size} base64 chars omitted for review"
+    return sanitized
 
 
 @mlflow.trace(name="fhir_semantic_reviewer")
@@ -48,7 +65,7 @@ def fhir_semantic_reviewer(state: CarePlanComposerState) -> dict:
     logger.info("── FHIR Semantic Reviewer (iteration %d) ──", review_count + 1)
 
     user_prompt = FHIR_SEMANTIC_REVIEWER_USER.format(
-        fhir_bundle=json.dumps(bundle, indent=2, default=str),
+        fhir_bundle=json.dumps(_bundle_for_review(bundle), indent=2, default=str),
         syntax_errors=json.dumps(syntax_errors) if syntax_errors else "None",
         terminology_issues=json.dumps(terminology_issues) if terminology_issues else "None",
     )
@@ -66,7 +83,7 @@ def fhir_semantic_reviewer(state: CarePlanComposerState) -> dict:
     logger.info("LLM responded in %.1fs", elapsed)
 
     try:
-        review = _parse_review_response(content_to_text(response.content))
+        review = loads_json(content_to_text(response.content))
     except (json.JSONDecodeError, Exception) as e:
         logger.warning("Could not parse FHIR review response, treating as APPROVE: %s", e)
         review = {"verdict": "APPROVE", "issues": []}

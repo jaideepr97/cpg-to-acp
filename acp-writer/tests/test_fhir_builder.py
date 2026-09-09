@@ -14,6 +14,14 @@ from acp_writer.planning_brief import (
     ReviewStatus,
     TargetValue,
 )
+from acp_writer.planning_brief import (
+    ConflictCategory,
+    ConflictEntry,
+    ConflictSeverity,
+    ConflictSource,
+    ConflictStatus,
+)
+from acp_writer.services.ai_transparency import ACP_EXT_BASE
 from acp_writer.validators.fhir_bundle_builder import AIAST_SECURITY, build_fhir_bundle
 
 
@@ -200,9 +208,41 @@ class TestActivities:
     def test_lifestyle_inline(self):
         bundle = build_fhir_bundle(_hypertension_brief())
         cp = _get_resources(bundle, "CarePlan")[0]
-        inline = [a for a in cp["activity"] if "performedActivity" in a]
+        inline = [a for a in cp["activity"] if "detail" in a]
         assert len(inline) == 1
-        assert "DASH" in inline[0]["performedActivity"][0]["text"]
+        assert "DASH" in inline[0]["detail"]["description"]
+
+
+CONFLICT_ID_URL = f"{ACP_EXT_BASE}/conflict-id"
+
+
+def _provenances(bundle: dict) -> list[dict]:
+    return _get_resources(bundle, "Provenance")
+
+
+def _is_conflict_prov(p: dict) -> bool:
+    return any("conflict-id" in e.get("url", "") for e in p.get("extension", []))
+
+
+def _bundle_level_prov(bundle: dict) -> dict:
+    """The single aggregate AI-Provenance (carries CPG derivation entities)."""
+    provs = [
+        p for p in _provenances(bundle)
+        if not _is_conflict_prov(p)
+        and any(e.get("role") == "derivation" for e in p.get("entity", []))
+    ]
+    assert len(provs) == 1
+    return provs[0]
+
+
+def _activity_source_provs(bundle: dict) -> list[dict]:
+    """Per-activity source provenances (entity role 'source', not conflicts)."""
+    return [
+        p for p in _provenances(bundle)
+        if not _is_conflict_prov(p)
+        and p.get("entity")
+        and all(e.get("role") == "source" for e in p["entity"])
+    ]
 
 
 class TestAITransparency:
@@ -220,23 +260,47 @@ class TestAITransparency:
         assert len(devices) == 1
         device = devices[0]
         assert device["type"]["coding"][0]["code"] == "Artificial-Intelligence"
-        assert any("AI-Device" in p for p in device["meta"].get("profile", []))
+        assert device["meta"]["profile"] == [
+            "http://hl7.org/fhir/uv/aitransparency/StructureDefinition/AI-Device"
+        ]
+        # AIKind extension names the LLM model kind.
+        aikind = device["extension"][0]
+        assert aikind["url"] == (
+            "http://hl7.org/fhir/uv/aitransparency/StructureDefinition/aitransparency.AIKind"
+        )
+        assert aikind["valueCodeableConcept"]["coding"][0]["code"] == "Large-Language-Models"
+
+    def test_ai_device_records_model_id(self):
+        bundle = build_fhir_bundle(_hypertension_brief(), model_id="my-model-x")
+        device = _get_resources(bundle, "Device")[0]
+        versions = [v["value"] for v in device["version"]]
+        assert "my-model-x" in versions
 
     def test_ai_provenance_present(self):
         bundle = build_fhir_bundle(_hypertension_brief())
-        provs = _get_resources(bundle, "Provenance")
-        ai_provs = [p for p in provs if any(
-            "AI-Provenance" in pr for pr in p.get("meta", {}).get("profile", [])
-        )]
-        assert len(ai_provs) == 1
-        ai_prov = ai_provs[0]
+        ai_prov = _bundle_level_prov(bundle)
+        assert ai_prov["meta"]["profile"] == [
+            "http://hl7.org/fhir/uv/aitransparency/StructureDefinition/AI-Provenance"
+        ]
         assert ai_prov["reason"][0]["coding"][0]["code"] == "AIAST"
+        assert "occurredDateTime" in ai_prov
+        # AI agent carries the fixed Artificial-Intelligence role coding.
+        role = ai_prov["agent"][0]["role"][0]["coding"][0]
+        assert role["code"] == "Artificial-Intelligence"
         assert len(ai_prov["target"]) >= 3
+
+    def test_all_provenances_conform(self):
+        bundle = build_fhir_bundle(_hypertension_brief())
+        for p in _provenances(bundle):
+            assert p["meta"]["profile"] == [
+                "http://hl7.org/fhir/uv/aitransparency/StructureDefinition/AI-Provenance"
+            ]
+            assert p["reason"][0]["coding"][0]["code"] == "AIAST"
+            assert "occurredDateTime" in p
 
     def test_per_activity_provenance(self):
         bundle = build_fhir_bundle(_hypertension_brief())
-        provs = _get_resources(bundle, "Provenance")
-        activity_provs = [p for p in provs if "AI-Provenance" not in str(p.get("meta", {}).get("profile", []))]
+        activity_provs = _activity_source_provs(bundle)
         assert len(activity_provs) == 3
         for prov in activity_provs:
             entities = prov.get("entity", [])
@@ -245,8 +309,7 @@ class TestAITransparency:
 
     def test_inline_activity_provenance_uses_target_path(self):
         bundle = build_fhir_bundle(_hypertension_brief())
-        provs = _get_resources(bundle, "Provenance")
-        activity_provs = [p for p in provs if "AI-Provenance" not in str(p.get("meta", {}).get("profile", []))]
+        activity_provs = _activity_source_provs(bundle)
         inline_provs = [
             p for p in activity_provs
             if any("targetPath" in str(ext.get("url", "")) for t in p.get("target", []) for ext in t.get("extension", []))
@@ -254,14 +317,13 @@ class TestAITransparency:
         assert len(inline_provs) == 1
         target = inline_provs[0]["target"][0]
         ext = target["extension"][0]
-        assert "targetPath" in ext["url"]
+        assert ext["url"] == "http://hl7.org/fhir/StructureDefinition/targetPath"
         assert "CarePlan.activity[" in ext["valueString"]
-        assert ".performedActivity" in ext["valueString"]
+        assert ".detail" in ext["valueString"]
 
     def test_standalone_activity_provenance_no_target_path(self):
         bundle = build_fhir_bundle(_hypertension_brief())
-        provs = _get_resources(bundle, "Provenance")
-        activity_provs = [p for p in provs if "AI-Provenance" not in str(p.get("meta", {}).get("profile", []))]
+        activity_provs = _activity_source_provs(bundle)
         standalone_provs = [
             p for p in activity_provs
             if not any(t.get("extension") for t in p.get("target", []))
@@ -272,14 +334,185 @@ class TestAITransparency:
 
     def test_provenance_has_cpg_source(self):
         bundle = build_fhir_bundle(_hypertension_brief())
-        provs = _get_resources(bundle, "Provenance")
-        ai_provs = [p for p in provs if any(
-            "AI-Provenance" in pr for pr in p.get("meta", {}).get("profile", [])
-        )]
-        ai_prov = ai_provs[0]
-        cpg_entities = [e for e in ai_prov["entity"] if e["role"] == "derivation"]
+        ai_prov = _bundle_level_prov(bundle)
+        cpg_entities = [
+            e for e in ai_prov["entity"]
+            if e["role"] == "derivation" and "display" in e.get("what", {})
+        ]
         assert len(cpg_entities) == 1
         assert "SYN-HTN-2026-001" in cpg_entities[0]["what"]["display"]
+
+
+class TestInputPromptCapture:
+    def test_prompts_become_docrefs(self):
+        bundle = build_fhir_bundle(
+            _hypertension_brief(),
+            prompts={"plan_composer": "Compose a plan", "conflict_analyst": "Find conflicts"},
+        )
+        docrefs = _get_resources(bundle, "DocumentReference")
+        input_prompts = [
+            d for d in docrefs
+            if d["type"]["coding"][0]["code"] == "AIInputPrompt"
+        ]
+        assert len(input_prompts) == 2
+        for d in input_prompts:
+            assert d["status"] == "current"
+            assert d["content"][0]["attachment"]["contentType"] == "text/markdown"
+
+    def test_prompt_base64_roundtrips(self):
+        import base64
+
+        bundle = build_fhir_bundle(
+            _hypertension_brief(), prompts={"plan_composer": "Hello prompt"}
+        )
+        docref = [
+            d for d in _get_resources(bundle, "DocumentReference")
+            if d["type"]["coding"][0]["code"] == "AIInputPrompt"
+        ][0]
+        data = docref["content"][0]["attachment"]["data"]
+        assert base64.b64decode(data).decode("utf-8") == "Hello prompt"
+
+    def test_input_prompt_referenced_as_entity(self):
+        bundle = build_fhir_bundle(
+            _hypertension_brief(), prompts={"plan_composer": "Compose"}
+        )
+        docref = [
+            d for d in _get_resources(bundle, "DocumentReference")
+            if d["type"]["coding"][0]["code"] == "AIInputPrompt"
+        ][0]
+        ai_prov = _bundle_level_prov(bundle)
+        refs = [e["what"].get("reference") for e in ai_prov["entity"]]
+        assert f"urn:uuid:{docref['id']}" in refs
+
+    def test_capture_disabled_via_env(self, monkeypatch):
+        monkeypatch.setenv("ACP_CAPTURE_PROMPTS", "false")
+        bundle = build_fhir_bundle(
+            _hypertension_brief(), prompts={"plan_composer": "Compose"}
+        )
+        docrefs = _get_resources(bundle, "DocumentReference")
+        assert docrefs == []
+
+
+class TestModelCard:
+    def test_absent_by_default(self):
+        bundle = build_fhir_bundle(_hypertension_brief())
+        model_cards = [
+            d for d in _get_resources(bundle, "DocumentReference")
+            if d["type"]["coding"][0]["code"] == "AIModelCard"
+        ]
+        assert model_cards == []
+
+    def test_present_when_env_set(self, monkeypatch):
+        monkeypatch.setenv("LLM_MODEL_CARD_URL", "https://example.org/card.html")
+        bundle = build_fhir_bundle(_hypertension_brief())
+        model_cards = [
+            d for d in _get_resources(bundle, "DocumentReference")
+            if d["type"]["coding"][0]["code"] == "AIModelCard"
+        ]
+        assert len(model_cards) == 1
+        assert model_cards[0]["content"][0]["attachment"]["url"] == "https://example.org/card.html"
+
+
+def _brief_with_conflict() -> PlanningBrief:
+    brief = _hypertension_brief()
+    # A second goal so goal_indices=[0,1] is valid for a divergent-target conflict.
+    brief.goals.append(
+        PlanGoal(
+            description="Lower blood pressure to tighter target",
+            target_measure_code=FHIRCode(system="http://loinc.org", code="8480-6", display="Systolic BP"),
+            target_value=TargetValue(high=130, unit="mmHg"),
+            source_recommendation_id="dm2-rec-002",
+            source_cpg="SYN-DM2-2026-001",
+        )
+    )
+    brief.conflicts = [
+        ConflictEntry(
+            id="conf-abc12345",
+            category=ConflictCategory.DIVERGENT_TARGET,
+            severity=ConflictSeverity.WARNING,
+            status=ConflictStatus.DETECTED,
+            description="Two guidelines set different BP targets",
+            rationale="HTN CPG targets <140/90; DM2 CPG targets <130/80",
+            confidence="high",
+            goal_indices=[0, 1],
+            activity_indices=[0],  # the MedicationRequest (standalone)
+            sources=[
+                ConflictSource(cpg_id="SYN-HTN-2026-001", recommendation_id="rec-123", excerpt="<140/90"),
+                ConflictSource(cpg_id="SYN-DM2-2026-001", recommendation_id="dm2-rec-002", excerpt="<130/80"),
+            ],
+        )
+    ]
+    return brief
+
+
+class TestConflictProvenance:
+    def test_marker_absent_without_conflicts(self):
+        bundle = build_fhir_bundle(_hypertension_brief())
+        cp = _get_resources(bundle, "CarePlan")[0]
+        exts = cp.get("extension", [])
+        assert not any("careplan-conflict-detected" in e.get("url", "") for e in exts)
+
+    def test_marker_present_with_conflicts(self):
+        bundle = build_fhir_bundle(_brief_with_conflict())
+        cp = _get_resources(bundle, "CarePlan")[0]
+        markers = [e for e in cp.get("extension", []) if "careplan-conflict-detected" in e["url"]]
+        assert len(markers) == 1
+        assert markers[0]["valueBoolean"] is True
+
+    def test_one_provenance_per_conflict(self):
+        bundle = build_fhir_bundle(_brief_with_conflict())
+        conflict_provs = [p for p in _provenances(bundle) if _is_conflict_prov(p)]
+        assert len(conflict_provs) == 1
+
+    def test_conflict_extensions(self):
+        bundle = build_fhir_bundle(_brief_with_conflict())
+        prov = [p for p in _provenances(bundle) if _is_conflict_prov(p)][0]
+        ext = {e["url"]: e for e in prov["extension"]}
+        assert ext[f"{ACP_EXT_BASE}/conflict-id"]["valueString"] == "conf-abc12345"
+        assert ext[f"{ACP_EXT_BASE}/conflict-severity"]["valueCode"] == "warning"
+        assert ext[f"{ACP_EXT_BASE}/conflict-category"]["valueCode"] == "divergent_target"
+        assert ext[f"{ACP_EXT_BASE}/conflict-status"]["valueCode"] == "detected"
+        assert "Two guidelines" in ext[f"{ACP_EXT_BASE}/conflict-description"]["valueString"]
+        # AIconfidence uses the certainty-rating value set.
+        conf = ext["http://hl7.org/fhir/uv/aitransparency/StructureDefinition/AIconfidence"]
+        assert conf["valueCodeableConcept"]["coding"][0]["code"] == "high"
+
+    def test_activity_source_provenances_carry_no_aiconfidence(self):
+        # C7: AIconfidence is a conflict-Provenance feature only. Per-activity
+        # source Provenances link to the source recommendation but carry no
+        # confidence rating — the docs must not claim otherwise.
+        aiconf_url = "http://hl7.org/fhir/uv/aitransparency/StructureDefinition/AIconfidence"
+        bundle = build_fhir_bundle(_brief_with_conflict())
+        source_provs = _activity_source_provs(bundle)
+        assert source_provs  # the med activity has a source_recommendation_id
+        for p in source_provs:
+            assert all(e.get("url") != aiconf_url for e in p.get("extension", []))
+
+    def test_conflict_targets_resolve(self):
+        bundle = build_fhir_bundle(_brief_with_conflict())
+        prov = [p for p in _provenances(bundle) if _is_conflict_prov(p)][0]
+        goals = _get_resources(bundle, "Goal")
+        meds = _get_resources(bundle, "MedicationRequest")
+        goal_urns = {f"urn:uuid:{g['id']}" for g in goals}
+        med_urns = {f"urn:uuid:{m['id']}" for m in meds}
+        target_refs = {t["reference"] for t in prov["target"]}
+        # Both goals + the medication are targeted directly.
+        assert goal_urns <= target_refs
+        assert med_urns & target_refs
+
+    def test_conflict_rationale_in_note(self):
+        bundle = build_fhir_bundle(_brief_with_conflict())
+        prov = [p for p in _provenances(bundle) if _is_conflict_prov(p)][0]
+        assert "HTN CPG targets" in prov["note"][0]["text"]
+        assert "authorReference" in prov["note"][0]
+
+    def test_conflict_sources_as_entities(self):
+        bundle = build_fhir_bundle(_brief_with_conflict())
+        prov = [p for p in _provenances(bundle) if _is_conflict_prov(p)][0]
+        source_entities = [e for e in prov["entity"] if e["role"] == "source"]
+        assert len(source_entities) == 2
+        idents = {e["what"]["identifier"]["value"] for e in source_entities}
+        assert idents == {"rec-123", "dm2-rec-002"}
 
 
 class TestNodeIntegration:
@@ -309,3 +542,32 @@ class TestNodeIntegration:
         }
         fhir_bundle_generator(state)
         assert (tmp_path / "fhir-bundle.json").exists()
+
+    def test_loose_conflict_does_not_empty_bundle(self):
+        # F4: one malformed conflict must not sink the whole brief. Before the
+        # PlanningBrief before-validator, validate raised and the goals/
+        # activities were silently dropped into an empty bundle.
+        from acp_writer.nodes.fhir_bundle_generator import fhir_bundle_generator
+
+        brief = _hypertension_brief().model_dump(mode="json")
+        brief["conflicts"] = [
+            {"description": "loose", "severity": "high", "sources": ["SYN-HTN-2026-001"]}
+        ]
+        result = fhir_bundle_generator({"planning_brief": brief})
+        assert len(result["fhir_bundle"]["entry"]) > 0
+        assert "fhir_generation_error" not in result
+
+    def test_invalid_brief_surfaces_error(self):
+        # F4: a genuinely invalid brief (bad goals/activities) must NOT report an
+        # empty bundle as success — it surfaces fhir_generation_error.
+        from acp_writer.nodes.fhir_bundle_generator import fhir_bundle_generator
+
+        bad = {
+            "patient_reference": "Patient/1",
+            "applicable_cpgs": ["CPG-A"],
+            "goals": [{"description": "g"}],  # missing required source_cpg
+            "activities": [],
+        }
+        result = fhir_bundle_generator({"planning_brief": bad})
+        assert result["fhir_bundle"]["entry"] == []
+        assert result["fhir_generation_error"]

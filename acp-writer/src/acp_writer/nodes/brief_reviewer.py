@@ -11,9 +11,14 @@ import time
 import mlflow
 from cpg_contracts import content_to_text, get_llm
 
+from acp_writer.llm_json import loads_json
 from acp_writer.output import write_artifact
 from acp_writer.planning_brief import PlanningBrief, ReviewStatus
-from acp_writer.prompts.brief_reviewer import BRIEF_REVIEWER_SYSTEM, BRIEF_REVIEWER_USER
+from acp_writer.prompts.brief_reviewer import (
+    BRIEF_REVIEWER_REVISION_NOTE,
+    BRIEF_REVIEWER_SYSTEM,
+    BRIEF_REVIEWER_USER,
+)
 from acp_writer.state import CarePlanComposerState
 
 logger = logging.getLogger(__name__)
@@ -23,14 +28,6 @@ def _format_code_list(codes: list[dict]) -> str:
     if not codes:
         return "None"
     return ", ".join(c.get("display", c.get("code", "?")) for c in codes)
-
-
-def _parse_review_response(content: str) -> dict:
-    text = content.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-    return json.loads(text)
 
 
 def _schema_validate(brief_dict: dict) -> list[str]:
@@ -78,7 +75,15 @@ def brief_reviewer(state: CarePlanComposerState) -> dict:
     allergy_codes = state.get("allergy_codes", [])
     recommendations = state.get("recommendations", [])
 
+    # F17: on a request-changes revision the composer minimally revised an
+    # already-approved base plan, so the reviewer should judge the changes for
+    # safety rather than demand authoring-style completeness rewrites.
+    prior_brief = state.get("prior_planning_brief") or {}
+    is_revision = bool(prior_brief.get("goals") or prior_brief.get("activities"))
+    revision_note = BRIEF_REVIEWER_REVISION_NOTE if is_revision else ""
+
     user_prompt = BRIEF_REVIEWER_USER.format(
+        revision_note=revision_note,
         patient_reference=patient_ref,
         conditions=_format_code_list(condition_codes),
         medications=_format_code_list(medication_codes),
@@ -105,7 +110,7 @@ def brief_reviewer(state: CarePlanComposerState) -> dict:
     logger.info("LLM responded in %.1fs", elapsed)
 
     try:
-        review = _parse_review_response(content_to_text(response.content))
+        review = loads_json(content_to_text(response.content))
     except (json.JSONDecodeError, Exception) as e:
         logger.warning("Could not parse review response, treating as APPROVE: %s", e)
         review = {"verdict": "APPROVE", "issues": []}

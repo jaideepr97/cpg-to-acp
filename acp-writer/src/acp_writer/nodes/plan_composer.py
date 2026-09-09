@@ -13,9 +13,19 @@ from typing import Any
 import mlflow
 from cpg_contracts import content_to_text, get_llm
 
+from acp_writer.llm_json import loads_json
 from acp_writer.output import write_artifact
-from acp_writer.planning_brief import PlanningBrief
-from acp_writer.prompts.plan_composer import PLAN_COMPOSER_SYSTEM, PLAN_COMPOSER_USER
+from acp_writer.planning_brief import (
+    PlanningBrief,
+    coerce_conflicts,
+    normalize_review_history,
+    render_clinician_directives,
+    render_feedback_history,
+)
+from acp_writer.prompts.plan_composer import (
+    PLAN_COMPOSER_USER,
+    compose_system_prompt,
+)
 from acp_writer.state import CarePlanComposerState
 
 logger = logging.getLogger(__name__)
@@ -71,32 +81,6 @@ def _format_demographics(demographics: dict) -> str:
     return ", ".join(parts) if parts else "Unknown"
 
 
-def _sanitize_conflicts(brief_data: dict) -> None:
-    """Coerce LLM-produced conflicts into valid ConflictEntry format."""
-    raw_conflicts = brief_data.get("conflicts", [])
-    if not raw_conflicts:
-        return
-    cleaned = []
-    for item in raw_conflicts:
-        if isinstance(item, str):
-            cleaned.append({
-                "description": item,
-                "activity_indices": [],
-                "sources": [],
-            })
-        elif isinstance(item, dict):
-            if "activity_indices" not in item or "sources" not in item:
-                cleaned.append({
-                    "description": item.get("description", str(item)),
-                    "activity_indices": item.get("activity_indices", []),
-                    "sources": item.get("sources", item.get("recommendation_ids", [])),
-                    "resolution": item.get("resolution"),
-                })
-            else:
-                cleaned.append(item)
-    brief_data["conflicts"] = cleaned
-
-
 def _sanitize_provenance(brief_data: dict, default_cpg: str) -> None:
     """Default null/missing source_cpg on goals & activities to the run's CPG.
 
@@ -114,17 +98,32 @@ def _sanitize_provenance(brief_data: dict, default_cpg: str) -> None:
                 item["source_cpg"] = default_cpg
 
 
+def _format_base_plan(base_goals: list[dict], base_activities: list[dict]) -> str:
+    """Render the revision base's goals + activities (F17a/F18b). Returns "" in
+    authoring mode (no base) so the user prompt is unchanged. On the first loop
+    iteration the base is the clinician-reviewed prior brief; on later
+    iterations it is the LATEST DRAFT, so internal-reviewer fixes build on the
+    directed changes already applied instead of reverting to the prior plan.
+    Conflicts are intentionally NOT rendered here — they reach the composer
+    through the "Clinician-directed changes" section (render_clinician_directives).
+    """
+    if not base_goals and not base_activities:
+        return ""
+    return (
+        "\n## Care Plan Base (authoritative — revise minimally)\n"
+        "This is the current plan under revision. Reproduce it and apply ONLY "
+        "the changes the Clinician-directed changes section and the Reviewer "
+        "Feedback require; do not add, re-word, or re-code untouched items.\n\n"
+        "### Base Goals\n"
+        f"{json.dumps(base_goals, indent=2, default=str)}\n\n"
+        "### Base Activities\n"
+        f"{json.dumps(base_activities, indent=2, default=str)}\n"
+    )
+
+
 def _parse_brief_from_response(content: str) -> dict[str, Any]:
     """Extract JSON from LLM response, handling markdown code blocks."""
-    text = content.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        start = 1
-        end = len(lines) - 1
-        if lines[-1].strip() == "```":
-            end = len(lines) - 1
-        text = "\n".join(lines[start:end])
-    return json.loads(text)
+    return loads_json(content)
 
 
 @mlflow.trace(name="plan_composer")
@@ -138,6 +137,41 @@ def plan_composer(state: CarePlanComposerState) -> dict:
     applicable_cpgs = state.get("applicable_cpgs", [])
     feedback = state.get("brief_review_feedback", "")
     output_dir = state.get("output_dir", "")
+
+    # Revision mode (F17a): a prior brief in state means this is a request-changes
+    # loop. The monolith never sets this key (it is one-shot from an IPS bundle),
+    # so it always authors.
+    prior_brief = state.get("prior_planning_brief") or {}
+    is_revision = bool(prior_brief.get("goals") or prior_brief.get("activities"))
+
+    # Evolving base (F18b): iteration 1 revises the clinician-reviewed prior
+    # brief; once the loop has produced a draft (state["planning_brief"]), later
+    # iterations revise THAT draft — otherwise every internal-reviewer round
+    # would rebuild from the prior brief and revert the clinician-directed
+    # changes applied in earlier iterations.
+    draft_brief = state.get("planning_brief") or {}
+    base_brief = draft_brief if (is_revision and (draft_brief.get("goals") or draft_brief.get("activities"))) else prior_brief
+    base_goals = base_brief.get("goals") or []
+    base_activities = base_brief.get("activities") or []
+
+    # Durable clinician channel (F18a): rendered EVERY iteration straight from
+    # state — never via brief_review_feedback, which the internal reviewer
+    # overwrites each round (the F18 bug). Carries the clinician's instruction,
+    # the prior conflicts with suggestions, and any F18c enforcement note.
+    clinician_directives = ""
+    if is_revision:
+        clinician_directives = render_clinician_directives(
+            prior_brief.get("conflicts"),
+            comment=state.get("careplan_feedback", ""),
+            enforcement_note=state.get("directive_enforcement_note", ""),
+        )
+        if clinician_directives:
+            clinician_directives = f"\n{clinician_directives}\n"
+
+    # Accumulated clinician feedback across the review loop (F17b). Rendered
+    # oldest-first so standing constraints from earlier rounds don't expire, and
+    # recorded on the brief for the audit trail / AI-InputPrompt DocRef.
+    review_history = state.get("careplan_review_history") or []
 
     cpg_ids = [c.get("cpg_id", c) if isinstance(c, dict) else c for c in applicable_cpgs]
 
@@ -162,26 +196,35 @@ def plan_composer(state: CarePlanComposerState) -> dict:
     if feedback:
         feedback_text = f"\n## Reviewer Feedback (address these issues)\n{feedback}"
 
+    history_block = render_feedback_history(review_history)
+    feedback_history_text = f"\n{history_block}\n" if history_block else ""
+
     user_prompt = PLAN_COMPOSER_USER.format(
         patient_reference=patient_ref,
         demographics=_format_demographics(demographics),
         conditions=_format_conditions(condition_codes),
         dmn_results=_format_dmn_results(dmn_results),
         recommendations=_format_recommendations(recommendations),
+        prior_plan=_format_base_plan(base_goals, base_activities),
+        clinician_directives=clinician_directives,
+        feedback_history=feedback_history_text,
         applicable_cpgs=json.dumps(cpg_ids),
-        dmn_audit_trail=json.dumps(dmn_results, default=str),
         feedback=feedback_text,
     )
 
     review_round = state.get("brief_review_count", 0)
-    logger.info("── Plan Composer (round %d) ──", review_round + 1)
+    logger.info(
+        "── Plan Composer (round %d, %s mode) ──",
+        review_round + 1,
+        "revision" if is_revision else "authoring",
+    )
 
     llm = get_llm(state)
     logger.info("Calling LLM...")
     t0 = time.time()
 
     response = llm.invoke([
-        {"role": "system", "content": PLAN_COMPOSER_SYSTEM},
+        {"role": "system", "content": compose_system_prompt(is_revision)},
         {"role": "user", "content": user_prompt},
     ])
 
@@ -190,7 +233,17 @@ def plan_composer(state: CarePlanComposerState) -> dict:
 
     try:
         brief_data = _parse_brief_from_response(content_to_text(response.content))
-        _sanitize_conflicts(brief_data)
+        # The DMN audit trail is authoritative data the executor already built —
+        # inject it directly rather than asking the LLM to echo it back through
+        # the prompt (F10). This removes a large, error-prone round-trip and
+        # guarantees the recorded trail matches what actually executed.
+        brief_data["dmn_audit_trail"] = dmn_results
+        brief_data["conflicts"] = coerce_conflicts(brief_data.get("conflicts"))
+        # Record the accumulated clinician feedback on the brief (F17b) — injected
+        # in code, not asked of the LLM, so the audit trail is authoritative. Left
+        # untouched (default []) on authoring / monolith runs with no history.
+        if review_history:
+            brief_data["revision_history"] = normalize_review_history(review_history)
         _sanitize_provenance(brief_data, cpg_ids[0] if cpg_ids else "unspecified")
         brief = PlanningBrief.model_validate(brief_data)
         brief_dict = brief.model_dump(mode="json")
@@ -208,6 +261,7 @@ def plan_composer(state: CarePlanComposerState) -> dict:
         return {
             "planning_brief": brief_dict,
             "brief_review_feedback": "",
+            "plan_composer_prompt": user_prompt,
         }
 
     except (json.JSONDecodeError, Exception) as e:
@@ -223,4 +277,5 @@ def plan_composer(state: CarePlanComposerState) -> dict:
                 "review_feedback": f"LLM response parse error: {e}",
             },
             "brief_review_feedback": "",
+            "plan_composer_prompt": user_prompt,
         }

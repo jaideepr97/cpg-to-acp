@@ -20,14 +20,51 @@ const patient = {
 
 export const carePlanView: CarePlanView = {
   goals: [
-    { id: "g1", description: "Achieve HbA1c < 7%", rationale: "Glycemic control per ADA 2024", sourceCpgId: "ada-2024" },
+    {
+      id: "g1",
+      description: "Achieve HbA1c < 7%",
+      rationale: "Glycemic control per ADA 2024",
+      target: "HbA1c < 7 %",
+      sourceCpgId: "ada-2024",
+      sourceRecommendationId: "ada-2024-rec-3",
+    },
   ],
   activities: [
-    { id: "a1", description: "Metformin 500mg twice daily", goalId: "g1", detail: "Titrate over 4 weeks" },
+    {
+      id: "a1",
+      description: "Metformin 500mg twice daily",
+      goalId: "g1",
+      dose: "500mg",
+      route: "oral",
+      frequency: "twice daily",
+      specialty: "endocrinology",
+      sourceCpg: "ada-2024",
+      sourceRecommendationId: "ada-2024-rec-7",
+      clinicalRationale: "First-line pharmacotherapy for type 2 diabetes.",
+    },
     { id: "a2", description: "HbA1c recheck in 3 months", goalId: "g1" },
   ],
   conflicts: [
-    { id: "c1", severity: "warning", description: "Overlapping recommendation with hypertension CPG on renal dosing." },
+    {
+      id: "c1",
+      category: "divergent_target",
+      severity: "warning",
+      status: "detected",
+      confidence: "high",
+      description: "Two guidelines set different blood-pressure targets.",
+      sources: [
+        { cpgId: "ada-2024", recommendationId: "rec-123", excerpt: "target < 140/90" },
+        { cpgId: "aha-2023", recommendationId: "rec-456", excerpt: "target < 130/80" },
+      ],
+    },
+    {
+      id: "c2",
+      category: "overlap",
+      severity: "info",
+      status: "detected",
+      description: "Overlapping recommendation with hypertension CPG on renal dosing.",
+      sources: [{ cpgId: "ada-2024", recommendationId: "rec-789" }],
+    },
   ],
   fhirBundle: { resourceType: "Bundle", type: "transaction", entry: [] },
 };

@@ -20,7 +20,10 @@ from cpg_contracts import (
     RecommendationSearchRequest,
 )
 
-from acp_writer.store.embedding import EmbeddingProvider, FakeEmbeddingProvider
+from acp_writer.store.embedding import (
+    EmbeddingProvider,
+    make_embedding_provider,
+)
 from acp_writer.store.guidelines_store import GuidelinesStore
 from acp_writer.store.vector_store import InMemoryVectorStore, VectorStore
 
@@ -37,10 +40,12 @@ DMN_NS = "https://www.omg.org/spec/DMN/20191111/MODEL/"
 _dynamic_models: dict[str, dict] = {}
 
 # --- Store initialization ---
-# Use FakeEmbeddingProvider by default to avoid downloading a model on import.
-# Set EMBEDDING_MODEL env var or call init_stores() with a real provider.
+# The provider is chosen by the EMBEDDING_PROVIDER env switch
+# (make_embedding_provider): "openai" for a real OpenAI-compatible endpoint,
+# otherwise a FakeEmbeddingProvider (the default — no network/downloads on
+# import, so tests stay hermetic). Call init_stores() to swap providers.
 
-_embedding_provider: EmbeddingProvider = FakeEmbeddingProvider(dimensions=8)
+_embedding_provider: EmbeddingProvider = make_embedding_provider()
 _vector_store: VectorStore = InMemoryVectorStore(_embedding_provider)
 _guidelines_store: GuidelinesStore = GuidelinesStore(_vector_store)
 
@@ -289,10 +294,12 @@ def get_careplan(careplan_id: str):
 @app.put("/api/v1/careplans/{careplan_id}/status")
 async def update_careplan_status(careplan_id: str, request: Request):
     from acp_writer.nodes.fhir_server_writer import approve_care_plan, reject_care_plan
+    from acp_writer.services.reviewer import reviewer_from_payload
     data = await request.json()
     new_status = data.get("status")
     if new_status == "active":
-        result = approve_care_plan(careplan_id, clinician=data.get("clinician"))
+        reviewer = reviewer_from_payload(data.get("reviewer"), clinician=data.get("clinician"))
+        result = approve_care_plan(careplan_id, reviewer=reviewer)
         if not result:
             raise HTTPException(status_code=404, detail=f"Care plan '{careplan_id}' not found")
         return result

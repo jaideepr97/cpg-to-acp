@@ -38,6 +38,28 @@ ERRORS=0
 SANDBOXES=(sb-patient-data sb-llm-reasoning sb-decision-engine sb-fhir-generation sb-fhir-server)
 verify_sandboxes "$IMAGE_TAG" "${SANDBOXES[@]}" || ERRORS=$?
 
+# Effective SonataFlow workflow in the running pod.
+# The operator mounts the flow definition into the `acpwriter` pod; a re-apply
+# that only changes the flow body does not always roll the pod, so an old
+# definition can keep serving. Grep the pod's mounted flow for a current-version
+# marker (F17 threads careplan_review_history through ComposePlan) to prove the
+# restart landed the new definition.
+echo ""
+log "SonataFlow workflow (effective in pod):"
+WF_MARKER="careplan_review_history"
+if oc get deployment/acpwriter -n "$NAMESPACE" >/dev/null 2>&1; then
+    if oc exec deployment/acpwriter -n "$NAMESPACE" -- \
+        sh -c "grep -rql '$WF_MARKER' /home/kogito 2>/dev/null || grep -rql '$WF_MARKER' /deployments 2>/dev/null" \
+        >/dev/null 2>&1; then
+        echo "  ✓ acpwriter pod serving current workflow (marker '$WF_MARKER' present)"
+    else
+        echo "  ✗ acpwriter pod workflow is stale (marker '$WF_MARKER' missing) — rerun deploy or 'oc rollout restart deployment/acpwriter'"
+        ERRORS=$((ERRORS + 1))
+    fi
+else
+    echo "  ⚠ acpwriter deployment not found — skipping workflow marker check"
+fi
+
 # Decision service (Helm-deployed, not sandboxed)
 echo ""
 log "Decision service:"

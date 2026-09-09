@@ -18,6 +18,7 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from pydantic import BaseModel, Field
 
+from acp_writer.llm_json import strip_code_fence
 from acp_writer.tools.bundle_inventory import BundleInventory, build_bundle_inventory
 from acp_writer.tools.concept_resolution import resolve_concept_in_bundle
 from acp_writer.tools.ips_extractor import (
@@ -409,11 +410,7 @@ def _parse_agent_response(message: Any) -> dict:
     if "INSUFFICIENT_DATA" in content.upper():
         return {"answer": None, "provenance": [], "insufficient_data": True}
 
-    if content.startswith("```"):
-        content = content.split("\n", 1)[1] if "\n" in content else content[3:]
-        if content.endswith("```"):
-            content = content[:-3]
-        content = content.strip()
+    content = strip_code_fence(content)
 
     try:
         parsed = json.loads(content)

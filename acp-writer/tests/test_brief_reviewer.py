@@ -170,3 +170,53 @@ class TestBriefReviewer:
 
         artifact = tmp_path / "brief-review-1.json"
         assert artifact.exists()
+
+
+class TestRevisionAwareness:
+    """F17: on a request-changes revision the reviewer prompt carries the
+    minimal-revision note so it doesn't demand authoring-style rewrites."""
+
+    def _user_prompt(self, mock_llm) -> str:
+        # The user message is the second entry passed to llm.invoke([...]).
+        messages = mock_llm.invoke.call_args[0][0]
+        return messages[1]["content"]
+
+    @patch("acp_writer.nodes.brief_reviewer.get_llm")
+    def test_authoring_has_no_revision_note(self, mock_get_llm):
+        mock_llm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = json.dumps({"verdict": "APPROVE", "issues": []})
+        mock_llm.invoke.return_value = mock_response
+        mock_get_llm.return_value = mock_llm
+
+        brief_reviewer(_make_state())
+        prompt = self._user_prompt(mock_llm)
+        assert "MINIMAL REVISION" not in prompt
+
+    @patch("acp_writer.nodes.brief_reviewer.get_llm")
+    def test_revision_includes_note(self, mock_get_llm):
+        mock_llm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = json.dumps({"verdict": "APPROVE", "issues": []})
+        mock_llm.invoke.return_value = mock_response
+        mock_get_llm.return_value = mock_llm
+
+        state = _make_state()
+        state["prior_planning_brief"] = _valid_brief()
+        brief_reviewer(state)
+        prompt = self._user_prompt(mock_llm)
+        assert "MINIMAL REVISION" in prompt
+
+    @patch("acp_writer.nodes.brief_reviewer.get_llm")
+    def test_empty_prior_brief_stays_authoring(self, mock_get_llm):
+        mock_llm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = json.dumps({"verdict": "APPROVE", "issues": []})
+        mock_llm.invoke.return_value = mock_response
+        mock_get_llm.return_value = mock_llm
+
+        state = _make_state()
+        state["prior_planning_brief"] = {"goals": [], "activities": []}
+        brief_reviewer(state)
+        prompt = self._user_prompt(mock_llm)
+        assert "MINIMAL REVISION" not in prompt

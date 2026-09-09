@@ -124,6 +124,8 @@ helm upgrade --install acp "$SCRIPT_DIR/chart-pods" \
     --set pods.llm-reasoning.env.litellmUrl="$LLM_BASE_URL" \
     --set pods.llm-reasoning.env.llmModel="$LLM_MODEL" \
     --set pods.llm-reasoning.env.llmRequestTimeout="${LLM_REQUEST_TIMEOUT:-600}" \
+    --set pods.llm-reasoning.env.embeddingProvider="${EMBEDDING_PROVIDER:-openai}" \
+    --set pods.llm-reasoning.env.embeddingModel="${EMBEDDING_MODEL:-text-embedding-3-small}" \
     --set pods.decision-engine.tag="$IMAGE_TAG" \
     --set pods.fhir-generation.tag="$IMAGE_TAG" \
     --set pods.fhir-generation.env.litellmUrl="$LLM_BASE_URL" \
@@ -144,6 +146,41 @@ oc apply -f "$SCRIPT_DIR/orchestrator/acpwriter-props.yaml" -n "$NAMESPACE" 2>/d
     || log "WARNING: acpwriter-props apply failed"
 oc apply -f "$SCRIPT_DIR/orchestrator/acp-writer-workflow.yaml" -n "$NAMESPACE" 2>/dev/null \
     || log "WARNING: SonataFlow workflow apply failed"
+# The SonataFlow operator mounts the workflow definition into the running
+# `acpwriter` pod via a ConfigMap; a re-apply that only changes the workflow
+# body does not always roll the pod, so the old definition keeps serving. Force
+# a restart so the new flow (e.g. careplan_review_history threading) takes
+# effect. Dev-only: this drops any in-flight workflow instances.
+if oc get deployment/acpwriter -n "$NAMESPACE" >/dev/null 2>&1; then
+    oc rollout restart deployment/acpwriter -n "$NAMESPACE" 2>/dev/null \
+        || log "WARNING: acpwriter rollout restart failed"
+    oc rollout status deployment/acpwriter -n "$NAMESPACE" --timeout=120s 2>/dev/null \
+        || log "WARNING: acpwriter rollout did not complete in time"
+
+    # A pod created seconds after the CM apply can mount a STALE cached CM; the
+    # kubelet swaps in the real content minutes later, and that delayed swap
+    # triggers a Quarkus devmode lazy live-reload that wipes all in-memory
+    # workflow instances — orphaning any in-flight run (observed 2026-08-28
+    # 00:01, run 5af4a6e5a58c). Wait for the projection to match the applied CM
+    # by content hash, then poke the lazy reload NOW, while nothing is running.
+    WF_FILE=/home/kogito/serverless-workflow-project/src/main/resources/acpwriter.sw.json
+    WF_SHA=$(oc get cm acpwriter -n "$NAMESPACE" -o jsonpath='{.data.acpwriter\.sw\.json}' | shasum | cut -d' ' -f1)
+    POD_SHA=""
+    for _ in $(seq 1 36); do
+        POD_SHA=$( (oc exec deployment/acpwriter -n "$NAMESPACE" -- cat "$WF_FILE" 2>/dev/null || true) | shasum | cut -d' ' -f1)
+        [ "$POD_SHA" = "$WF_SHA" ] && break
+        sleep 5
+    done
+    if [ "$POD_SHA" = "$WF_SHA" ]; then
+        log "Workflow projection settled in pod (sha ${WF_SHA:0:8})"
+        # Trigger devmode's request-driven reload deterministically.
+        oc exec deployment/acpwriter -n "$NAMESPACE" -- \
+            curl -s -o /dev/null -m 10 http://localhost:8080/q/health 2>/dev/null \
+            || log "WARNING: reload poke failed (continuing)"
+    else
+        log "WARNING: pod workflow projection still stale after 3m — first run may be orphaned by a late reload"
+    fi
+fi
 
 # --- Step 5: Deploy MCP server ---
 

@@ -246,6 +246,142 @@ class TestPlanComposer:
         assert "Missing monitoring activity" in user_msg
 
     @patch("acp_writer.nodes.plan_composer.get_llm")
+    def test_dmn_audit_trail_injected_from_state_not_llm(self, mock_get_llm):
+        # F10: the DMN audit trail is authoritative data the executor already
+        # built. It is injected into the brief in code, not echoed back through
+        # the LLM prompt. Even though SAMPLE_BRIEF_JSON carries an empty
+        # dmn_audit_trail, the composed brief must reflect state["dmn_results"].
+        mock_llm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = SAMPLE_BRIEF_JSON  # has "dmn_audit_trail": []
+        mock_llm.invoke.return_value = mock_response
+        mock_get_llm.return_value = mock_llm
+
+        state = self._make_state()
+        result = plan_composer(state)
+
+        trail = result["planning_brief"]["dmn_audit_trail"]
+        assert len(trail) == len(state["dmn_results"]) == 1
+        assert trail[0]["model_id"] == "treatment-recommendation"
+
+        # And the prompt no longer serializes the audit trail into the LLM input.
+        user_prompt = result["plan_composer_prompt"]
+        assert "dmn_audit_trail" not in user_prompt
+
+    @patch("acp_writer.nodes.plan_composer.get_llm")
+    def test_authoring_mode_when_no_prior_brief(self, mock_get_llm):
+        # F17a: with no prior_planning_brief the composer authors from scratch —
+        # authoring system prompt, and no "Prior Care Plan" block in the user
+        # prompt. This is the monolith / first-pass path.
+        mock_llm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = SAMPLE_BRIEF_JSON
+        mock_llm.invoke.return_value = mock_response
+        mock_get_llm.return_value = mock_llm
+
+        result = plan_composer(self._make_state())
+
+        call_args = mock_llm.invoke.call_args[0][0]
+        system_msg = call_args[0]["content"]
+        user_msg = call_args[1]["content"]
+        assert "Preserving conflicts between guidelines" in system_msg
+        assert "Revising an existing care plan" not in system_msg
+        assert "Care Plan Base" not in user_msg
+        # user prompt is captured verbatim
+        assert "Care Plan Base" not in result["plan_composer_prompt"]
+
+    @patch("acp_writer.nodes.plan_composer.get_llm")
+    def test_revision_mode_when_prior_brief_present(self, mock_get_llm):
+        # F17a: a prior_planning_brief with goals/activities flips the composer to
+        # revision mode — revision system prompt, and the prior plan rendered as
+        # the authoritative base in the user prompt.
+        mock_llm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = SAMPLE_BRIEF_JSON
+        mock_llm.invoke.return_value = mock_response
+        mock_get_llm.return_value = mock_llm
+
+        state = self._make_state()
+        state["prior_planning_brief"] = {
+            "goals": [{"description": "Lower systolic BP to <140", "source_cpg": "SYN-HTN-2026-001"}],
+            "activities": [{"type": "medication", "description": "Amlodipine 5mg daily",
+                            "source_cpg": "SYN-HTN-2026-001"}],
+            "conflicts": [],
+        }
+        result = plan_composer(state)
+
+        call_args = mock_llm.invoke.call_args[0][0]
+        system_msg = call_args[0]["content"]
+        user_msg = call_args[1]["content"]
+        assert "Revising an existing care plan" in system_msg
+        assert "Preserving conflicts between guidelines" not in system_msg
+        assert "Care Plan Base" in user_msg
+        # prior goals/activities are rendered as the base
+        assert "Lower systolic BP to <140" in user_msg
+        assert "Amlodipine 5mg daily" in user_msg
+        assert "Care Plan Base" in result["plan_composer_prompt"]
+
+    @patch("acp_writer.nodes.plan_composer.get_llm")
+    def test_empty_prior_brief_stays_authoring(self, mock_get_llm):
+        # An empty prior brief (no goals, no activities) is NOT a revision — e.g.
+        # a prior first pass that produced nothing. Stay in authoring mode.
+        mock_llm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = SAMPLE_BRIEF_JSON
+        mock_llm.invoke.return_value = mock_response
+        mock_get_llm.return_value = mock_llm
+
+        state = self._make_state()
+        state["prior_planning_brief"] = {"goals": [], "activities": [], "conflicts": []}
+        plan_composer(state)
+
+        system_msg = mock_llm.invoke.call_args[0][0][0]["content"]
+        assert "Preserving conflicts between guidelines" in system_msg
+        assert "Revising an existing care plan" not in system_msg
+
+    @patch("acp_writer.nodes.plan_composer.get_llm")
+    def test_feedback_history_threads_into_prompt_and_brief(self, mock_get_llm):
+        # F17b: accumulated review history reaches the composer prompt oldest-first
+        # and is recorded on the brief's revision_history for the audit trail.
+        mock_llm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = SAMPLE_BRIEF_JSON
+        mock_llm.invoke.return_value = mock_response
+        mock_get_llm.return_value = mock_llm
+
+        state = self._make_state()
+        state["careplan_review_history"] = [
+            {"decision": "request_changes", "comment": "never add opioids",
+             "clinician": {"display": "Dr. A"}},
+            {"decision": "request_changes", "comment": "merge the diet activities",
+             "clinician": {"display": "Dr. B"}},
+        ]
+        result = plan_composer(state)
+
+        user_msg = mock_llm.invoke.call_args[0][0][1]["content"]
+        assert "## Feedback history (oldest first)" in user_msg
+        # oldest-first and newest marked current
+        assert user_msg.index("never add opioids") < user_msg.index("merge the diet activities")
+        assert "address THIS round now" in user_msg
+        # recorded on the brief
+        history = result["planning_brief"]["revision_history"]
+        assert [r["comment"] for r in history] == ["never add opioids", "merge the diet activities"]
+
+    @patch("acp_writer.nodes.plan_composer.get_llm")
+    def test_no_feedback_history_when_absent(self, mock_get_llm):
+        # First pass / monolith: no history → no history block, empty revision_history.
+        mock_llm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = SAMPLE_BRIEF_JSON
+        mock_llm.invoke.return_value = mock_response
+        mock_get_llm.return_value = mock_llm
+
+        result = plan_composer(self._make_state())
+        user_msg = mock_llm.invoke.call_args[0][0][1]["content"]
+        assert "## Feedback history" not in user_msg
+        assert result["planning_brief"].get("revision_history", []) == []
+
+    @patch("acp_writer.nodes.plan_composer.get_llm")
     def test_writes_artifact(self, mock_get_llm, tmp_path):
         mock_llm = MagicMock()
         mock_response = MagicMock()

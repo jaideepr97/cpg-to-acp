@@ -32,6 +32,32 @@ spec:
               value: {{ .Values.decisionService.url | quote }}
             - name: MLFLOW_TRACKING_URI
               value: {{ .Values.mlflow.trackingUri | quote }}
+            {{- with .Values.aiTransparency }}
+            {{- if hasKey . "capturePrompts" }}
+            - name: ACP_CAPTURE_PROMPTS
+              value: {{ .capturePrompts | quote }}
+            {{- end }}
+            {{- if .modelCardUrl }}
+            - name: LLM_MODEL_CARD_URL
+              value: {{ .modelCardUrl | quote }}
+            {{- end }}
+            {{- if .reviewerDisplay }}
+            - name: ACP_REVIEWER_DISPLAY
+              value: {{ .reviewerDisplay | quote }}
+            {{- end }}
+            {{- if .reviewerReference }}
+            - name: ACP_REVIEWER_REFERENCE
+              value: {{ .reviewerReference | quote }}
+            {{- end }}
+            {{- if .reviewerIdSystem }}
+            - name: ACP_REVIEWER_ID_SYSTEM
+              value: {{ .reviewerIdSystem | quote }}
+            {{- end }}
+            {{- if .reviewerIdValue }}
+            - name: ACP_REVIEWER_ID_VALUE
+              value: {{ .reviewerIdValue | quote }}
+            {{- end }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /health/ready

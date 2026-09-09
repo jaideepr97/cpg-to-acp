@@ -234,15 +234,57 @@ wait_for_pod_ready() {
 
 label_pod() {
     # Apply K8s labels to a pod. Call after wait_for_pod_ready.
+    # Retries transient failures (the sandbox controller updates pod metadata
+    # concurrently right after readiness, so oc label can hit a conflict); a
+    # persistent failure warns and continues — under set -e an unguarded
+    # failure here silently aborted the whole deploy mid-sandbox-creation
+    # (observed repeatedly 2026-08-27), which is far worse than a missing
+    # cosmetic label.
     # Usage: label_pod <pod-name> <app-name> <instance>
     local pod_name="$1"
     local app_name="$2"
     local instance="$3"
 
-    oc label pod "$pod_name" -n "$NAMESPACE" \
-        "app.kubernetes.io/name=$app_name" \
-        "app.kubernetes.io/instance=$instance" \
-        --overwrite 2>/dev/null
+    for _ in 1 2 3; do
+        if oc label pod "$pod_name" -n "$NAMESPACE" \
+            "app.kubernetes.io/name=$app_name" \
+            "app.kubernetes.io/instance=$instance" \
+            --overwrite 2>/dev/null; then
+            return 0
+        fi
+        sleep 2
+    done
+    log "WARNING: could not label pod $pod_name after 3 attempts — continuing"
+    return 0
+}
+
+expose_service() {
+    # Expose a sandbox's port as a K8s Service, retrying transient failures.
+    # A failure here silently breaks the pod-split path (no in-cluster DNS name
+    # for the pod), so on persistent failure we surface the real error and fail
+    # the deploy rather than swallowing it. Usage:
+    #   expose_service <sandbox-name> [port] [scheme]
+    local name="$1"
+    local port="${2:-8080}"
+    local scheme="${3:-http}"
+    local attempts=3
+    local out=""
+
+    for attempt in $(seq 1 "$attempts"); do
+        if out=$(openshell service expose "$name" "$port" "$scheme" 2>&1); then
+            return 0
+        fi
+        # An already-exposed service is success, not a failure to retry.
+        if echo "$out" | grep -qiE 'already ex[il]st'; then
+            return 0
+        fi
+        log "  service expose for $name failed (attempt ${attempt}/${attempts}); retrying in 3s..."
+        sleep 3
+    done
+
+    echo "ERROR: could not expose service for '$name' on port ${port} after ${attempts} attempts:" >&2
+    echo "$out" >&2
+    return 1
 }
 
 # --- Build helpers ---

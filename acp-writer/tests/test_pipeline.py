@@ -71,6 +71,7 @@ class TestPipelineStructure:
             "recommendation_retriever",
             "plan_composer",
             "brief_reviewer",
+            "conflict_analyst",
             "fhir_bundle_generator",
             "terminology_validator",
             "fhir_syntax_validator",
@@ -79,9 +80,18 @@ class TestPipelineStructure:
         }
         assert expected == node_names
 
-    def test_eleven_nodes(self):
+    def test_twelve_nodes(self):
         graph = build_pipeline()
-        assert len(graph.nodes) == 11
+        assert len(graph.nodes) == 12
+
+    def test_conflict_analyst_wiring(self):
+        """brief_reviewer → conflict_analyst → fhir_bundle_generator; the FHIR
+        loop must not pass back through the analyst."""
+        graph = build_pipeline()
+        edges = set(graph.edges)
+        assert ("conflict_analyst", "fhir_bundle_generator") in edges
+        # The FHIR review loop returns to the generator, never the analyst.
+        assert ("fhir_semantic_reviewer", "conflict_analyst") not in edges
 
 
 class TestPipelineExecution:

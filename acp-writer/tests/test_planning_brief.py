@@ -8,14 +8,24 @@ from pydantic import ValidationError
 from acp_writer.planning_brief import (
     ActivityType,
     ActivityWorkflow,
+    ConflictCategory,
     ConflictEntry,
+    ConflictSeverity,
+    ConflictSource,
+    ConflictStatus,
     DMNAuditEntry,
     FHIRCode,
     PlanActivity,
     PlanGoal,
     PlanningBrief,
     ReviewStatus,
+    RevisionRound,
     TargetValue,
+    coerce_conflicts,
+    conflict_id,
+    normalize_review_history,
+    render_clinician_directives,
+    render_feedback_history,
 )
 
 
@@ -204,23 +214,276 @@ class TestPlanActivity:
 
 
 class TestConflictEntry:
-    def test_conflict(self):
+    def test_new_model(self):
         c = ConflictEntry(
+            id="conf-abc123",
+            category=ConflictCategory.DIVERGENT_TARGET,
+            severity=ConflictSeverity.WARNING,
             description="Conflicting BP targets from two guidelines",
-            activity_indices=[0, 1],
-            sources=["CPG-A", "CPG-B"],
+            goal_indices=[0, 1],
+            sources=[
+                ConflictSource(cpg_id="SYN-HTN-2026-001", recommendation_id="rec-1"),
+                ConflictSource(cpg_id="SYN-DM2-2026-001", recommendation_id="rec-2"),
+            ],
         )
+        assert c.status == ConflictStatus.DETECTED
         assert len(c.sources) == 2
         assert c.resolution is None
 
-    def test_with_resolution(self):
+    def test_defaults(self):
+        c = ConflictEntry(id="conf-1", description="x")
+        assert c.category == ConflictCategory.OTHER
+        assert c.severity == ConflictSeverity.WARNING
+        assert c.goal_indices == []
+        assert c.activity_indices == []
+        assert c.sources == []
+
+    def test_json_roundtrip(self):
         c = ConflictEntry(
-            description="Duplicate monitoring",
-            activity_indices=[2, 3],
-            sources=["rec-1", "rec-2"],
-            resolution="Merged into single monitoring activity",
+            id="conf-1",
+            category=ConflictCategory.CONTRADICTION,
+            description="titrate up vs. reduce lisinopril",
+            activity_indices=[0, 3],
+            sources=[ConflictSource(cpg_id="A", recommendation_id="r1", excerpt="q")],
+            confidence="high",
         )
-        assert c.resolution is not None
+        restored = ConflictEntry.model_validate(c.model_dump(mode="json"))
+        assert restored == c
+
+
+class TestConflictId:
+    def test_deterministic(self):
+        sources = [ConflictSource(cpg_id="A", recommendation_id="r1")]
+        a = conflict_id(ConflictCategory.OVERLAP, sources)
+        b = conflict_id(ConflictCategory.OVERLAP, sources)
+        assert a == b
+        assert a.startswith("conf-")
+
+    def test_order_insensitive(self):
+        s1 = [ConflictSource(cpg_id="A", recommendation_id="r1"),
+              ConflictSource(cpg_id="B", recommendation_id="r2")]
+        s2 = list(reversed(s1))
+        assert conflict_id(ConflictCategory.OVERLAP, s1) == conflict_id(ConflictCategory.OVERLAP, s2)
+
+    def test_category_and_content_key_change_id(self):
+        sources = [ConflictSource(cpg_id="A", recommendation_id="r1")]
+        base = conflict_id(ConflictCategory.OVERLAP, sources)
+        assert conflict_id(ConflictCategory.CONTRADICTION, sources) != base
+        assert conflict_id(ConflictCategory.OVERLAP, sources, content_key="bp") != base
+
+    def test_falls_back_to_cpg_ids(self):
+        # No recommendation ids → cpg ids drive the hash (still stable).
+        s = [ConflictSource(cpg_id="A"), ConflictSource(cpg_id="B")]
+        assert conflict_id(ConflictCategory.OVERLAP, s) == conflict_id(
+            ConflictCategory.OVERLAP, list(reversed(s))
+        )
+
+
+class TestCoerceConflicts:
+    def test_empty(self):
+        assert coerce_conflicts(None) == []
+        assert coerce_conflicts([]) == []
+
+    def test_bare_string(self):
+        [c] = coerce_conflicts(["Two guidelines disagree on BP target"])
+        assert c["description"] == "Two guidelines disagree on BP target"
+        assert c["id"].startswith("conf-")
+        ConflictEntry.model_validate(c)  # must validate
+
+    def test_legacy_sources_list_of_str(self):
+        [c] = coerce_conflicts([
+            {"description": "dup monitoring", "activity_indices": [2, 3], "sources": ["CPG-A", "CPG-B"]}
+        ])
+        assert c["sources"] == [{"cpg_id": "CPG-A"}, {"cpg_id": "CPG-B"}]
+        ConflictEntry.model_validate(c)
+
+    def test_legacy_recommendation_ids_key(self):
+        [c] = coerce_conflicts([{"description": "x", "recommendation_ids": ["r1"]}])
+        assert c["sources"] == [{"cpg_id": "r1"}]
+        assert "recommendation_ids" not in c
+        ConflictEntry.model_validate(c)
+
+    def test_preserves_existing_id(self):
+        [c] = coerce_conflicts([
+            {"id": "conf-keep", "description": "x", "sources": []}
+        ])
+        assert c["id"] == "conf-keep"
+
+    # --- F7: coerce_conflicts must be total (never raise on loose input) ---
+
+    def test_camelcase_source_keys(self):
+        [c] = coerce_conflicts([
+            {"description": "x", "sources": [
+                {"cpgId": "CPG-A", "recommendationId": "r1", "excerpt": "quote"}
+            ]}
+        ])
+        assert c["sources"] == [
+            {"cpg_id": "CPG-A", "recommendation_id": "r1", "excerpt": "quote"}
+        ]
+        ConflictEntry.model_validate(c)
+
+    def test_source_missing_cpg_id_is_dropped_not_fatal(self):
+        # A source with no recoverable cpg_id must be dropped without sinking
+        # the whole conflict (previously raised inside ConflictSource(**s)).
+        [c] = coerce_conflicts([
+            {"description": "x", "sources": [{"recommendation_id": "r1"}, {"cpg_id": "CPG-A"}]}
+        ])
+        assert c["sources"] == [{"cpg_id": "CPG-A"}]
+        ConflictEntry.model_validate(c)
+
+    def test_non_string_source_fields_coerced(self):
+        [c] = coerce_conflicts([{"description": "x", "sources": [{"cpg_id": 123}]}])
+        assert c["sources"] == [{"cpg_id": "123"}]
+        ConflictEntry.model_validate(c)
+
+    def test_severity_synonyms_coerced(self):
+        [c] = coerce_conflicts([{"description": "x", "severity": "high", "sources": []}])
+        assert c["severity"] == "critical"
+        [c2] = coerce_conflicts([{"description": "x", "severity": "low", "sources": []}])
+        assert c2["severity"] == "info"
+        ConflictEntry.model_validate(c)
+        ConflictEntry.model_validate(c2)
+
+    def test_unknown_category_and_status_defaulted(self):
+        [c] = coerce_conflicts([
+            {"description": "x", "category": "banana", "status": "whatever", "sources": []}
+        ])
+        assert c["category"] == "other"
+        assert c["status"] == "detected"
+        ConflictEntry.model_validate(c)
+
+    def test_conflict_entry_instances_accepted(self):
+        entry = ConflictEntry(id="conf-1", description="x")
+        [c] = coerce_conflicts([entry])
+        assert c["id"] == "conf-1"
+        ConflictEntry.model_validate(c)
+
+    def test_non_string_description_coerced(self):
+        [c] = coerce_conflicts([{"description": 42, "sources": []}])
+        assert c["description"] == "42"
+        ConflictEntry.model_validate(c)
+
+
+class TestRenderClinicianDirectives:
+    """F18a: the durable clinician-directives composer section."""
+
+    def _conflict(self, **over) -> dict:
+        c = {
+            "id": "conf-abc12345",
+            "category": "divergent_target",
+            "severity": "warning",
+            "description": "Two guidelines set different BP targets",
+            "rationale": "HTN <140/90 vs DM2 <130/80",
+            "suggested_resolution": "Prefer the diabetes guideline's <130/80 target",
+            "sources": [
+                {"cpg_id": "SYN-HTN-2026-001", "recommendation_id": "htn-rec-002"},
+                {"cpg_id": "SYN-DM2-2026-001"},
+            ],
+        }
+        c.update(over)
+        return c
+
+    def test_empty_is_blank(self):
+        assert render_clinician_directives(None) == ""
+        assert render_clinician_directives([], comment="") == ""
+
+    def test_renders_instruction_and_referents_compactly(self):
+        block = render_clinician_directives(
+            [self._conflict()], comment="resolve all conflicts as suggested"
+        )
+        assert "## Clinician-directed changes (MANDATORY" in block
+        assert "### Clinician instruction (this round)" in block
+        assert "resolve all conflicts as suggested" in block
+        assert "### Unresolved conflicts" in block
+        assert "[conf-abc12345]" in block
+        assert "divergent_target" in block
+        assert "Two guidelines set different BP targets" in block
+        assert "Rationale: HTN <140/90 vs DM2 <130/80" in block
+        assert "Suggested: Prefer the diabetes guideline's <130/80 target" in block
+        assert "SYN-HTN-2026-001/htn-rec-002" in block
+        assert "SYN-DM2-2026-001" in block
+        # Compact — no raw JSON dump of the conflict object.
+        assert "{" not in block
+
+    def test_resolved_conflicts_listed_as_keep_resolved(self):
+        resolved = self._conflict(
+            id="conf-done", status="resolved", resolution="Merged the diet items"
+        )
+        block = render_clinician_directives(
+            [resolved, self._conflict()], comment="now resolve the BP conflict"
+        )
+        assert "### Resolved in earlier rounds" in block
+        assert "[conf-done]: Merged the diet items" in block
+        # Resolved conflicts are NOT in the unresolved referent list.
+        unresolved_section = block.split("### Unresolved conflicts")[1].split(
+            "### Resolved in earlier rounds")[0]
+        assert "conf-done" not in unresolved_section
+
+    def test_enforcement_note_rendered_first(self):
+        block = render_clinician_directives(
+            [self._conflict()], comment="resolve as suggested",
+            enforcement_note="- [conf-abc12345] was not applied",
+        )
+        assert "### NOT APPLIED in your previous attempt" in block
+        assert "- [conf-abc12345] was not applied" in block
+        assert block.index("NOT APPLIED") < block.index("Clinician instruction")
+
+    def test_comment_only(self):
+        block = render_clinician_directives([], comment="please remove the statin activity")
+        assert "please remove the statin activity" in block
+        assert "### Unresolved conflicts" not in block
+
+    def test_coerces_loose_shapes(self):
+        # Bare-string / legacy conflicts must not raise (coerced first).
+        block = render_clinician_directives(["two guidelines disagree on BP"], comment="x")
+        assert "two guidelines disagree on BP" in block
+
+
+class TestPlanningBriefCoercesConflicts:
+    """F4: a single malformed conflict must never sink the whole brief."""
+
+    def _base(self, conflicts):
+        return {
+            "patient_reference": "Patient/1",
+            "applicable_cpgs": ["CPG-A"],
+            "goals": [{"description": "g", "source_cpg": "CPG-A"}],
+            "activities": [
+                {"type": "lifestyle", "description": "a", "source_cpg": "CPG-A"}
+            ],
+            "conflicts": conflicts,
+        }
+
+    def test_loose_conflict_does_not_drop_goals_and_activities(self):
+        # Before the before-validator, this brief raised on validate — and every
+        # caller that swallowed the error dropped the goals/activities too.
+        brief = PlanningBrief.model_validate(self._base([
+            {"description": "loose", "severity": "high", "sources": ["CPG-A"]}
+        ]))
+        assert len(brief.goals) == 1
+        assert len(brief.activities) == 1
+        assert len(brief.conflicts) == 1
+        assert brief.conflicts[0].severity == ConflictSeverity.CRITICAL
+
+    def test_bare_string_conflict_validates(self):
+        brief = PlanningBrief.model_validate(self._base(["two guidelines disagree"]))
+        assert brief.conflicts[0].description == "two guidelines disagree"
+        assert len(brief.goals) == 1
+
+    def test_source_without_cpg_id_does_not_raise(self):
+        brief = PlanningBrief.model_validate(self._base([
+            {"description": "x", "sources": [{"recommendation_id": "r1"}]}
+        ]))
+        assert brief.conflicts[0].sources == []
+        assert len(brief.activities) == 1
+
+    def test_clean_brief_is_idempotent(self):
+        clean = self._base([
+            {"id": "conf-x", "description": "x",
+             "category": "overlap", "severity": "info", "sources": [{"cpg_id": "CPG-A"}]}
+        ])
+        once = PlanningBrief.model_validate(clean)
+        twice = PlanningBrief.model_validate(once.model_dump(mode="json"))
+        assert once == twice
 
 
 class TestPlanningBrief:
@@ -306,3 +569,108 @@ class TestPlanningBrief:
             "Observation/bp-001",
             "Condition/diabetes-001",
         ]
+
+
+class TestFeedbackHistory:
+    """F17b: accumulated clinician feedback rendered oldest-first, with the
+    newest round marked current and older rounds under a growth guard."""
+
+    def _rounds(self, n: int) -> list[dict]:
+        return [
+            {"decision": "request_changes", "comment": f"change number {i}",
+             "clinician": {"display": f"Dr. {i}"}, "completed_at": f"2026-08-27T0{i}:00:00Z"}
+            for i in range(1, n + 1)
+        ]
+
+    def test_empty_is_blank(self):
+        assert render_feedback_history(None) == ""
+        assert render_feedback_history([]) == ""
+        # Rounds with no comment (e.g. an approve) render nothing.
+        assert render_feedback_history([{"decision": "approve", "comment": ""}]) == ""
+
+    def test_three_rounds_oldest_first_newest_marked_current(self):
+        block = render_feedback_history(self._rounds(3))
+        assert "## Feedback history (oldest first)" in block
+        # Oldest first: round 1 appears before round 3.
+        assert block.index("change number 1") < block.index("change number 3")
+        # Newest round is flagged as the one to act on now.
+        assert "(address THIS round now)" in block
+        newest_header = block.split("### Round 3")[1].splitlines()[0]
+        assert "address THIS round now" in newest_header
+        # Round 1 is NOT marked current.
+        assert "### Round 1" in block
+        round1_header = block.split("### Round 1")[1].splitlines()[0]
+        assert "address THIS round now" not in round1_header
+        # Standing-constraint guidance is present.
+        assert "standing context" in block
+
+    def test_growth_guard_summarizes_older_rounds(self):
+        # 5 rounds: the oldest 2 collapse to one-line summaries, the newest 3
+        # render in full (### headers).
+        block = render_feedback_history(self._rounds(5))
+        assert block.count("### Round") == 3
+        assert "### Round 3" in block  # verbatim
+        assert "### Round 5" in block  # verbatim
+        assert "### Round 1" not in block  # summarized
+        assert "### Round 2" not in block  # summarized
+        # Older rounds still appear as one-line summaries.
+        assert "- Round 1 (Dr. 1): change number 1" in block
+        assert "- Round 2 (Dr. 2): change number 2" in block
+
+    def test_skips_empty_comment_rounds_but_keeps_numbering(self):
+        rounds = [
+            {"decision": "request_changes", "comment": "first ask", "clinician": "Dr. A"},
+            {"decision": "approve", "comment": ""},
+            {"decision": "request_changes", "comment": "second ask", "clinician": "Dr. B"},
+        ]
+        block = render_feedback_history(rounds)
+        assert "first ask" in block
+        assert "second ask" in block
+        # Round numbers reflect original position (3, not 2, for the last).
+        assert "### Round 3" in block
+
+
+class TestNormalizeReviewHistory:
+    def test_flattens_to_audit_shape(self):
+        rounds = normalize_review_history([
+            {"decision": "request_changes", "comment": "  fix BP  ",
+             "clinician": {"display": "Dr. Reynolds"}, "completed_at": "2026-08-27T01:00:00Z"},
+        ])
+        assert rounds == [{
+            "round": 1,
+            "comment": "fix BP",
+            "reviewer": "Dr. Reynolds",
+            "timestamp": "2026-08-27T01:00:00Z",
+            "decision": "request_changes",
+        }]
+
+    def test_reviewer_fallbacks(self):
+        # dict without display → name → id → default; bare string; missing.
+        assert normalize_review_history([{"reviewer": "Dr. Bare"}])[0]["reviewer"] == "Dr. Bare"
+        assert normalize_review_history([{"clinician": {"name": "N"}}])[0]["reviewer"] == "N"
+        assert normalize_review_history([{"comment": "x"}])[0]["reviewer"] == "clinician"
+
+    def test_skips_non_dict_entries(self):
+        assert normalize_review_history(["oops", None, {"comment": "ok"}]) == [
+            {"round": 3, "comment": "ok", "reviewer": "clinician",
+             "timestamp": None, "decision": None},
+        ]
+
+    def test_revision_round_serializes_on_brief(self):
+        brief = PlanningBrief(
+            patient_reference="Patient/1",
+            applicable_cpgs=["CPG-A"],
+            goals=[PlanGoal(description="g", source_cpg="CPG-A")],
+            activities=[],
+            revision_history=[RevisionRound(round=1, comment="fix it", reviewer="Dr. A")],
+        )
+        data = brief.model_dump(mode="json")
+        assert data["revision_history"][0]["round"] == 1
+        assert data["revision_history"][0]["comment"] == "fix it"
+
+    def test_revision_history_defaults_empty(self):
+        brief = PlanningBrief(
+            patient_reference="Patient/1", applicable_cpgs=["CPG-A"],
+            goals=[PlanGoal(description="g", source_cpg="CPG-A")], activities=[],
+        )
+        assert brief.revision_history == []

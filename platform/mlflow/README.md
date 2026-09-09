@@ -26,6 +26,11 @@ Set `MLFLOW_TRACKING_URI` to point your services at the MLflow server:
 - `extract_patient_data` — FHIR Bundle parsing
 - `invoke_decisions` / `invoke_decisions_dynamic` — DMN decision evaluation
 - `evaluate_jit_dmn` — individual JIT decision engine calls
+- `conflict_analyst` — LLM plan-level conflict detection
+- `coerce_conflicts` — normalize loosely-shaped conflict entries into the brief contract
+- `build_conflict_provenance` — emit an AI-Provenance recording a detected plan conflict
+- `plan_conflict_from_provenance` — reconstruct a conflict view-model from a stored Provenance (persisted plans)
+- `plan_conflict_from_entry` — reconstruct a conflict view-model from a live planning-brief entry
 - `build_careplan` — FHIR CarePlan construction
 
 ### cpg-ingester (CLI tools)

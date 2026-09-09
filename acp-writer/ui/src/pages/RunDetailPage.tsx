@@ -99,7 +99,11 @@ export function RunDetailPage() {
         </FlexItem>
         {run.awaitingReview === "careplan" && run.carePlan && (
           <FlexItem>
+            {/* Key by round so the panel remounts fresh (idle, empty comment)
+                when a request_changes loop arms the next gate — round N's
+                submitted/error state can never bleed into round N+1. */}
             <ReviewPanel
+              key={run.reviewIteration}
               carePlan={run.carePlan}
               reviewIteration={run.reviewIteration}
               previousFeedback={run.previousFeedback}

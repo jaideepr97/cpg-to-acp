@@ -9,6 +9,7 @@ cpg-phi bucket; non-PHI data (recommendations) in cpg-artifacts.
 import logging
 from typing import Any
 
+import mlflow
 from cpg_contracts.artifact_store import ArtifactStore
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,128 @@ def _fetch_ref(store: ArtifactStore, ref: str) -> dict | None:
     except Exception as exc:
         logger.warning("Could not resolve artifact ref %s: %s", ref, exc)
         return None
+
+
+def _format_number(x) -> str:
+    """Render a numeric bound without a trailing ``.0`` (7.0 → "7", 7.5 → "7.5").
+
+    Target bounds are typed ``float`` on the brief, so an LLM-emitted ``7``
+    round-trips through JSON as ``7.0``; strip the noise for display.
+    """
+    if isinstance(x, float) and x.is_integer():
+        return str(int(x))
+    return str(x)
+
+
+def _format_brief_goal_target(
+    measure_code: dict | None, value: dict | None
+) -> str:
+    """Format a planning-brief goal target (FHIRCode + TargetValue) into a string.
+
+    e.g. ``{"display": "HbA1c"}`` + ``{"high": 7, "unit": "%"}`` → ``"HbA1c < 7 %"``.
+    Returns ``""`` when no measure is present.
+    """
+    mc = measure_code or {}
+    measure = mc.get("display") or mc.get("code") or ""
+    if not measure:
+        return ""
+    val = value or {}
+    low, high, unit = val.get("low"), val.get("high"), val.get("unit", "")
+    if low is not None and high is not None:
+        return f"{measure}: {_format_number(low)}–{_format_number(high)} {unit}".rstrip()
+    if high is not None:
+        return f"{measure} < {_format_number(high)} {unit}".rstrip()
+    if low is not None:
+        return f"{measure} > {_format_number(low)} {unit}".rstrip()
+    return measure
+
+
+@mlflow.trace(name="plan_goal_from_entry")
+def plan_goal_from_entry(entry: dict, idx: int) -> dict:
+    """Map a planning-brief goal dict → the BFF ``PlanGoal`` shape.
+
+    The brief has no id; assign an index-based id (``g{idx}``) — the UI uses it
+    only as a React key. snake_case → camelCase, mirroring
+    ``plan_conflict_from_entry``.
+    """
+    pg: dict = {
+        "id": entry.get("id") or f"g{idx}",
+        "description": entry.get("description", ""),
+    }
+    target = _format_brief_goal_target(
+        entry.get("target_measure_code"), entry.get("target_value")
+    )
+    if target:
+        pg["target"] = target
+    if entry.get("source_cpg"):
+        pg["sourceCpgId"] = entry["source_cpg"]
+    if entry.get("source_recommendation_id"):
+        pg["sourceRecommendationId"] = entry["source_recommendation_id"]
+    return pg
+
+
+@mlflow.trace(name="plan_activity_from_entry")
+def plan_activity_from_entry(entry: dict, idx: int) -> dict:
+    """Map a planning-brief activity dict → the BFF ``PlanActivity`` shape.
+
+    The brief has no id; assign an index-based id (``a{idx}``). snake_case →
+    camelCase, mirroring ``plan_conflict_from_entry``. ``source_dmn_call``,
+    ``code``, ``type``, and ``workflow`` are intentionally not surfaced yet
+    (see spec — deferred to the raw-FHIR viewer / surface 2).
+    """
+    pa: dict = {
+        "id": entry.get("id") or f"a{idx}",
+        "description": entry.get("description", ""),
+    }
+    for key in ("dose", "route", "frequency", "specialty"):
+        val = entry.get(key)
+        if val:
+            pa[key] = val
+    for src_key, dst_key in (
+        ("source_cpg", "sourceCpg"),
+        ("source_recommendation_id", "sourceRecommendationId"),
+        ("clinical_rationale", "clinicalRationale"),
+    ):
+        val = entry.get(src_key)
+        if val:
+            pa[dst_key] = val
+    return pa
+
+
+@mlflow.trace(name="plan_conflict_from_entry")
+def plan_conflict_from_entry(entry: dict) -> dict:
+    """Map a planning-brief ``ConflictEntry`` dict → the BFF ``PlanConflict`` shape.
+
+    The brief uses snake_case (``cpg_id``/``recommendation_id``); the API uses
+    camelCase (``cpgId``/``recommendationId``). Only the UI-facing fields are
+    carried through — the full provenance record is the read-back source of
+    truth (see ``ai_transparency.plan_conflict_from_provenance``).
+    """
+    pc: dict = {
+        "id": entry.get("id", ""),
+        "description": entry.get("description", ""),
+    }
+    for src_key, dst_key in (("severity", "severity"), ("category", "category"),
+                             ("status", "status"), ("confidence", "confidence"),
+                             ("suggested_resolution", "suggestedResolution"),
+                             ("resolution", "resolution")):
+        val = entry.get(src_key)
+        if val:
+            pc[dst_key] = val
+
+    sources: list[dict] = []
+    for s in entry.get("sources", []) or []:
+        if not isinstance(s, dict):
+            continue
+        src: dict = {"cpgId": s.get("cpg_id", "")}
+        if s.get("recommendation_id"):
+            src["recommendationId"] = s["recommendation_id"]
+        if s.get("excerpt"):
+            src["excerpt"] = s["excerpt"]
+        sources.append(src)
+    if sources:
+        pc["sources"] = sources
+    return pc
 
 
 def _to_coded_items(codes: list | None) -> list[dict]:
@@ -115,9 +238,21 @@ def enrich_run_detail(
 
         care_plan_view: dict[str, Any] = {"fhirBundle": fhir_bundle}
         if planning_brief and isinstance(planning_brief, dict):
-            care_plan_view["goals"] = planning_brief.get("goals", [])
-            care_plan_view["activities"] = planning_brief.get("activities", [])
-            care_plan_view["conflicts"] = planning_brief.get("conflicts", [])
+            care_plan_view["goals"] = [
+                plan_goal_from_entry(g, i)
+                for i, g in enumerate(planning_brief.get("goals", []))
+                if isinstance(g, dict)
+            ]
+            care_plan_view["activities"] = [
+                plan_activity_from_entry(a, i)
+                for i, a in enumerate(planning_brief.get("activities", []))
+                if isinstance(a, dict)
+            ]
+            care_plan_view["conflicts"] = [
+                plan_conflict_from_entry(c)
+                for c in planning_brief.get("conflicts", [])
+                if isinstance(c, dict)
+            ]
         detail["carePlan"] = care_plan_view
 
     # --- Write result ---

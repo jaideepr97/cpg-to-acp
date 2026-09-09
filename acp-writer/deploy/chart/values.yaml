@@ -25,3 +25,16 @@ decisionService:
 
 mlflow:
   trackingUri: https://mlflow-redhat-ods-applications.apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com
+
+# AI Transparency on FHIR (issue #169). Only non-empty values are emitted.
+aiTransparency:
+  # Capture rendered prompts as AI-InputPrompt DocumentReferences. Prompts embed
+  # patient data — set to "false" before touching real PHI.
+  capturePrompts: "true"
+  # Optional model-card URL → AI-ModelCard DocumentReference.
+  modelCardUrl: ""
+  # Default human verifier recorded on approve (request payload may override).
+  reviewerDisplay: "Demo Clinician"
+  reviewerReference: "Practitioner/demo-clinician"
+  reviewerIdSystem: ""
+  reviewerIdValue: ""

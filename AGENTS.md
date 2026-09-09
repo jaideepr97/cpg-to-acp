@@ -27,7 +27,7 @@ These are hard rules. Do not violate them.
 ### Component Ownership
 
 - **`cpg-ingester`** has two outputs: (1) DMN decision tables for computable logic, and (2) recommendations and other non-computable content destined for a vector store in `acp-writer`. It must not be coupled to the decision engine runtime or vector store implementation. It interacts with downstream services only through API/MCP. The recommendation contract is defined in `shared/cpg_contracts/recommendations.py` — see `dev_docs/design/contract-proposal-ingester-writer.md` for the full design rationale.
-- **`acp-writer`** owns the Drools/Kogito decision engine runtime and the vector store. Both are internal implementation details of `acp-writer` — they are not platform services. It deploys and executes DMN. It produces two outputs: FHIR CarePlans (to the FHIR server) and BPMN (to automation). The API contract is defined in `acp-writer/api/openapi.yaml` (REST) and `acp-writer/api/mcp-tools.json` (MCP tools). Callers provide patient data directly — acp-writer does not query FHIR servers.
+- **`acp-writer`** owns the Drools/Kogito decision engine runtime and the vector store. Both are internal implementation details of `acp-writer` — they are not platform services. It deploys and executes DMN. It produces two outputs: FHIR CarePlans (to the FHIR server) and BPMN (to automation). The API contract is defined in `acp-writer/api/openapi.yaml` (REST) and `acp-writer/api/mcp-tools.json` (MCP tools). Callers provide patient data directly — acp-writer does not query FHIR servers. Plan-level conflicts are detected by an LLM `conflict_analyst` node and recorded as FHIR Provenance resources (AI-Provenance profile) with a single `careplan-conflict-detected` marker on the CarePlan — see [`docs/ai-transparency.md`](docs/ai-transparency.md).
 - **`automation`** is a downstream runtime service that executes BPMN process definitions. It does not orchestrate other services.
 - **`mock-EHR`** is development/test infrastructure. It is not application logic.
 - **`platform`** holds shared infrastructure services (MaaS, MLflow) that multiple application components consume. These are platform-level dependencies, not application logic. On OpenShift AI, these are typically configured rather than deployed; for local dev, this directory contains the deployment artifacts.
@@ -93,6 +93,7 @@ Key technologies referenced in this project (all subject to change):
 
 - **Document parsing:** Docling
 - **Decision engine:** Drools / Kogito (Apache KIE), DMN 1.4 (latest supported at conformance level 3; upgrade to 1.5 when Drools adds support)
+- **AI transparency:** HL7 AI Transparency on FHIR IG (AI-Device, AI-Provenance, AI-InputPrompt, AI-ModelCard, AIAST labels, AIconfidence, human-verifier agents) — see `docs/ai-transparency.md`
 - **FHIR server:** HAPI FHIR
 - **Agent framework:** LangGraph (see `dev_docs/spikes/spike-agent-framework.md`)
 - **Observability:** MLflow (tracing, experiment tracking)

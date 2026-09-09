@@ -3,7 +3,10 @@
 import json
 from unittest.mock import MagicMock, patch
 
-from acp_writer.nodes.fhir_semantic_reviewer import fhir_semantic_reviewer
+from acp_writer.nodes.fhir_semantic_reviewer import (
+    _bundle_for_review,
+    fhir_semantic_reviewer,
+)
 
 
 def _make_state(bundle: dict | None = None) -> dict:
@@ -103,6 +106,55 @@ class TestFHIRSemanticReviewer:
         user_msg = call_args[1]["content"]
         assert "Missing AIAST" in user_msg
         assert "INVALID" in user_msg
+
+    @patch("acp_writer.nodes.fhir_semantic_reviewer.get_llm")
+    def test_strips_attachment_data_from_review_prompt(self, mock_get_llm):
+        # F10: DocumentReference attachment payloads (captured prompts, model
+        # cards) are huge base64 blobs with no clinical signal. They must not
+        # reach the reviewer LLM prompt — and the original bundle in state must
+        # be left untouched.
+        big_data = "QQ==" * 5000
+        bundle = {
+            "resourceType": "Bundle",
+            "type": "transaction",
+            "entry": [
+                {"resource": {"resourceType": "CarePlan", "id": "cp-1"}},
+                {"resource": {
+                    "resourceType": "DocumentReference",
+                    "id": "prompt-1",
+                    "content": [{"attachment": {"contentType": "text/plain", "data": big_data}}],
+                }},
+            ],
+        }
+        mock_llm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = json.dumps({"verdict": "APPROVE", "issues": []})
+        mock_llm.invoke.return_value = mock_response
+        mock_get_llm.return_value = mock_llm
+
+        fhir_semantic_reviewer(_make_state(bundle))
+
+        user_msg = mock_llm.invoke.call_args[0][0][1]["content"]
+        assert big_data not in user_msg
+        assert "omitted for review" in user_msg
+        # Original bundle in state is not mutated.
+        assert bundle["entry"][1]["resource"]["content"][0]["attachment"]["data"] == big_data
+
+    def test_bundle_for_review_leaves_non_docref_untouched(self):
+        bundle = {
+            "entry": [
+                {"resource": {"resourceType": "CarePlan", "id": "cp-1"}},
+                {"resource": {
+                    "resourceType": "DocumentReference",
+                    "content": [{"attachment": {"data": "abc", "contentType": "text/plain"}}],
+                }},
+            ],
+        }
+        sanitized = _bundle_for_review(bundle)
+        assert sanitized["entry"][0]["resource"] == {"resourceType": "CarePlan", "id": "cp-1"}
+        att = sanitized["entry"][1]["resource"]["content"][0]["attachment"]
+        assert "data" not in att
+        assert att["contentType"] == "text/plain"
 
     @patch("acp_writer.nodes.fhir_semantic_reviewer.get_llm")
     def test_writes_artifact(self, mock_get_llm, tmp_path):

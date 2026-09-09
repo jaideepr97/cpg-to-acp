@@ -74,6 +74,21 @@
           "original_grade": null
         },
         "provenance": "reviewed"
+      },
+      {
+        "id": "dm2-rec-005",
+        "source_cpg": "SYN-DM2-2026-001",
+        "section": "4.5",
+        "title": "Renal Protection — ACE Inhibitor Dose Reduction",
+        "content": "In patients with diabetic nephropathy showing a decline in renal function, consider reducing the lisinopril dose and monitoring serum creatinine and potassium closely, as continued high-dose ACE inhibition may worsen renal outcomes in this subgroup.",
+        "recommendation_type": "treatment",
+        "certainty": {
+          "strength": "conditional-for",
+          "evidence_quality": "moderate",
+          "grading_system": null,
+          "original_grade": "Conditional recommendation, moderate-certainty evidence"
+        },
+        "provenance": "reviewed"
       }
     ]
   }

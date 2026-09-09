@@ -5,7 +5,7 @@ metadata:
   annotations:
     sonataflow.org/profile: dev
     sonataflow.org/description: "ACP Writer pipeline orchestration"
-    sonataflow.org/version: "0.2.0"
+    sonataflow.org/version: "0.3.0"
 spec:
   podTemplate:
     container:
@@ -163,6 +163,17 @@ spec:
               # the first pass; on a request_changes loop it seeds the composer's
               # reviewer feedback so goals/activities are actually revised.
               careplan_feedback: '${ .careplanReview.comment // "" }'
+              # Ref to the PRIOR planning brief, so a request_changes recomposition
+              # can feed the previously-detected conflicts back to the composer
+              # (issue #169 F16a) — this is what makes "resolve all identified
+              # conflicts as you suggested" resolvable. Empty "" on the first pass
+              # (composerData is not set yet); llm_reasoning guards for that.
+              prior_brief_ref: '${ .composerData.planning_brief_ref // "" }'
+              # Full accumulated clinician review history, oldest-first (issue #169
+              # F17b). Each revision otherwise sees only the latest comment, so
+              # earlier instructions — including standing constraints ("never add
+              # X") — silently expire. Empty [] on the first pass.
+              careplan_review_history: '${ .careplanReviewHistory // [] }'
         eventRef: composeDone
         eventDataFilter:
           toStateData: "${ .composerData }"
@@ -189,6 +200,10 @@ spec:
               callback_url: "http://acpwriter:80/wait-generate"
               process_instance_id: "$WORKFLOW.instanceId"
               planning_brief_ref: "${ .composerData.planning_brief_ref }"
+              # Rendered composer/conflict prompts captured by ComposePlan, so the
+              # deployed bundle carries AI-InputPrompt DocRefs like the monolith
+              # (issue #169 F2). Null when prompt capture is disabled.
+              prompts_ref: "${ .composerData.prompts_ref }"
               patient_demographics: "${ .patientData.patient_demographics }"
               fhir_review_feedback: "${ .fhirReviewFeedback }"
         eventRef: generateDone
@@ -236,8 +251,11 @@ spec:
 
       - name: InitCarePlanReview
         type: inject
-        data:
-          careplanReviewCount: 0
+        # NOTE: inject `data` merges into state BEFORE stateDataFilter runs, so
+        # putting careplanReviewCount into `data` would clobber the incremented
+        # value back to 0 on every request_changes loop (the UI then shows
+        # "round 1" forever). Initialize only via the null-guarded filter.
+        data: {}
         stateDataFilter:
           output: "${ if .careplanReviewCount == null then . + {careplanReviewCount: 0} else . end }"
         transition: ReviewCarePlan
@@ -259,13 +277,44 @@ spec:
         eventRef: careplanReviewed
         eventDataFilter:
           toStateData: "${ .careplanReview }"
-        transition: IncrementCarePlanReview
+        transition: ValidateReviewRound
+
+      # Round-binding guard (issue #169): the UI stamps each submission with the
+      # reviewRound it was showing (== careplanReviewCount at the armed gate). If
+      # a submission carries a round that no longer matches the gate's current
+      # round, the user reviewed a superseded plan version -- discard it and
+      # re-arm the gate so they review the real plan, rather than (e.g.) approving
+      # content they never saw. reviewRound == null is treated as valid for
+      # backward compatibility (old clients, manual curl events); that fail-open
+      # path is watched by verify-review-gate.sh.
+      - name: ValidateReviewRound
+        type: switch
+        dataConditions:
+          - name: staleRound
+            condition: "${ .careplanReview.reviewRound != null and .careplanReview.reviewRound != .careplanReviewCount }"
+            transition: DiscardStaleReview
+        defaultCondition:
+          transition: IncrementCarePlanReview
+
+      - name: DiscardStaleReview
+        type: inject
+        # data:{} + filter only -- never put loop-surviving data in an inject
+        # `data:` block (it merges BEFORE stateDataFilter and clobbers state;
+        # see the InitCarePlanReview note). Drop the stale review and re-arm the
+        # gate without touching careplanReviewCount or careplanReviewHistory.
+        data: {}
+        stateDataFilter:
+          output: "${ del(.careplanReview) }"
+        transition: ReviewCarePlan
 
       - name: IncrementCarePlanReview
         type: inject
         data: {}
         stateDataFilter:
-          output: "${ . + {careplanReviewCount: ((.careplanReviewCount // 0) + 1)} }"
+          # Bump the round counter AND append this round to the accumulated
+          # review history (issue #169 F17b), so a request_changes loop back to
+          # ComposePlan carries every prior comment, not just the latest.
+          output: "${ . + {careplanReviewCount: ((.careplanReviewCount // 0) + 1), careplanReviewHistory: ((.careplanReviewHistory // []) + [.careplanReview])} }"
         transition: CheckCarePlanReview
 
       - name: CheckCarePlanReview
@@ -297,6 +346,11 @@ spec:
               arguments:
                 fhir_bundle_ref: "${ .fhirGenData.fhir_bundle_ref }"
                 patient_reference: "${ .patientData.patient_reference }"
+                # Approving clinician from the care-plan review gate. Null when
+                # the UI omits it; /api/v1/write then falls back to the config
+                # default reviewer. Threaded so the deployed approval records the
+                # verifier Humanagent + acknowledges conflicts (issue #169 F1).
+                reviewer: "${ .careplanReview.reviewer }"
             actionDataFilter:
               results: "${ . }"
               toStateData: "${ .writeResult }"

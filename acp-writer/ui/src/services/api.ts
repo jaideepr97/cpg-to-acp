@@ -19,14 +19,28 @@ class ApiError extends Error {
   }
 }
 
+// BFF errors carry a JSON body of the shape {"message": "..."}; surface that
+// human-readable string rather than the raw JSON so callers (e.g. inline
+// alerts) can display it directly. Falls back to the raw text for non-JSON
+// bodies.
+function errorMessage(body: string): string {
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed && typeof parsed.message === "string") return parsed.message;
+  } catch {
+    // not JSON — use the raw body as-is
+  }
+  return body;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     headers: { "Content-Type": "application/json", ...init?.headers },
     ...init,
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText);
-    throw new ApiError(res.status, text);
+    const text = await res.text().catch(() => "");
+    throw new ApiError(res.status, errorMessage(text) || res.statusText);
   }
   if (res.status === 204) return undefined as T;
   return res.json();

@@ -34,6 +34,11 @@ pods:
       llmModel: default
       llmRequestTimeout: "600"
       decisionEngineUrl: http://acp-decision-engine:8080
+      # Real embedding provider for recommendation RAG. "openai" reuses the
+      # LITELLM_URL + LLM_API_KEY already on this pod (no heavy model download).
+      # Set to "fake" to fall back to the deterministic 8-dim test provider.
+      embeddingProvider: openai
+      embeddingModel: text-embedding-3-small
     secrets:
       llm: true
       minio: true
@@ -73,6 +78,11 @@ pods:
       litellmUrl: http://localhost:4000
       llmModel: default
       llmRequestTimeout: "600"
+      # AI Transparency (issue #169): capture rendered prompts as AI-InputPrompt
+      # DocumentReferences. Prompts embed patient data — set to "false" before
+      # touching real PHI. Optional model-card URL → AI-ModelCard DocumentReference.
+      capturePrompts: "true"
+      # modelCardUrl: https://example.org/model-card
     secrets:
       llm: true
       minio: true
@@ -92,6 +102,12 @@ pods:
     port: 8080
     env:
       fhirServerUrl: http://cpg-mock-ehr-medplum-server:8103/fhir/R4
+      # AI Transparency (issue #169): default human verifier recorded on approve
+      # (a review request payload may override these per-review).
+      reviewerDisplay: Demo Clinician
+      reviewerReference: Practitioner/demo-clinician
+      # reviewerIdSystem: http://hl7.org/fhir/sid/us-npi
+      # reviewerIdValue: "1234567890"
     secrets:
       minio: true
       fhir: true

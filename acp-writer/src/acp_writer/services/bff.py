@@ -21,7 +21,8 @@ from fastapi.responses import JSONResponse, Response
 
 from cpg_contracts.artifact_store import ArtifactStore
 
-from acp_writer.services.artifact_resolver import enrich_run_detail
+from acp_writer.services.ai_transparency import plan_conflict_from_provenance
+from acp_writer.services.artifact_resolver import _format_number, enrich_run_detail
 from acp_writer.services.sonataflow_client import (
     SonataFlowClient,
     map_to_run_detail,
@@ -338,6 +339,27 @@ def _resolve_sonataflow_id(run_id: str) -> str | None:
     return None
 
 
+async def _resolve_sf_id(run_id: str) -> str | None:
+    """Resolve a run_id (the workflow business key) to its SonataFlow instance ID.
+
+    Prefers the in-memory pending-run mapping; falls back to a business-key
+    lookup in the data-index. A raw run_id is never a valid instance ID, so the
+    fallback is what lets existing runs still be found after a BFF restart (when
+    the in-memory map is empty).
+    """
+    sf_id = _resolve_sonataflow_id(run_id)
+    if sf_id:
+        return sf_id
+    if _sonataflow:
+        try:
+            instance = await _sonataflow.get_instance_by_business_key(run_id)
+        except Exception:
+            instance = None
+        if instance:
+            return instance["id"]
+    return None
+
+
 @app.get("/api/v1/runs")
 async def list_runs(status: str | None = None, limit: int = 50):
     summaries: list[dict] = []
@@ -394,12 +416,22 @@ async def get_run(run_id: str):
                 return enrich_run_detail(detail, _phi_store, _artifacts_store)
         return _pending_run_detail(pr)
 
-    # Fall through to direct SonataFlow lookup (for runs created before this change)
+    # Fall through: run not in the in-memory map (e.g. after a BFF restart).
+    # run_id is the workflow business key; try a direct id lookup first (legacy
+    # runs addressed by instance id), then resolve by business key.
     if not _sonataflow:
         return JSONResponse(status_code=503, content={"message": "SonataFlow not configured"})
+    instance = None
     try:
         instance = await _sonataflow.get_instance(run_id)
     except Exception:
+        instance = None
+    if not instance:
+        try:
+            instance = await _sonataflow.get_instance_by_business_key(run_id)
+        except Exception:
+            instance = None
+    if not instance:
         return JSONResponse(status_code=404, content={"message": f"Run {run_id} not found"})
     detail = map_to_run_detail(instance)
     return enrich_run_detail(detail, _phi_store, _artifacts_store)
@@ -413,18 +445,35 @@ async def submit_review(run_id: str, gate: str, request: Request):
     if not _sonataflow:
         return JSONResponse(status_code=503, content={"message": "SonataFlow not configured"})
 
-    sf_id = _resolve_sonataflow_id(run_id) or run_id
+    sf_id = await _resolve_sf_id(run_id)
+    if not sf_id:
+        return JSONResponse(status_code=404, content={"message": f"Run {run_id} not found"})
     try:
         instance = await _sonataflow.get_instance(sf_id)
     except Exception:
         return JSONResponse(status_code=404, content={"message": f"Run {run_id} not found"})
 
     pre_detail = map_to_run_detail(instance)
+    # Fast-feedback courtesy only. The data-index this reads lags the engine, so
+    # this check can be wrong either way — but harmlessly: a wrongly-passed check
+    # ends in an engine-side round discard + UI retry, and a wrongly-failed one
+    # shows a clear 409. The authoritative guard is round-binding in the workflow
+    # (ValidateReviewRound), not this pre-check.
     if pre_detail.get("awaitingReview") != gate:
         return JSONResponse(status_code=409, content={"message": "Run is not awaiting careplan review"})
 
     review = await request.json()
-    await _sonataflow.send_review(sf_id, gate, review or {})
+    try:
+        # Forwarded verbatim into the CloudEvent data, so the reviewRound the UI
+        # sent reaches the workflow's round guard unchanged (single spelling,
+        # camelCase, end to end — no translation point to disagree).
+        await _sonataflow.send_review(sf_id, gate, review or {})
+    except Exception:
+        logger.exception("send_review failed for run %s gate %s", run_id, gate)
+        return JSONResponse(
+            status_code=503,
+            content={"message": "Workflow engine temporarily unavailable — please try again."},
+        )
 
     try:
         updated = await _sonataflow.get_instance(sf_id)
@@ -440,7 +489,9 @@ async def submit_review(run_id: str, gate: str, request: Request):
 async def cancel_run(run_id: str):
     if not _sonataflow:
         return JSONResponse(status_code=503, content={"message": "SonataFlow not configured"})
-    sf_id = _resolve_sonataflow_id(run_id) or run_id
+    sf_id = await _resolve_sf_id(run_id)
+    if not sf_id:
+        return JSONResponse(status_code=404, content={"message": f"Run {run_id} not found"})
     try:
         await _sonataflow.abort_instance(sf_id)
     except Exception:
@@ -678,7 +729,7 @@ def _extract_view_from_bundle(bundle: dict) -> tuple[list, list, list]:
             goals.append({
                 "id": r.get("id", ""),
                 "description": r.get("description", {}).get("text", ""),
-                "rationale": target_text or None,
+                "target": target_text or None,
                 "sourceCpgId": source_cpgs.get(url),
             })
 
@@ -711,26 +762,37 @@ def _extract_view_from_bundle(bundle: dict) -> tuple[list, list, list]:
                 "detail": None,
             })
 
-    return goals, activities, []
+    conflicts = []
+    for r in resources.values():
+        if r.get("resourceType") != "Provenance":
+            continue
+        # plan_conflict_from_provenance returns None for any Provenance without
+        # the conflict-id extension, so it doubles as the conflict filter (C6).
+        pc = plan_conflict_from_provenance(r)
+        if pc:
+            conflicts.append(pc)
+
+    return goals, activities, conflicts
 
 
 def _format_goal_target(targets: list) -> str:
-    """Format Goal.target[] into a human-readable string."""
+    """Format Goal.target[] into a human-readable string, e.g. "HbA1c < 7 %"."""
     parts = []
     for t in targets:
         measure = t.get("measure", {}).get("text", "")
         detail_range = t.get("detailRange", {})
         low = detail_range.get("low", {})
         high = detail_range.get("high", {})
-        if measure:
-            if high and low:
-                parts.append(f"Target {measure}: {low.get('value')}–{high.get('value')} {high.get('unit', '')}")
-            elif high:
-                parts.append(f"Target {measure}: < {high.get('value')} {high.get('unit', '')}")
-            elif low:
-                parts.append(f"Target {measure}: > {low.get('value')} {low.get('unit', '')}")
-            else:
-                parts.append(f"Target: {measure}")
+        if not measure:
+            continue
+        if high and low:
+            parts.append(f"{measure}: {_format_number(low.get('value'))}–{_format_number(high.get('value'))} {high.get('unit', '')}".rstrip())
+        elif high:
+            parts.append(f"{measure} < {_format_number(high.get('value'))} {high.get('unit', '')}".rstrip())
+        elif low:
+            parts.append(f"{measure} > {_format_number(low.get('value'))} {low.get('unit', '')}".rstrip())
+        else:
+            parts.append(measure)
     return "; ".join(parts)
 
 

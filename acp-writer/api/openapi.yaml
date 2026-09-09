@@ -764,6 +764,35 @@ components:
           enum: [approved, rejected]
         reason:
           type: string
+        clinician:
+          type: string
+          description: Legacy display-name shortcut for the verifier; prefer `reviewer`.
+        reviewer:
+          $ref: "#/components/schemas/ReviewerRef"
+
+    ReviewerRef:
+      type: object
+      description: >
+        Identity of the human verifier recorded on the AI-Provenance when the
+        plan is approved. Optional request override; falls back to the
+        ACP_REVIEWER_* config defaults. A SMART-on-FHIR launch would populate
+        this from the token's fhirUser claim. Mirrors the ReviewerRef schema in
+        bff-openapi.yaml — the BFF and REST specs are independent documents, so
+        each defines it once (no cross-file $ref).
+      required: [display]
+      properties:
+        display:
+          type: string
+          description: Human-readable verifier name.
+        reference:
+          type: string
+          description: 'FHIR reference to the verifier, e.g. "Practitioner/demo-clinician".'
+        identifierSystem:
+          type: string
+          description: Identifier system for the verifier (paired with identifierValue).
+        identifierValue:
+          type: string
+          description: Identifier value for the verifier (paired with identifierSystem).
 
     # --- Health ---
 

@@ -1,8 +1,13 @@
 """FHIR Bundle Builder — deterministic FHIR R4 resource construction.
 
-Produces CarePlan, Goal, MedicationRequest, ServiceRequest,
-AI-Device, AI-Provenance resources from a PlanningBrief.
-All resources get AIAST meta.security tags.
+Produces Patient, CarePlan, Goal, MedicationRequest, ServiceRequest, and the
+AI-transparency resources (AI-Device, AI-Provenance, AI-InputPrompt /
+AI-ModelCard DocumentReferences) from a PlanningBrief. All AI-produced
+resources carry AIAST ``meta.security`` tags.
+
+AI-transparency resource construction lives in
+``acp_writer.services.ai_transparency`` (the HL7 AI Transparency IG is the
+source of truth); this builder wires those resources into the bundle.
 """
 
 import uuid
@@ -10,14 +15,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 from acp_writer.planning_brief import ActivityType, PlanningBrief
+from acp_writer.services import ai_transparency as ait
+from acp_writer.services.ai_transparency import ACP_EXT_BASE, aiast_security
 
-AIAST_SECURITY = {
-    "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationValue",
-    "code": "AIAST",
-    "display": "asserted by AI system",
-}
-
-AI_TRANSPARENCY_PROFILE = "http://hl7.org/fhir/uv/ai-transparency/StructureDefinition"
+# Retained for import back-compat; sourced from the IG-conformant helper.
+AIAST_SECURITY = aiast_security()
 
 
 def _uuid() -> str:
@@ -66,10 +68,18 @@ def _codeable_concept(code_dict: dict | None, text: str | None = None) -> dict:
 def build_fhir_bundle(
     brief: PlanningBrief,
     patient_demographics: dict[str, Any] | None = None,
+    model_id: str | None = None,
+    prompts: dict[str, str] | None = None,
 ) -> dict:
-    """Build a complete FHIR R4 transaction Bundle from a PlanningBrief."""
+    """Build a complete FHIR R4 transaction Bundle from a PlanningBrief.
+
+    ``model_id`` names the LLM behind the AI-Device (from state ``llm_model``).
+    ``prompts`` maps a human label → rendered prompt text; each becomes an
+    AI-InputPrompt DocumentReference (when ``ACP_CAPTURE_PROMPTS`` is enabled).
+    """
     entries: list[dict] = []
     now = datetime.now(timezone.utc).isoformat()
+    prompts = prompts or {}
 
     bundle_id = _uuid()
 
@@ -209,6 +219,7 @@ def build_fhir_bundle(
             activity_refs.append(detail_entry)
 
     careplan_uid = _uuid()
+    careplan_urn = _urn(careplan_uid)
     careplan: dict[str, Any] = {
         "resourceType": "CarePlan",
         "id": careplan_uid,
@@ -227,33 +238,46 @@ def build_fhir_bundle(
         "goal": [{"reference": _urn(uid)} for uid in goal_uids],
         "activity": activity_refs,
     }
+    # WS4 marker: exactly one boolean extension when the plan has conflicts.
+    if brief.conflicts:
+        careplan["extension"] = [{
+            "url": f"{ACP_EXT_BASE}/careplan-conflict-detected",
+            "valueBoolean": True,
+        }]
     entries.append(_entry(careplan, careplan_uid))
 
+    # ── AI-Device ───────────────────────────────────────────────────────────
     device_uid = _uuid()
-    ai_device: dict[str, Any] = {
-        "resourceType": "Device",
-        "id": device_uid,
-        "meta": {
-            "profile": [f"{AI_TRANSPARENCY_PROFILE}/AI-Device"],
-            "security": [AIAST_SECURITY],
-        },
-        "type": {
-            "coding": [{
-                "system": "http://hl7.org/fhir/uv/ai-transparency/CodeSystem/ai-device-type",
-                "code": "Artificial-Intelligence",
-                "display": "Artificial Intelligence",
-            }],
-        },
-        "deviceName": [{"name": "acp-writer", "type": "user-friendly-name"}],
-        "version": [{"value": "0.2.0"}],
-    }
+    device_urn = _urn(device_uid)
+    ai_device = ait.build_ai_device(device_uid, model_id)
     entries.append(_entry(ai_device, device_uid))
 
-    prov_uid = _uuid()
-    all_target_refs = [{"reference": _urn(careplan_uid)}]
-    all_target_refs.extend({"reference": _urn(uid)} for uid in goal_uids)
-    for idx, uid in activity_uid_map.items():
-        all_target_refs.append({"reference": _urn(uid)})
+    # ── AI-InputPrompt DocumentReferences (captured prompts) ─────────────────
+    input_prompt_urns: list[str] = []
+    if ait.prompts_capture_enabled():
+        for label, text in prompts.items():
+            if not text:
+                continue
+            docref_uid = _uuid()
+            docref = ait.build_input_prompt_docref(
+                docref_uid, text, f"Rendered prompt: {label}"
+            )
+            entries.append(_entry(docref, docref_uid))
+            input_prompt_urns.append(_urn(docref_uid))
+
+    # ── AI-ModelCard DocumentReference (optional, env-gated) ─────────────────
+    model_card_urn: str | None = None
+    mc_url = ait.model_card_url()
+    if mc_url:
+        mc_uid = _uuid()
+        entries.append(_entry(ait.build_model_card_docref(mc_uid, mc_url), mc_uid))
+        model_card_urn = _urn(mc_uid)
+
+    # ── Bundle-level AI-Provenance ───────────────────────────────────────────
+    all_targets = [{"reference": careplan_urn}]
+    all_targets.extend({"reference": _urn(uid)} for uid in goal_uids)
+    for _idx, uid in activity_uid_map.items():
+        all_targets.append({"reference": _urn(uid)})
 
     prov_entities: list[dict] = []
     for cpg_id in brief.applicable_cpgs:
@@ -261,35 +285,23 @@ def build_fhir_bundle(
             "role": "derivation",
             "what": {"display": f"CPG: {cpg_id}"},
         })
+    for ip_urn in input_prompt_urns:
+        prov_entities.append({"role": "derivation", "what": {"reference": ip_urn}})
+    if model_card_urn:
+        prov_entities.append({"role": "derivation", "what": {"reference": model_card_urn}})
 
-    ai_provenance: dict[str, Any] = {
-        "resourceType": "Provenance",
-        "id": prov_uid,
-        "meta": {
-            "profile": [f"{AI_TRANSPARENCY_PROFILE}/AI-Provenance"],
-            "security": [AIAST_SECURITY],
-        },
-        "target": all_target_refs,
-        "recorded": now,
-        "reason": [{
-            "coding": [{
-                "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationValue",
-                "code": "AIAST",
-            }],
-        }],
-        "agent": [{
-            "type": {
-                "coding": [{
-                    "system": "http://terminology.hl7.org/CodeSystem/provenance-participant-type",
-                    "code": "author",
-                }],
-            },
-            "who": {"reference": _urn(device_uid)},
-        }],
-        "entity": prov_entities,
-    }
+    prov_uid = _uuid()
+    ai_provenance = ait.build_ai_provenance(
+        prov_uid=prov_uid,
+        targets=all_targets,
+        device_urn=device_urn,
+        recorded=now,
+        occurred=now,
+        entities=prov_entities or None,
+    )
     entries.append(_entry(ai_provenance, prov_uid))
 
+    # ── Per-activity source Provenances ──────────────────────────────────────
     for i, activity in enumerate(brief.activities):
         if not activity.source_recommendation_id:
             continue
@@ -298,40 +310,43 @@ def build_fhir_bundle(
             prov_target: dict[str, Any] = {"reference": _urn(uid)}
         else:
             prov_target = {
-                "reference": _urn(careplan_uid),
-                "extension": [{
-                    "url": f"{AI_TRANSPARENCY_PROFILE}/targetPath",
-                    "valueString": f"CarePlan.activity[{i}].detail",
-                }],
+                "reference": careplan_urn,
+                "extension": [ait.targetPath_ext(f"CarePlan.activity[{i}].detail")],
             }
 
         act_prov_uid = _uuid()
-        act_provenance: dict[str, Any] = {
-            "resourceType": "Provenance",
-            "id": act_prov_uid,
-            "meta": _meta(),
-            "target": [prov_target],
-            "recorded": now,
-            "agent": [{
-                "type": {
-                    "coding": [{
-                        "system": "http://terminology.hl7.org/CodeSystem/provenance-participant-type",
-                        "code": "author",
-                    }],
-                },
-                "who": {"reference": _urn(device_uid)},
-            }],
-            "entity": [{
+        act_provenance = ait.build_ai_provenance(
+            prov_uid=act_prov_uid,
+            targets=[prov_target],
+            device_urn=device_urn,
+            recorded=now,
+            occurred=now,
+            entities=[{
                 "role": "source",
                 "what": {
                     "display": f"Recommendation: {activity.source_recommendation_id}",
-                    "identifier": {
-                        "value": activity.source_recommendation_id,
-                    },
+                    "identifier": {"value": activity.source_recommendation_id},
                 },
             }],
-        }
+        )
         entries.append(_entry(act_provenance, act_prov_uid))
+
+    # ── Conflict Provenances (WS4) ───────────────────────────────────────────
+    goal_urns = [_urn(uid) for uid in goal_uids]
+    activity_urn_map = {idx: _urn(uid) for idx, uid in activity_uid_map.items()}
+    for conflict in brief.conflicts:
+        conf_prov_uid = _uuid()
+        conf_prov = ait.build_conflict_provenance(
+            prov_uid=conf_prov_uid,
+            conflict=conflict,
+            careplan_urn=careplan_urn,
+            goal_urns=goal_urns,
+            activity_urn_map=activity_urn_map,
+            device_urn=device_urn,
+            recorded=now,
+            occurred=now,
+        )
+        entries.append(_entry(conf_prov, conf_prov_uid))
 
     bundle: dict[str, Any] = {
         "resourceType": "Bundle",

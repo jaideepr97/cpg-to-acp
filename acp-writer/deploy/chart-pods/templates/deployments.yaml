@@ -46,6 +46,14 @@ spec:
             - name: LLM_MODEL
               value: {{ $pod.env.llmModel | quote }}
             {{- end }}
+            {{- if $pod.env.embeddingProvider }}
+            - name: EMBEDDING_PROVIDER
+              value: {{ $pod.env.embeddingProvider | quote }}
+            {{- end }}
+            {{- if $pod.env.embeddingModel }}
+            - name: EMBEDDING_MODEL
+              value: {{ $pod.env.embeddingModel | quote }}
+            {{- end }}
             {{- if $pod.env.llmRequestTimeout }}
             - name: LLM_REQUEST_TIMEOUT
               value: {{ $pod.env.llmRequestTimeout | quote }}
@@ -77,6 +85,31 @@ spec:
             {{- if $pod.env.bffHost }}
             - name: BFF_HOST
               value: {{ $pod.env.bffHost | quote }}
+            {{- end }}
+            {{- /* AI Transparency (issue #169) */}}
+            {{- if hasKey $pod.env "capturePrompts" }}
+            - name: ACP_CAPTURE_PROMPTS
+              value: {{ $pod.env.capturePrompts | quote }}
+            {{- end }}
+            {{- if $pod.env.modelCardUrl }}
+            - name: LLM_MODEL_CARD_URL
+              value: {{ $pod.env.modelCardUrl | quote }}
+            {{- end }}
+            {{- if $pod.env.reviewerDisplay }}
+            - name: ACP_REVIEWER_DISPLAY
+              value: {{ $pod.env.reviewerDisplay | quote }}
+            {{- end }}
+            {{- if $pod.env.reviewerReference }}
+            - name: ACP_REVIEWER_REFERENCE
+              value: {{ $pod.env.reviewerReference | quote }}
+            {{- end }}
+            {{- if $pod.env.reviewerIdSystem }}
+            - name: ACP_REVIEWER_ID_SYSTEM
+              value: {{ $pod.env.reviewerIdSystem | quote }}
+            {{- end }}
+            {{- if $pod.env.reviewerIdValue }}
+            - name: ACP_REVIEWER_ID_VALUE
+              value: {{ $pod.env.reviewerIdValue | quote }}
             {{- end }}
             {{- end }}
             {{- if $pod.secrets }}

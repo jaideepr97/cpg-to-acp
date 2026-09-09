@@ -57,6 +57,16 @@ POLICY_DIR="$RENDERED_POLICY_DIR"
 LLM_BASE_URL="${MAAS_GATEWAY_URL}/${MAAS_ROUTE_SEGMENT}"
 LLM_MODEL="${ACP_WRITER_LLM_MODEL:-$LLM_MODEL_DEFAULT}"
 
+# AI Transparency on FHIR (issue #169). Prompts embed patient data — set
+# ACP_CAPTURE_PROMPTS=false before touching real PHI. Reviewer defaults are the
+# demo verifier recorded on approve when a review request carries no override.
+ACP_CAPTURE_PROMPTS="${ACP_CAPTURE_PROMPTS:-true}"
+LLM_MODEL_CARD_URL="${LLM_MODEL_CARD_URL:-}"
+ACP_REVIEWER_DISPLAY="${ACP_REVIEWER_DISPLAY:-Demo Clinician}"
+ACP_REVIEWER_REFERENCE="${ACP_REVIEWER_REFERENCE:-Practitioner/demo-clinician}"
+ACP_REVIEWER_ID_SYSTEM="${ACP_REVIEWER_ID_SYSTEM:-}"
+ACP_REVIEWER_ID_VALUE="${ACP_REVIEWER_ID_VALUE:-}"
+
 # Read secrets from K8s Secrets (never from env vars or files)
 { set +x; } 2>/dev/null
 LLM_API_KEY=$(read_secret llm-credentials LLM_API_KEY)
@@ -80,6 +90,22 @@ teardown_sandboxes() {
         log "Deleting $sb..."
         openshell sandbox delete "$sb" 2>/dev/null || true
     done
+
+    # Wait for the old pods to actually disappear before recreating. Without
+    # this, wait_for_pod_ready matches a Terminating old pod ("ready after 1s")
+    # and the follow-up oc calls race the deletion — set -e then aborts the
+    # deploy mid-way (observed twice on 2026-08-27, leaving sandboxes missing).
+    log "Waiting for old sandbox pods to terminate..."
+    for _ in $(seq 1 60); do
+        local remaining
+        # `|| true`: grep exits 1 on zero matches, which pipefail+set -e would
+        # otherwise turn into a deploy abort at exactly the success condition.
+        remaining=$( (oc get pods -n "$NAMESPACE" --no-headers 2>/dev/null \
+            | awk '{print $1}' | grep -Fx -f <(printf '%s\n' "${SANDBOXES[@]}") || true) | wc -l | tr -d ' ')
+        [ "$remaining" = "0" ] && break
+        sleep 5
+    done
+    log "Old sandbox pods gone"
 }
 
 deploy_sandboxes() {
@@ -106,7 +132,7 @@ deploy_sandboxes() {
 
         wait_for_pod_ready "$name" 90 || true
         label_pod "$name" "$k8s_name" "acp"
-        openshell service expose "$name" 8080 http 2>/dev/null || true
+        expose_service "$name"
         log "Done: $name"
     }
 
@@ -146,7 +172,9 @@ deploy_sandboxes() {
         "LITELLM_URL=${LLM_BASE_URL}" \
         "LLM_MODEL=${LLM_MODEL}" \
         "LLM_API_KEY=${LLM_API_KEY}" \
-        "LLM_REQUEST_TIMEOUT=${LLM_REQUEST_TIMEOUT:-600}"
+        "LLM_REQUEST_TIMEOUT=${LLM_REQUEST_TIMEOUT:-600}" \
+        "ACP_CAPTURE_PROMPTS=${ACP_CAPTURE_PROMPTS}" \
+        "LLM_MODEL_CARD_URL=${LLM_MODEL_CARD_URL}"
 
     # FHIR Server
     create_acp_sandbox "sb-fhir-server" "acp-writer-fhir-srv" "acp-writer-fhir-srv.yaml" \
@@ -156,7 +184,11 @@ deploy_sandboxes() {
         "PYTHONPATH=/app/src" \
         "FHIR_SERVER_URL=http://cpg-mock-ehr-medplum-server.${NAMESPACE}.svc.cluster.local:8103/fhir/R4" \
         "FHIR_CLIENT_ID=${FHIR_CLIENT_ID:-}" \
-        "FHIR_CLIENT_SECRET=${FHIR_CLIENT_SECRET:-}"
+        "FHIR_CLIENT_SECRET=${FHIR_CLIENT_SECRET:-}" \
+        "ACP_REVIEWER_DISPLAY=${ACP_REVIEWER_DISPLAY}" \
+        "ACP_REVIEWER_REFERENCE=${ACP_REVIEWER_REFERENCE}" \
+        "ACP_REVIEWER_ID_SYSTEM=${ACP_REVIEWER_ID_SYSTEM}" \
+        "ACP_REVIEWER_ID_VALUE=${ACP_REVIEWER_ID_VALUE}"
 
     # Wait for background sandbox-create processes to settle
     sleep 5

@@ -30,6 +30,24 @@ def health():
     return {"status": "UP", "service": "fhir-generation"}
 
 
+def _resolve_prompts(data: dict) -> dict:
+    """Resolve the rendered prompts ferried from the compose service (#169 F2).
+
+    The compose service captures ``plan_composer_prompt``/``conflict_prompt`` and
+    passes them as ``prompts_ref`` (or inline ``prompts``). Resolve them back
+    into state keys so ``fhir_bundle_generator`` emits the AI-InputPrompt
+    DocumentReferences in the deployed bundle, exactly as the monolith does.
+    """
+    prompts = resolve_ref(data, "prompts", _phi_store)
+    if not isinstance(prompts, dict):
+        return {}
+    return {
+        k: prompts[k]
+        for k in ("plan_composer_prompt", "conflict_prompt")
+        if prompts.get(k)
+    }
+
+
 @app.post("/api/v1/generate-bundle")
 async def generate_bundle(request: Request):
     """Generate FHIR Bundle from Planning Brief, then validate."""
@@ -43,6 +61,7 @@ async def generate_bundle(request: Request):
         "llm_model": LLM_MODEL,
         "llm_api_key": LLM_API_KEY,
     }
+    state.update(_resolve_prompts(data))
 
     gen_result = fhir_bundle_generator(state)
     state.update(gen_result)
@@ -57,6 +76,8 @@ async def generate_bundle(request: Request):
         "terminology_issues": term_result.get("terminology_issues", []),
         "syntax_errors": syntax_result.get("syntax_errors", []),
     }
+    if gen_result.get("fhir_generation_error"):
+        response["fhir_generation_error"] = gen_result["fhir_generation_error"]
     if ref:
         response["fhir_bundle_ref"] = ref
     else:
@@ -86,6 +107,7 @@ def _run_generate_background(data: dict, callback_url: str, process_instance_id:
             "llm_model": LLM_MODEL,
             "llm_api_key": LLM_API_KEY,
         }
+        state.update(_resolve_prompts(data))
 
         gen_result = fhir_bundle_generator(state)
         state.update(gen_result)
@@ -99,6 +121,8 @@ def _run_generate_background(data: dict, callback_url: str, process_instance_id:
             "terminology_issues": term_result.get("terminology_issues", []),
             "syntax_errors": syntax_result.get("syntax_errors", []),
         }
+        if gen_result.get("fhir_generation_error"):
+            result["fhir_generation_error"] = gen_result["fhir_generation_error"]
         if ref:
             result["fhir_bundle_ref"] = ref
         elif _phi_store:

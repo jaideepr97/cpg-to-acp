@@ -1,0 +1,65 @@
+{
+  "metadata": {
+    "contract_version": "1.0",
+    "cpg_id": "SYN-HTN-2026-001",
+    "title": "Clinical Practice Guideline: Management of Hypertension in Adults",
+    "version": "1.0",
+    "publication_date": "2026-07-01",
+    "evidence_review_date": "2026-06-01",
+    "issuing_body": "Synthetic Guidelines Collaborative",
+    "grading_system": "GRADE",
+    "scope": "Adults (age 18+) with essential hypertension",
+    "supersedes": null
+  },
+  "recommendation_bundle": {
+    "contract_version": "1.0",
+    "source_cpg": "SYN-HTN-2026-001",
+    "recommendations": [
+      {
+        "id": "htn-rec-001",
+        "source_cpg": "SYN-HTN-2026-001",
+        "section": "3.1",
+        "title": "Blood Pressure Target — General Adults",
+        "content": "For most adults with hypertension, aim for a target blood pressure of < 140/90 mmHg. Intensification of therapy is recommended when blood pressure remains at or above this threshold on repeat measurement.",
+        "recommendation_type": "treatment",
+        "certainty": {
+          "strength": "strong-for",
+          "evidence_quality": "high",
+          "grading_system": null,
+          "original_grade": "Strong recommendation, high-certainty evidence"
+        },
+        "provenance": "reviewed"
+      },
+      {
+        "id": "htn-rec-002",
+        "source_cpg": "SYN-HTN-2026-001",
+        "section": "3.2",
+        "title": "Pharmacological Therapy — ACE Inhibitor Titration",
+        "content": "When blood pressure remains above target on a stable dose, titrate lisinopril upward to reach the blood pressure target, up to the maximum tolerated dose. Reassess blood pressure and renal function 2-4 weeks after each dose increase.",
+        "recommendation_type": "treatment",
+        "certainty": {
+          "strength": "strong-for",
+          "evidence_quality": "moderate",
+          "grading_system": null,
+          "original_grade": "Strong recommendation, moderate-certainty evidence"
+        },
+        "provenance": "reviewed"
+      },
+      {
+        "id": "htn-rec-003",
+        "source_cpg": "SYN-HTN-2026-001",
+        "section": "3.3",
+        "title": "Lifestyle — Dietary Sodium and Balanced Diet",
+        "content": "Adopt a balanced diet rich in vegetables, fruits, whole grains, and lean proteins while limiting sodium, refined carbohydrates, and added sugars. Dietary counseling by a registered dietitian is recommended to support blood pressure control.",
+        "recommendation_type": "lifestyle",
+        "certainty": {
+          "strength": "strong-for",
+          "evidence_quality": "moderate",
+          "grading_system": null,
+          "original_grade": null
+        },
+        "provenance": "reviewed"
+      }
+    ]
+  }
+}

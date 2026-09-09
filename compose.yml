@@ -174,6 +174,17 @@ services:
       - LITELLM_URL=http://litellm:4000
       - LITELLM_API_KEY=sk-change-me
       - FHIR_SERVER_URL=http://medplum-server:8103/fhir/R4
+      # --- AI Transparency (issue #169) ---
+      # Capture rendered prompts as AI-InputPrompt DocumentReferences. Prompts
+      # embed patient data — MUST be set to "false" before touching real PHI.
+      - ACP_CAPTURE_PROMPTS=true
+      # Optional model-card URL → AI-ModelCard DocumentReference. Unset = omit.
+      # - LLM_MODEL_CARD_URL=
+      # Default human verifier recorded on approve (request payload may override).
+      - ACP_REVIEWER_DISPLAY=Demo Clinician
+      - ACP_REVIEWER_REFERENCE=Practitioner/demo-clinician
+      # - ACP_REVIEWER_ID_SYSTEM=http://hl7.org/fhir/sid/us-npi
+      # - ACP_REVIEWER_ID_VALUE=
     env_file:
       - path: .medplum/medplum-fhir.env
         required: false

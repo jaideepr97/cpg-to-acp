@@ -225,7 +225,10 @@ export interface components {
             id: string;
             description: string;
             rationale?: string;
+            /** @description Formatted measurable target, e.g. HbA1c < 7 % */
+            target?: string;
             sourceCpgId?: string;
+            sourceRecommendationId?: string;
         };
         PlanActivity: {
             id: string;
@@ -233,17 +236,60 @@ export interface components {
             /** @description Links to the goal it serves. */
             goalId?: string;
             detail?: string;
+            dose?: string;
+            route?: string;
+            frequency?: string;
+            specialty?: string;
+            sourceRecommendationId?: string;
+            /** @description Source guideline the activity derives from. */
+            sourceCpg?: string;
+            /** @description Why the activity was selected. */
+            clinicalRationale?: string;
         };
+        /** @description A plan-level conflict flagged by the conflict_analyst node. Persisted plans reconstruct these from the conflict Provenance resources' extensions (never from note text); the live review view carries them on the brief. */
         PlanConflict: {
+            /** @description Semantic (index-free) id, stable across request-changes regeneration. */
             id: string;
-            /** @enum {string} */
+            /**
+             * @description Display severity; drives the UI alert variant (info=blue, warning/critical=amber/red).
+             * @enum {string}
+             */
             severity?: "info" | "warning" | "critical";
+            /**
+             * @description The kind of conflict the analyst detected.
+             * @enum {string}
+             */
+            category?: "overlap" | "contradiction" | "divergent_target" | "divergent_schedule" | "other";
+            /**
+             * @description Lifecycle — flips to acknowledged when a reviewer approves.
+             * @enum {string}
+             */
+            status?: "detected" | "acknowledged" | "resolved";
+            /** @description Analyst confidence ("low" | "medium" | "high"); recorded as the AIconfidence extension on the Provenance. */
+            confidence?: string;
+            /** @description Clinician-legible summary of the conflict. */
             description: string;
+            /** @description One conservative sentence from the analyst proposing how the clinician might resolve the conflict. Advisory only — never auto-applied. Persisted in the conflict-suggested-resolution extension on the Provenance. */
+            suggestedResolution?: string;
+            /** @description The clinician's applied resolution on a resolved conflict — the note of what was actually done, recorded on a request-changes revision (F17c). Persisted in the conflict-resolution extension on the Provenance. */
+            resolution?: string;
+            /** @description The guideline recommendations that give rise to the conflict. */
+            sources?: components["schemas"]["ConflictSource"][];
+        };
+        /** @description One guideline recommendation contributing to a conflict. */
+        ConflictSource: {
+            /** @description Source CPG identifier (e.g. SYN-HTN-2026-001). */
+            cpgId: string;
+            /** @description Source recommendation identifier within the CPG. */
+            recommendationId?: string;
+            /** @description Short quote from the source recommendation */
+            excerpt?: string;
         };
         /** @description View-model reused by CarePlanReviewPanel and CarePlanDetail, rendered by GoalCard/ActivityCard/ConflictAlert. Raw FHIR is included ONLY for the "View FHIR JSON" viewer. NOTE: this is a deliberately flattened first cut. The internal model carries richer provenance (targets, dose/route/frequency, source refs, DMN audit); extending the view-model with those fields is tracked in #128. */
         CarePlanView: {
             goals?: components["schemas"]["PlanGoal"][];
             activities?: components["schemas"]["PlanActivity"][];
+            /** @description Plan-level conflicts. For a persisted plan these are read back from the bundle's conflict Provenance resources; at the review gate they come from the planning brief. */
             conflicts?: components["schemas"]["PlanConflict"][];
             /** @description Raw FHIR bundle for the JSON viewer only. UI does not parse this for display. */
             fhirBundle?: {
@@ -268,11 +314,26 @@ export interface components {
         };
         ReviewAction: {
             decision: components["schemas"]["ReviewDecision"];
+            /** @description Legacy display-name shortcut; prefer `reviewer`. */
             clinician?: string;
+            reviewer?: components["schemas"]["ReviewerRef"];
             /** @description Overall free-text note. */
             comment?: string;
+            /** @description The review round this submission refers to (== RunDetail.reviewIteration of the plan the clinician had on screen). The engine discards a submission whose round no longer matches the armed gate, preventing approval of a superseded plan version. Optional for backward compatibility; omitted/null is treated as valid. */
+            reviewRound?: number;
             /** @description Per-item feedback (CarePlanReviewPanel/FeedbackInput). Required-ish when decision=request_changes. */
             feedback?: components["schemas"]["FeedbackItem"][];
+        };
+        /** @description Identity of the human verifier. A SMART-on-FHIR launch would populate this from the token's fhirUser claim; today it is an optional request override (falls back to the ACP_REVIEWER_* config defaults). */
+        ReviewerRef: {
+            /** @description Human-readable verifier name recorded on the AI-Provenance. */
+            display: string;
+            /** @description FHIR reference to the verifier, e.g. "Practitioner/demo-clinician". */
+            reference?: string;
+            /** @description Identifier system for the verifier (paired with identifierValue). */
+            identifierSystem?: string;
+            /** @description Identifier value for the verifier (paired with identifierSystem). */
+            identifierValue?: string;
         };
         FeedbackItem: {
             /** @description References a PlanGoal/PlanActivity/PlanConflict.id in the CarePlanView. */
@@ -284,6 +345,7 @@ export interface components {
             decisionEngine?: {
                 available?: boolean;
                 modelsDeployed?: number;
+                /** @description Deployed DMN decision models (SystemStatus page). */
                 decisions?: {
                     id: string;
                     name: string;
@@ -294,6 +356,7 @@ export interface components {
                 available?: boolean;
                 guidelines?: number;
                 recommendations?: number;
+                /** @description Registered clinical practice guidelines (SystemStatus page). */
                 cpgs?: {
                     cpgId: string;
                     title: string;

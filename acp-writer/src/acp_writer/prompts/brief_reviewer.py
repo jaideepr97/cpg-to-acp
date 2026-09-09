@@ -54,7 +54,7 @@ one — APPROVE with a warning, do not REVISE
 
 BRIEF_REVIEWER_USER = """\
 Review this Planning Brief for clinical correctness.
-
+{revision_note}
 ## Patient Context
 Reference: {patient_reference}
 Conditions: {conditions}
@@ -68,4 +68,14 @@ Allergies: {allergies}
 {recommendations}
 
 Respond with your verdict as a JSON object.
+"""
+
+# Prepended to the user prompt on a request-changes revision (F17b/F17c) so the
+# reviewer judges a targeted revision, not a from-scratch draft.
+BRIEF_REVIEWER_REVISION_NOTE = """
+NOTE: This brief is a MINIMAL REVISION of a care plan a clinician already \
+reviewed and approved as a base — the composer changed only what the clinician's \
+latest feedback required. Review the CHANGES for clinical safety; do NOT REVISE \
+to demand authoring-style completeness rewrites of untouched items that were \
+already acceptable in the approved base.
 """

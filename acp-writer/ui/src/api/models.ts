@@ -16,6 +16,7 @@ export type StepKey = S["StepKey"];
 export type ReviewGate = S["ReviewGate"];
 export type ReviewDecision = S["ReviewDecision"];
 export type ReviewAction = S["ReviewAction"];
+export type ReviewerRef = S["ReviewerRef"];
 export type FeedbackItem = S["FeedbackItem"];
 
 export type PatientSummary = S["PatientSummary"];
@@ -24,6 +25,7 @@ export type CodedItem = S["CodedItem"];
 export type PlanGoal = S["PlanGoal"];
 export type PlanActivity = S["PlanActivity"];
 export type PlanConflict = S["PlanConflict"];
+export type ConflictSource = S["ConflictSource"];
 export type CarePlanView = S["CarePlanView"];
 export type CarePlanSummary = S["CarePlanSummary"];
 export type CarePlanDetail = S["CarePlanDetail"];
