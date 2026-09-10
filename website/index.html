@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Actionable Care Plans</title>
+<meta name="description" content="An open source system that reads the documents that define good care and turns them into a care plan for a specific patient that a clinician reviews, edits, and approves. Built by Red Hat, Apache 2.0.">
+<meta property="og:title" content="Actionable Care Plans">
+<meta property="og:description" content="Guidelines, policies, and quality rules, turned into one patient's care plan. Every line traces back to its source, and a clinician approves every plan.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2314303B'/%3E%3Cpath d='M8 10h16M8 16h16M8 22h10' stroke='%23F5F8F7' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='24' cy='22' r='3' fill='%23C7392F'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ink: #14303B;
+    --ink-2: #33525C;
+    --muted: #5F7378;
+    --ground: #F5F8F7;
+    --surface: #FFFFFF;
+    --surface-2: #E9EFEE;
+    --line: #CFDAD8;
+    --line-strong: #A9BBB8;
+    --accent: #C7392F;
+    --accent-ink: #A62D25;
+    --accent-soft: #FBE9E7;
+    --teal: #1F7A8C;
+    --teal-soft: #E1EFF2;
+    --code-bg: #14303B;
+    --code-fg: #DCE7E5;
+    --display: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+    --body: "IBM Plex Sans", "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #E4ECEA;
+      --ink-2: #B9C9C6;
+      --muted: #8FA3A0;
+      --ground: #0F1D22;
+      --surface: #16282E;
+      --surface-2: #1D333A;
+      --line: #2B434A;
+      --line-strong: #3E5A62;
+      --accent: #E4574C;
+      --accent-ink: #F08A82;
+      --accent-soft: #3A1F1E;
+      --teal: #5FB3C4;
+      --teal-soft: #163037;
+      --code-bg: #0B161A;
+      --code-fg: #D6E2E0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #E4ECEA;
+    --ink-2: #B9C9C6;
+    --muted: #8FA3A0;
+    --ground: #0F1D22;
+    --surface: #16282E;
+    --surface-2: #1D333A;
+    --line: #2B434A;
+    --line-strong: #3E5A62;
+    --accent: #E4574C;
+    --accent-ink: #F08A82;
+    --accent-soft: #3A1F1E;
+    --teal: #5FB3C4;
+    --teal-soft: #163037;
+    --code-bg: #0B161A;
+    --code-fg: #D6E2E0;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--teal); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:hover { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+  h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 1.08; margin: 0; font-weight: 700; }
+  h1 { font-size: clamp(2.3rem, 5.2vw, 3.9rem); letter-spacing: -0.02em; }
+  h2 { font-size: clamp(1.7rem, 3.2vw, 2.4rem); letter-spacing: -0.015em; }
+  h3 { font-size: 1.2rem; font-weight: 500; }
+  p { margin: 0; }
+  code, pre, .mono { font-family: var(--mono); }
+  code { font-size: 0.88em; background: var(--surface-2); padding: 0.1em 0.35em; border-radius: 3px; }
+  pre { margin: 0; background: var(--code-bg); color: var(--code-fg); padding: 1rem 1.2rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; line-height: 1.6; }
+  pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+  .wrap { width: min(1120px, 100%); margin-inline: auto; padding-inline: clamp(16px, 4vw, 40px); }
+  .eyebrow { font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .lede { font-size: 1.15rem; color: var(--ink-2); max-width: 62ch; }
+  .prose { max-width: 66ch; color: var(--ink-2); }
+  section { padding-block: clamp(3rem, 7vw, 5.5rem); border-top: 1px solid var(--line); }
+  .sec-head { display: grid; gap: 0.6rem; margin-bottom: 2.2rem; }
+
+  /* Nav */
+  .nav { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--ground) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  .nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: 1rem; height: 58px; }
+  .brand { display: flex; align-items: center; gap: 0.6rem; font-family: var(--display); font-weight: 700; color: var(--ink); text-decoration: none; font-size: 1.05rem; }
+  .brand svg { width: 26px; height: 26px; }
+  .nav ul { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 1.4rem; font-size: 0.92rem; line-height: 1; }
+  .nav ul a { color: var(--ink-2); text-decoration: none; }
+  .nav ul a:hover { color: var(--accent); }
+  .gh { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.42rem 0.85rem; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink) !important; font-weight: 500; }
+  .gh:hover { border-color: var(--accent); }
+  .gh svg { width: 16px; height: 16px; fill: currentColor; }
+  @media (max-width: 760px) { .nav ul li:not(.keep) { display: none; } }
+
+  /* Hero */
+  .hero { padding-block: clamp(3rem, 8vw, 6rem) clamp(2.5rem, 6vw, 4.5rem); border-top: 0; }
+  .hero .wrap { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: clamp(2rem, 5vw, 4.5rem); align-items: center; }
+  .hero-copy { display: grid; gap: 1.4rem; }
+  .status { display: inline-flex; align-items: center; gap: 0.5rem; width: fit-content; font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-ink); background: var(--accent-soft); padding: 0.3rem 0.7rem; border-radius: 999px; }
+  .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .cta { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+  .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.7rem 1.15rem; border-radius: 6px; font-weight: 600; text-decoration: none; font-size: 0.95rem; border: 1px solid transparent; }
+  .btn-primary { background: var(--ink); color: var(--ground); }
+  .btn-primary:hover { background: var(--accent); color: #fff; }
+  .btn-ghost { border-color: var(--line-strong); color: var(--ink); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn svg { width: 16px; height: 16px; fill: currentColor; }
+  @media (max-width: 860px) { .hero .wrap { grid-template-columns: 1fr; } }
+
+  /* Decision table motif */
+  .dmn { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; box-shadow: 0 20px 50px -30px rgba(20,48,59,0.35); }
+  .dmn-title { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.7rem 1rem; border-bottom: 1px solid var(--line); background: var(--surface-2); font-family: var(--mono); font-size: 0.76rem; color: var(--muted); }
+  .dmn-title strong { color: var(--ink); font-weight: 500; }
+  .dmn table { width: 100%; border-collapse: collapse; font-size: 0.76rem; font-family: var(--mono); }
+  .dmn th, .dmn td { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); text-align: left; vertical-align: top; white-space: nowrap; }
+  .dmn th:last-child, .dmn td:last-child { border-right: 0; }
+  .dmn thead th { font-weight: 500; color: var(--muted); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; background: var(--surface); }
+  .dmn thead th.in { border-top: 3px solid var(--teal); }
+  .dmn thead th.out { border-top: 3px solid var(--accent); }
+  .dmn td.rule { color: var(--muted); width: 2.2rem; }
+  .dmn td.out { color: var(--accent-ink); font-weight: 500; }
+  .dmn tbody tr:last-child td { border-bottom: 0; }
+  .dmn-foot { display: flex; flex-wrap: wrap; gap: 0.5rem 1.2rem; padding: 0.65rem 1rem; font-family: var(--mono); font-size: 0.72rem; color: var(--muted); border-top: 1px solid var(--line); }
+  .dmn-foot span::before { content: ""; display: inline-block; width: 10px; height: 3px; margin-right: 0.45rem; vertical-align: middle; border-radius: 2px; }
+  .dmn-foot .k-in::before { background: var(--teal); }
+  .dmn-foot .k-out::before { background: var(--accent); }
+  .dmn-wrap { overflow-x: auto; }
+  .dmn-caption { margin-top: 0.8rem; font-size: 0.85rem; color: var(--muted); max-width: 48ch; }
+
+  /* Pipeline diagram */
+  .pipe { overflow-x: auto; padding-block: 0.5rem; }
+  .pipe svg { display: block; width: 100%; min-width: 760px; height: auto; font-family: var(--mono); }
+  .pipe .box { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1.2; }
+  .pipe .box-ext { fill: var(--surface-2); stroke: var(--line-strong); stroke-width: 1.2; stroke-dasharray: 4 3; }
+  .pipe .lbl { fill: var(--ink); font-family: var(--display); font-weight: 700; font-size: 15px; }
+  .pipe .sub { fill: var(--muted); font-size: 11px; }
+  .pipe .edge { stroke: var(--ink-2); stroke-width: 1.5; fill: none; marker-end: url(#arr); }
+  .pipe .contract { fill: var(--teal); font-size: 11px; font-weight: 500; letter-spacing: 0.06em; }
+  .pipe .contract-custom { fill: var(--accent-ink); }
+  .pipe .arrhead { fill: var(--ink-2); }
+  .contracts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-top: 2rem; }
+  .contract-card { border-top: 2px solid var(--teal); padding-top: 0.9rem; display: grid; gap: 0.35rem; }
+  .contract-card.custom { border-top-color: var(--accent); }
+  .contract-card .mono { font-size: 0.78rem; color: var(--muted); }
+  .contract-card h3 { font-size: 1.05rem; }
+  .contract-card p { font-size: 0.92rem; color: var(--ink-2); }
+  @media (max-width: 760px) { .contracts { grid-template-columns: 1fr; } }
+
+  /* Steps */
+  .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem 2rem; counter-reset: step; }
+  .step { display: grid; align-content: start; gap: 0.5rem; padding-top: 1rem; border-top: 1px solid var(--line); position: relative; }
+  .step::before { counter-increment: step; content: counter(step, decimal-leading-zero); font-family: var(--mono); font-size: 0.75rem; color: var(--accent); letter-spacing: 0.08em; }
+  .step h3 { font-family: var(--display); font-weight: 700; font-size: 1.15rem; }
+  .step p { font-size: 0.95rem; color: var(--ink-2); }
+  .step .tag { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); }
+  @media (max-width: 860px) { .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 560px) { .steps { grid-template-columns: 1fr; } }
+
+  /* Principles */
+  .principles { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 2.5rem; align-items: start; }
+  .principles dl { margin: 0; display: grid; gap: 0; }
+  .principles .row { display: grid; grid-template-columns: 11rem 1fr; gap: 1rem; padding-block: 1rem; border-top: 1px solid var(--line); }
+  .principles .row:last-child { border-bottom: 1px solid var(--line); }
+  .principles dt { font-family: var(--display); font-weight: 700; font-size: 1.05rem; }
+  .principles dd { margin: 0; color: var(--ink-2); font-size: 0.96rem; }
+  .pull { font-family: var(--display); font-weight: 500; font-size: clamp(1.35rem, 2.4vw, 1.75rem); line-height: 1.25; color: var(--ink); border-left: 3px solid var(--accent); padding-left: 1.2rem; }
+  @media (max-width: 860px) { .principles { grid-template-columns: 1fr; } .principles .row { grid-template-columns: 1fr; gap: 0.3rem; } }
+
+  /* Components table */
+  .table-wrap { overflow-x: auto; }
+  table.comp { width: 100%; border-collapse: collapse; font-size: 0.94rem; }
+  table.comp th, table.comp td { text-align: left; padding: 0.85rem 0.9rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.comp th { font-family: var(--mono); font-weight: 500; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  table.comp td:first-child { white-space: nowrap; }
+  table.comp td:first-child a { font-family: var(--mono); font-size: 0.86rem; }
+  table.comp td:nth-child(2) { color: var(--ink-2); min-width: 22rem; }
+  table.comp td:last-child { color: var(--muted); font-size: 0.86rem; white-space: nowrap; }
+
+  /* Videos */
+  .videos { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1rem; }
+  .video { display: grid; gap: 0.5rem; text-decoration: none; color: var(--ink); }
+  .thumb { aspect-ratio: 16/9; width: 100%; max-width: 100%; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; position: relative; display: grid; place-items: center; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb::after { content: ""; position: absolute; width: 34px; height: 34px; border-radius: 50%; background: color-mix(in srgb, var(--ink) 85%, transparent); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 6l9 6-9 6z' fill='%23F5F8F7'/%3E%3C/svg%3E"); background-size: 18px; background-repeat: no-repeat; background-position: 55% 50%; opacity: 0.9; transition: transform 0.15s ease; }
+  .video:hover .thumb::after { transform: scale(1.1); }
+  .video .n { font-family: var(--mono); font-size: 0.7rem; color: var(--accent); letter-spacing: 0.08em; }
+  .video .t { font-weight: 500; font-size: 0.92rem; line-height: 1.3; }
+  .video:hover .t { color: var(--accent); }
+  .note { display: flex; gap: 0.7rem; align-items: flex-start; font-size: 0.88rem; color: var(--muted); border-left: 2px solid var(--line-strong); padding-left: 0.9rem; max-width: 66ch; }
+  @media (max-width: 960px) { .videos { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 560px) { .videos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  /* Docs */
+  .docs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 2.5rem; }
+  .doc { display: grid; grid-template-columns: 1fr auto; gap: 0.2rem 1rem; padding-block: 1rem; border-top: 1px solid var(--line); text-decoration: none; color: var(--ink); align-items: baseline; }
+  .doc:hover .doc-t { color: var(--accent); }
+  .doc-t { font-weight: 600; font-size: 1rem; }
+  .doc-d { grid-column: 1 / -1; color: var(--ink-2); font-size: 0.9rem; }
+  .doc .arrow { color: var(--muted); font-family: var(--mono); }
+  @media (max-width: 760px) { .docs { grid-template-columns: 1fr; } }
+
+  /* Getting started */
+  .start { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 2.5rem; align-items: start; }
+  .start ol { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.5rem; color: var(--ink-2); font-size: 0.95rem; }
+  .start ol li::marker { font-family: var(--mono); color: var(--accent); }
+  .start .prereq { display: grid; gap: 0.4rem; margin-top: 1.5rem; font-size: 0.9rem; color: var(--ink-2); }
+  .start .prereq span { display: block; }
+  .start .prereq span::before { content: "· "; color: var(--muted); }
+  .cmd { display: grid; gap: 0.9rem; }
+  .cmd .lbl { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.35rem; }
+  @media (max-width: 860px) { .start { grid-template-columns: 1fr; } }
+
+  /* Standards */
+  .standards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+  .std { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1.2rem 1.3rem; display: grid; gap: 0.3rem; }
+  .std .big { font-family: var(--display); font-weight: 700; font-size: 2rem; letter-spacing: -0.02em; display: flex; align-items: baseline; gap: 0.5rem; }
+  .std .big small { font-family: var(--mono); font-size: 0.85rem; font-weight: 400; color: var(--muted); }
+  .std p { font-size: 0.88rem; color: var(--ink-2); }
+  @media (max-width: 700px) { .standards { grid-template-columns: 1fr; } }
+
+  footer { border-top: 1px solid var(--line); padding-block: 2.5rem; font-size: 0.88rem; color: var(--muted); }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 1rem 2rem; justify-content: space-between; }
+  footer a { color: var(--ink-2); }
+
+  /* --- v2 additions --- */
+  :root { --orange: #D9772A; --orange-soft: #FBEEDD; --orange-ink: #B4551A; --blue: #2F6DD0; --blue-soft: #E4ECFA; --khaki: #7D7052; --khaki-ink: #5E5340; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --orange: #E8924E; --orange-soft: #3A2A1A; --orange-ink: #F0B27E; --blue: #7FA6EA; --blue-soft: #1C2A40; --khaki: #6E6249; --khaki-ink: #D8CDB3; } }
+  :root[data-theme="dark"] { --orange: #E8924E; --orange-soft: #3A2A1A; --orange-ink: #F0B27E; --blue: #7FA6EA; --blue-soft: #1C2A40; --khaki: #6E6249; --khaki-ink: #D8CDB3; }
+  .lede.small { font-size: 0.95rem; color: var(--muted); }
+  .status { color: var(--teal); background: var(--teal-soft); }
+  .status::before { background: var(--teal); }
+  .prose-col { display: grid; gap: 1rem; max-width: 62ch; color: var(--ink-2); font-size: 1.02rem; }
+  .prose-col strong { color: var(--ink); font-weight: 600; }
+  .problem { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 2.5rem; align-items: start; }
+  .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3rem; }
+  @media (max-width: 860px) { .problem, .two-col { grid-template-columns: 1fr; gap: 2rem; } }
+  .steps.four { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 3rem; }
+  .steps.four .step h3 { font-size: 1.4rem; }
+  .steps.four .step p { font-size: 0.93rem; }
+  @media (max-width: 960px) { .steps.four { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 560px) { .steps.four { grid-template-columns: 1fr; } }
+  .choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2rem; margin-top: 3rem; padding-top: 2.5rem; border-top: 1px solid var(--line); }
+  .choice { display: grid; gap: 0.8rem; }
+  @media (max-width: 760px) { .choices { grid-template-columns: 1fr; } }
+  .faq { display: grid; gap: 0; }
+  .qa { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 1rem 3rem; padding-block: 2rem; border-top: 1px solid var(--line); }
+  .qa:last-child { border-bottom: 1px solid var(--line); }
+  .qa h3 { font-family: var(--display); font-weight: 700; font-size: 1.35rem; line-height: 1.2; color: var(--ink); }
+  .qa .prose-col { font-size: 0.98rem; }
+  @media (max-width: 860px) { .qa { grid-template-columns: 1fr; } }
+  .partner { background: var(--surface); }
+  .partner-inner { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 2.5rem; align-items: start; }
+  @media (max-width: 860px) { .partner-inner { grid-template-columns: 1fr; } }
+  .eng-divider { background: var(--surface-2); padding-block: 3rem; }
+  #components { border-top: 0; }
+
+  /* Flow diagram */
+  .flow { overflow-x: auto; padding-block: 0.5rem; }
+  .flow svg { display: block; width: 100%; min-width: 820px; height: auto; font-family: var(--body); }
+  .flow .lane-bg { fill: var(--surface); }
+  .flow .lane { font-family: var(--mono); font-size: 12px; letter-spacing: 0.12em; fill: var(--muted); }
+  .flow .lane-sub { font-size: 11.5px; fill: var(--muted); font-style: italic; }
+  .flow .ttl { font-family: var(--display); font-weight: 700; font-size: 16px; fill: var(--ink); }
+  .flow .tx { font-size: 12px; fill: var(--ink-2); }
+  .flow .bx-doc { fill: var(--ground); stroke: var(--line-strong); stroke-width: 1.4; stroke-dasharray: 5 4; }
+  .flow .bx-sys { fill: var(--teal-soft); stroke: var(--teal); stroke-width: 1.4; }
+  .flow .bx-gate { fill: var(--surface); stroke: var(--ink); stroke-width: 2.2; }
+  .flow .bx-out { fill: var(--ink); stroke: var(--ink); }
+  .flow .on-dark { fill: var(--ground) !important; }
+  .flow .bx-kb { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1.4; }
+  .flow .kb-ttl { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; fill: var(--muted); }
+  .flow .chip { fill: var(--surface-2); }
+  .flow .chip-t { font-family: var(--mono); font-size: 11px; fill: var(--ink); }
+  .flow .glyph { fill: var(--accent); }
+  .flow .gate-lbl { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; fill: var(--accent); }
+  .flow .edge-lbl { font-family: var(--mono); font-size: 10.5px; fill: var(--muted); }
+  .flow .ed-k { stroke: var(--ink-2); stroke-width: 1.6; fill: none; marker-end: url(#fa-k); }
+  .flow .ed-t { stroke: var(--teal); stroke-width: 2; fill: none; marker-end: url(#fa-t); }
+  .flow .ed-dash { stroke-dasharray: 4 4; }
+  .flow .fh-k { fill: var(--ink-2); } .flow .fh-t { fill: var(--teal); }
+  .flow .leg { font-size: 12px; fill: var(--muted); }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Actionable Care Plans home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="6" fill="#14303B"/><path d="M8 10h16M8 16h16M8 22h10" stroke="#F5F8F7" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="22" r="3" fill="#C7392F"/></svg>
+      Actionable Care Plans
+    </a>
+    <ul>
+      <li><a href="#problem">The problem</a></li>
+      <li><a href="#how">How it works</a></li>
+      <li><a href="#faq">From where you sit</a></li>
+      <li><a href="#partner">Partner with us</a></li>
+      <li><a href="#engineers">For engineers</a></li>
+      <li class="keep"><a class="gh" href="https://github.com/samschifman/cpg-to-acp"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="hero-copy">
+      <span class="status">For providers, payers, and quality regulators</span>
+      <h1>Guidelines, policies, and quality rules, turned into one patient's care plan.</h1>
+      <p class="lede">Clinical practice guidelines, payer coverage policies, and quality requirements all describe what good care looks like, and all of them were written to be read, not run. Actionable Care Plans reads them, drafts a care plan for a specific patient, and puts a clinician in charge of approving it. Every line in the plan traces back to the guideline or policy it came from.</p>
+      <p class="lede small">Built by Red Hat. Runs on Red Hat OpenShift AI in your environment. Apache 2.0 licensed.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="#partner">Become a development partner</a>
+        <a class="btn btn-ghost" href="#how">See how it works</a>
+      </div>
+    </div>
+
+    <div>
+      <div class="dmn">
+        <div class="dmn-title"><span><strong>Decision table</strong> · Hypertension pathway</span><span>extracted from the guideline</span></div>
+        <div class="dmn-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="rule">#</th>
+              <th class="in">Systolic</th>
+              <th class="in">Diastolic</th>
+              <th class="in">T2DM</th>
+              <th class="out">Pathway</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="rule">1</td><td>&lt; 130</td><td>&lt; 80</td><td>-</td><td class="out">"monitor"</td></tr>
+            <tr><td class="rule">2</td><td>[130..140)</td><td>[80..90)</td><td>false</td><td class="out">"lifestyle"</td></tr>
+            <tr><td class="rule">3</td><td>[130..140)</td><td>[80..90)</td><td>true</td><td class="out">"medication"</td></tr>
+            <tr><td class="rule">4</td><td>&gt;= 140</td><td>-</td><td>-</td><td class="out">"medication"</td></tr>
+            <tr><td class="rule">5</td><td>-</td><td>&gt;= 90</td><td>-</td><td class="out">"medication"</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div class="dmn-foot"><span class="k-in">inputs from the patient record</span><span class="k-out">output → care plan</span><span>runs the same way every time</span></div>
+      </div>
+      <p class="dmn-caption">Illustrative. The crisp parts of a guideline become tables like this one: an informaticist checks them against the source text, and a rules engine runs them the same way every time.</p>
+    </div>
+  </div>
+</header>
+
+<section id="problem">
+  <div class="wrap">
+    <div class="problem">
+      <div class="sec-head" style="margin-bottom:0">
+        <span class="eyebrow">The problem</span>
+        <h2>The best knowledge in medicine is locked in PDFs.</h2>
+      </div>
+      <div class="prose-col">
+        <p>A clinical practice guideline can run hundreds of pages. A patient with three chronic conditions has three of them, and none of the three knows the other two exist. Reconciling them for this patient, in a fifteen-minute visit, is work that happens in the clinician's head.</p>
+        <p>The same is true of a hospital's own protocols, a payer's coverage policies, and a quality program's measures. All of it was written for people to read. None of it was written for a computer to act on.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">How it works</span>
+      <h2>The system does the reading. People make the decisions.</h2>
+    </div>
+
+    <div class="flow">
+      <svg viewBox="0 0 980 660" role="img" aria-labelledby="flow-title">
+        <title id="flow-title">Source documents are read by AI, reviewed by an informaticist, and stored as decision tables, recommendations and processes. The patient's record and that knowledge feed a drafting engine. A clinician reviews and approves the draft, it is written to the EHR as a FHIR CarePlan, and reviewers later audit the plan against the care delivered.</title>
+        <defs>
+          <marker id="fa-k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="fh-k"/></marker>
+          <marker id="fa-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="fh-t"/></marker>
+          <symbol id="person" viewBox="0 0 20 20"><circle cx="10" cy="6.5" r="4"/><path d="M2 19a8 6 0 0 1 16 0z"/></symbol>
+        </defs>
+
+        <!-- lane bands -->
+        <rect x="0" y="20" width="980" height="180" rx="8" class="lane-bg"/>
+        <rect x="0" y="400" width="980" height="200" rx="8" class="lane-bg"/>
+
+        <!-- lane labels -->
+        <text x="24" y="52" class="lane">KNOWLEDGE</text>
+        <text x="24" y="70" class="lane-sub">read once, reviewed once</text>
+        <text x="24" y="242" class="lane">PATIENT</text>
+        <text x="24" y="260" class="lane-sub">fresh for every plan</text>
+        <text x="24" y="432" class="lane">CARE PLAN</text>
+        <text x="24" y="450" class="lane-sub">approved by a clinician</text>
+
+        <!-- Row 1 -->
+        <rect x="160" y="70" width="170" height="90" rx="6" class="bx-doc"/>
+        <text x="245" y="98" text-anchor="middle" class="ttl">Source documents</text>
+        <text x="245" y="120" text-anchor="middle" class="tx">Clinical practice guidelines,</text>
+        <text x="245" y="137" text-anchor="middle" class="tx">your protocols, payer policy</text>
+
+        <path d="M330 115 H366" class="ed-k"/>
+
+        <rect x="370" y="70" width="170" height="90" rx="6" class="bx-sys"/>
+        <text x="455" y="98" text-anchor="middle" class="ttl">Read</text>
+        <text x="455" y="120" text-anchor="middle" class="tx">AI extracts rules, judgment</text>
+        <text x="455" y="137" text-anchor="middle" class="tx">and workflows from the text</text>
+
+        <path d="M540 115 H576" class="ed-k"/>
+
+        <rect x="580" y="70" width="170" height="90" rx="6" class="bx-gate"/>
+        <use href="#person" x="592" y="80" width="16" height="16" class="glyph"/>
+        <text x="675" y="98" text-anchor="middle" class="ttl">Review</text>
+        <text x="675" y="120" text-anchor="middle" class="tx">An informaticist checks it</text>
+        <text x="675" y="137" text-anchor="middle" class="tx">against the source text</text>
+        <text x="665" y="176" text-anchor="middle" class="gate-lbl">PEOPLE DECIDE</text>
+
+        <path d="M750 115 H786" class="ed-k"/>
+
+        <g class="kb">
+          <rect x="790" y="62" width="166" height="106" rx="6" class="bx-kb"/>
+          <text x="873" y="84" text-anchor="middle" class="kb-ttl">KNOWLEDGE BASE</text>
+          <rect x="802" y="94" width="142" height="18" rx="3" class="chip"/><text x="873" y="107" text-anchor="middle" class="chip-t">Decision tables</text>
+          <rect x="802" y="116" width="142" height="18" rx="3" class="chip"/><text x="873" y="129" text-anchor="middle" class="chip-t">Recommendations</text>
+          <rect x="802" y="138" width="142" height="18" rx="3" class="chip"/><text x="873" y="151" text-anchor="middle" class="chip-t">Processes</text>
+        </g>
+
+        <!-- KB down to engine -->
+        <path d="M873 168 V 260 Q 873 272 861 272 H 696" class="ed-k"/>
+
+        <!-- Row 2 -->
+        <rect x="160" y="250" width="170" height="90" rx="6" class="bx-doc"/>
+        <text x="245" y="278" text-anchor="middle" class="ttl">Patient record</text>
+        <text x="245" y="300" text-anchor="middle" class="tx">Read from the EHR in FHIR,</text>
+        <text x="245" y="317" text-anchor="middle" class="tx">when a plan is asked for</text>
+
+        <path d="M330 295 H 426" class="ed-k"/>
+
+        <rect x="430" y="240" width="260" height="110" rx="6" class="bx-sys"/>
+        <text x="560" y="268" text-anchor="middle" class="ttl">Draft</text>
+        <text x="560" y="290" text-anchor="middle" class="tx">A rules engine runs the decision tables</text>
+        <text x="560" y="307" text-anchor="middle" class="tx">against the record, matching</text>
+        <text x="560" y="324" text-anchor="middle" class="tx">recommendations are gathered, and</text>
+        <text x="560" y="341" text-anchor="middle" class="tx">conflicts between sources are flagged</text>
+
+        <!-- engine down to clinician -->
+        <path d="M560 350 V 446" class="ed-t"/>
+        <text x="572" y="402" class="edge-lbl">draft plan</text>
+
+        <!-- Row 3 -->
+        <rect x="430" y="450" width="260" height="90" rx="6" class="bx-gate"/>
+        <use href="#person" x="442" y="460" width="16" height="16" class="glyph"/>
+        <text x="560" y="478" text-anchor="middle" class="ttl">Approve</text>
+        <text x="560" y="500" text-anchor="middle" class="tx">The clinician edits, declines,</text>
+        <text x="560" y="517" text-anchor="middle" class="tx">and approves the plan</text>
+        <text x="560" y="558" text-anchor="middle" class="gate-lbl">PEOPLE DECIDE</text>
+
+        <path d="M690 495 H 786" class="ed-t"/>
+
+        <rect x="790" y="450" width="166" height="90" rx="6" class="bx-out"/>
+        <text x="873" y="478" text-anchor="middle" class="ttl on-dark">In the EHR</text>
+        <text x="873" y="500" text-anchor="middle" class="tx on-dark">A FHIR CarePlan, labeled</text>
+        <text x="873" y="517" text-anchor="middle" class="tx on-dark">AI-assisted, clinician-verified</text>
+
+        <!-- audit loop -->
+        <path d="M873 540 V 566 Q 873 574 865 574 H 253 Q 245 574 245 566 V 544" class="ed-k ed-dash"/>
+        <rect x="160" y="450" width="170" height="90" rx="6" class="bx-gate"/>
+        <use href="#person" x="172" y="460" width="16" height="16" class="glyph"/>
+        <text x="245" y="478" text-anchor="middle" class="ttl">Audit</text>
+        <text x="245" y="500" text-anchor="middle" class="tx">Reviewers compare the plan</text>
+        <text x="245" y="517" text-anchor="middle" class="tx">with the care delivered</text>
+        <text x="560" y="592" text-anchor="middle" class="edge-lbl">later, for quality</text>
+
+        <!-- legend -->
+        <rect x="160" y="626" width="14" height="14" rx="3" class="bx-sys"/><text x="182" y="637" class="leg">the system</text>
+        <rect x="290" y="626" width="14" height="14" rx="3" class="bx-gate"/><text x="312" y="637" class="leg">a person decides</text>
+        <rect x="450" y="626" width="14" height="14" rx="3" class="bx-doc"/><text x="472" y="637" class="leg">documents and records</text>
+        <rect x="650" y="626" width="14" height="14" rx="3" class="bx-out"/><text x="672" y="637" class="leg">the result</text>
+      </svg>
+    </div>
+
+    <div class="steps four">
+      <div class="step"><h3>Read</h3><p>AI reads the authoritative document and pulls out three kinds of knowledge. The crisp parts ("if blood pressure is above this threshold and the patient has diabetes, then…") become decision tables a computer can run the same way every time. The judgment and context become recommendations in a knowledge base. Workflows become business processes.</p></div>
+      <div class="step"><h3>Review</h3><p>An informaticist checks the extracted tables and recommendations against the source text, side by side, and approves them. Nothing is published without that sign-off.</p></div>
+      <div class="step"><h3>Draft</h3><p>At the right time, the system takes the patient's record (in FHIR, the standard language of health data), runs the decision tables in a rules engine, gathers the matching recommendations, and drafts a care plan with goals and activities. Where two or more sources overlap or disagree, it flags the conflict instead of quietly picking one.</p></div>
+      <div class="step"><h3>Approve</h3><p>The clinician reviews the draft, changes what they want, declines what they don't, and approves. The plan lands in the patient's record as a standard FHIR CarePlan, labeled as AI-assisted and clinician-verified.</p></div>
+    </div>
+
+    <div class="choices">
+      <div class="choice">
+        <span class="eyebrow">Design choice 1</span>
+        <p class="pull">Clinical decisions come from decision tables running in a rules engine, not from a language model guessing.</p>
+      </div>
+      <div class="choice">
+        <span class="eyebrow">Design choice 2</span>
+        <p class="pull">People sit at both gates. An expert approves what the system learned; a clinician approves what it proposes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="actionable">
+  <div class="wrap">
+    <div class="two-col">
+      <div>
+        <div class="sec-head">
+          <span class="eyebrow">Why "actionable"</span>
+          <h2>Most care plans are documentation. Ours is built to do work.</h2>
+        </div>
+        <div class="prose-col">
+          <p>The plan carries process definitions alongside its goals and activities, so the routine parts (ordering the labs, scheduling the follow-up, enrolling the patient in a program) can be handed to automation.</p>
+          <p>Executing those processes is the next stage of the project, and it is where we most want partners at the table.</p>
+        </div>
+      </div>
+      <div>
+        <div class="sec-head">
+          <span class="eyebrow">Where it stands</span>
+          <h2>A working prototype, not a product.</h2>
+        </div>
+        <div class="prose-col">
+          <p>It runs end to end today on Red Hat OpenShift AI: guideline in, reviewed knowledge out, patient record in, approved plan into the EHR, with the AI agents sandboxed and every step traced. An earlier version was shown at HIMSS 2026.</p>
+          <p>It is built on open standards (FHIR, DMN, BPMN) so any piece can be swapped, and the code is public. What comes next will be shaped by the people who build it with us.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">From where you sit</span>
+      <h2>The questions we hear first</h2>
+    </div>
+    <div class="faq">
+      <div class="qa">
+        <h3>"Isn't this what OpenEvidence or UpToDate already does?"</h3>
+        <div class="prose-col">
+          <p>Those tools are very good at answering "what does the evidence say?" when a clinician asks. This is a different job, in two ways.</p>
+          <p><strong>It knows your organization.</strong> A reference tool gives the same answer in every hospital. This system ingests your own protocols alongside the published guidelines: your formulary, your referral pathways, which imaging you can do in house, how your clinics like to follow up. The plan it drafts is your organization's plan, not a generic one.</p>
+          <p><strong>It produces something that does work.</strong> A reference tool gives you a paragraph to read and then re-type as orders. This gives you a plan in the patient's record, with activities detailed enough to drive orders, follow-ups, and outreach. Reference tools stay useful for reading. This is the layer that turns evidence and your own policies into the plan.</p>
+        </div>
+      </div>
+      <div class="qa">
+        <h3>"Will it actually help, or is this another pop-up?"</h3>
+        <div class="prose-col">
+          <p>It doesn't pop up. It drafts a plan when you ask for one, for the patient you're seeing, with all of that patient's guidelines considered at once. The tighter blood pressure target because of the kidney disease. The metformin note because of the eGFR. The follow-up interval your own protocol calls for. Click any activity and you see the sentence in the guideline it came from. Where two sources disagree, you see that too, with the reasoning, and you decide.</p>
+          <p>The gap between what guidelines recommend and what patients actually receive is well documented. The problem was never that clinicians don't know the guidance. It's that reconciling six hundred pages per patient doesn't fit in the visit. This is meant to give that time back to the patient.</p>
+        </div>
+      </div>
+      <div class="qa">
+        <h3>"Is it going to decide for me?"</h3>
+        <div class="prose-col">
+          <p>No, and it's built so it can't. Decisions come from reviewed decision tables in a rules engine, not from a language model's opinion. Nothing reaches a patient's record without a clinician approving it, and the record carries that approval, following the HL7 AI Transparency on FHIR standard. The system drafts. You decide. The plan is yours, and the record says so.</p>
+        </div>
+      </div>
+      <div class="qa">
+        <h3>"Is it going to work in our environment?"</h3>
+        <div class="prose-col">
+          <p>It runs on Red Hat OpenShift AI in your environment, on premises or in your cloud, with your choice of models, including models that never leave your walls. Patient data is not sent to a vendor.</p>
+          <p>Each AI agent runs in a kernel-level sandbox with a strict allow list, so the piece that talks to the language model physically cannot reach the patient record, and the piece that reads the record cannot reach the model. Every connection is logged. The clinician's view opens inside the EHR through SMART on FHIR, so there is no second login and no second system to live in.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="partner" class="partner">
+  <div class="wrap">
+    <div class="partner-inner">
+      <div class="sec-head" style="margin-bottom:0">
+        <span class="eyebrow">What it would take from you</span>
+        <h2>We're looking for a provider organization to be a development partner.</h2>
+      </div>
+      <div class="prose-col">
+        <p>That means a modest amount of informaticist time to review what the system extracts from real guidelines and your own protocols, clinicians willing to put drafts in front of real or realistic cases and tell us what's wrong, and a seat at the table for what automation should look like.</p>
+        <p>We bring the engineers, the platform, and an open source project you can see all of. You would be shaping a tool that knows how your organization practices medicine, rather than buying one that doesn't.</p>
+        <div class="cta" style="margin-top:0.5rem">
+          <a class="btn btn-primary" href="https://github.com/samschifman/cpg-to-acp/issues">Start the conversation on GitHub</a>
+          <a class="btn btn-ghost" href="https://www.youtube.com/playlist?list=PLBrn0oRf1lNM">Watch the intro series</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="engineers" class="eng-divider">
+  <div class="wrap">
+    <div class="sec-head" style="margin-bottom:0">
+      <span class="eyebrow">For engineers</span>
+      <h2>How it is built</h2>
+      <p class="lede">Everything below is for the people who will run, extend, or contribute to the system. Open standards at each boundary: DMN for decision logic, FHIR for patient data and the care plan, BPMN for the processes. Any runtime can be swapped without changing the components next to it.</p>
+    </div>
+  </div>
+</section>
+
+<section id="components">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Components</span>
+      <h2>What's in the repository</h2>
+      <p class="lede">Four application components plus shared platform services. Each sits behind a standard interface.</p>
+    </div>
+    <div class="table-wrap">
+    <table class="comp">
+      <thead><tr><th>Directory</th><th>Purpose</th><th>Built with</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://github.com/samschifman/cpg-to-acp/tree/main/cpg-ingester">cpg-ingester/</a></td><td>Parses CPG documents and produces DMN decision tables plus recommendations for the acp-writer's vector store. Includes an upload, progress and human-in-the-loop review UI, and a FastAPI BFF between the UI and SonataFlow/MinIO.</td><td>Docling · PatternFly 6 · React 19 · FastAPI</td></tr>
+        <tr><td><a href="https://github.com/samschifman/cpg-to-acp/tree/main/acp-writer">acp-writer/</a></td><td>Composes patient-specific care plans by invoking DMN decision services, retrieving recommendations and integrating FHIR patient data. Outputs FHIR CarePlans and BPMN. Includes the clinician review UI.</td><td>Drools/Kogito · SMART on FHIR</td></tr>
+        <tr><td><a href="https://github.com/samschifman/cpg-to-acp/tree/main/automation">automation/</a></td><td>Executes BPMN process definitions produced by the acp-writer. The runtime is pluggable.</td><td>Ansible · SonataFlow</td></tr>
+        <tr><td><a href="https://github.com/samschifman/cpg-to-acp/tree/main/mock-EHR">mock-EHR/</a></td><td>Mock EHR for development and demos, with a clinical-facing "CareView EHR" UI and an IPS Viewer SMART app.</td><td>Medplum · FHIR R4 · OAuth</td></tr>
+        <tr><td><a href="https://github.com/samschifman/cpg-to-acp/tree/main/platform">platform/</a></td><td>Shared infrastructure services consumed by multiple components. Platform capabilities on OpenShift AI; local equivalents for dev.</td><td>MaaS · MLflow · LiteLLM</td></tr>
+        <tr><td><a href="https://github.com/samschifman/cpg-to-acp/tree/main/shared">shared/</a></td><td>Shared contracts and utilities, used sparingly to prevent coupling.</td><td>Python</td></tr>
+        <tr><td><a href="https://github.com/samschifman/cpg-to-acp/tree/main/deploy">deploy/</a></td><td>Helm charts per component and the OpenShift install script.</td><td>Helm · OpenShift</td></tr>
+        <tr><td><a href="https://github.com/samschifman/cpg-to-acp/tree/main/docs">docs/</a></td><td>User-facing documentation: architecture, security, deployment guides.</td><td>–</td></tr>
+        <tr><td><a href="https://github.com/samschifman/cpg-to-acp/tree/main/dev_docs">dev_docs/</a></td><td>Internal design docs, spikes and the project plan. Point-in-time references.</td><td>–</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<section id="videos">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Introduction series</span>
+      <h2>Ten short videos, one idea each</h2>
+      <p class="lede">A high-level tour of the parts and concepts in the project, not an in-depth treatment. <a href="https://www.youtube.com/playlist?list=PLBrn0oRf1lNM">Open the full playlist</a>.</p>
+    </div>
+    <div class="videos">
+      <a class="video" href="https://youtu.be/bP39Nwj0WUQ"><span class="thumb"><img src="https://i.ytimg.com/vi/bP39Nwj0WUQ/mqdefault.jpg" alt="" loading="lazy"></span><span class="n">PART 1</span><span class="t">Overview: goals and parts of the project</span></a>
+      <a class="video" href="https://youtu.be/-pfzh3IQH18"><span class="thumb"><img src="https://i.ytimg.com/vi/-pfzh3IQH18/mqdefault.jpg" alt="" loading="lazy"></span><span class="n">PART 2</span><span class="t">CPG: Clinical Practice Guidelines</span></a>
+      <a class="video" href="https://youtu.be/H6Z3my6Lv5Q"><span class="thumb"><img src="https://i.ytimg.com/vi/H6Z3my6Lv5Q/mqdefault.jpg" alt="" loading="lazy"></span><span class="n">PART 3</span><span class="t">DMN: Decision Model and Notation</span></a>
+      <a class="video" href="https://youtu.be/h2ekn2hdnfo"><span class="thumb"><img src="https://i.ytimg.com/vi/h2ekn2hdnfo/mqdefault.jpg" alt="" loading="lazy"></span><span class="n">PART 4</span><span class="t">Recommendations: modeling the narrative</span></a>
+      <a class="video" href="https://youtu.be/LuFMUkjXaOY"><span class="thumb"><img src="https://i.ytimg.com/vi/LuFMUkjXaOY/mqdefault.jpg" alt="" loading="lazy"></span><span class="n">PART 5</span><span class="t">FHIR: Fast Healthcare Interoperability Resources</span></a>
+      <a class="video" href="https://youtu.be/-7EwXg68jMA"><span class="thumb"><img src="https://i.ytimg.com/vi/-7EwXg68jMA/mqdefault.jpg" alt="" loading="lazy"></span><span class="n">PART 6</span><span class="t">Care Plan: what an ACP contains</span></a>
+      <a class="video" href="https://youtu.be/rotr4CHi794"><span class="thumb"><img src="https://i.ytimg.com/vi/rotr4CHi794/mqdefault.jpg" alt="" loading="lazy"></span><span class="n">PART 7</span><span class="t">BPMN: Business Process Model and Notation</span></a>
+      <a class="video" href="https://youtu.be/CKAtb7Ibbz4"><span class="thumb"><img src="https://i.ytimg.com/vi/CKAtb7Ibbz4/mqdefault.jpg" alt="" loading="lazy"></span><span class="n">PART 8</span><span class="t">UI: the interfaces the system needs</span></a>
+      <a class="video" href="https://youtu.be/vcVf6HB4zy8"><span class="thumb"><img src="https://i.ytimg.com/vi/vcVf6HB4zy8/mqdefault.jpg" alt="" loading="lazy"></span><span class="n">PART 9</span><span class="t">Future: where the project is headed</span></a>
+      <a class="video" href="https://youtu.be/iU2ok5_p5r8"><span class="thumb"><img src="https://i.ytimg.com/vi/iU2ok5_p5r8/mqdefault.jpg" alt="" loading="lazy"></span><span class="n">PART 10</span><span class="t">Code: a tour of the project structure</span></a>
+    </div>
+    <p class="note" style="margin-top:1.5rem">These videos were shot at a point in time; the project may have changed since. The repository is the source of truth.</p>
+  </div>
+</section>
+
+<section id="docs">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Documentation</span>
+      <h2>Design documentation</h2>
+    </div>
+    <div class="docs">
+      <a class="doc" href="https://github.com/samschifman/cpg-to-acp/blob/main/docs/adversarial-review-pattern.md"><span class="doc-t">Adversarial Review Pattern</span><span class="arrow">→</span><span class="doc-d">How agents check agents: independent review before outputs cross a pipeline boundary.</span></a>
+      <a class="doc" href="https://github.com/samschifman/cpg-to-acp/blob/main/docs/ai-transparency.md"><span class="doc-t">AI Transparency on FHIR</span><span class="arrow">→</span><span class="doc-d">Labelling and tracing AI-produced care plans with the HL7 AI Transparency IG; plan-level conflicts as Provenance.</span></a>
+      <a class="doc" href="https://github.com/samschifman/cpg-to-acp/blob/main/docs/clinical-data-qa.md"><span class="doc-t">Clinical Data Question Answering</span><span class="arrow">→</span><span class="doc-d">Extracting DMN inputs from FHIR IPS bundles: layered resolution, temporal primitives, benchmarking.</span></a>
+      <a class="doc" href="https://github.com/samschifman/cpg-to-acp/blob/main/docs/sonataflow-orchestration.md"><span class="doc-t">Workflow Orchestration with SonataFlow</span><span class="arrow">→</span><span class="doc-d">Orchestrating the pipelines, async callback patterns and MinIO-based state transfer.</span></a>
+      <a class="doc" href="https://github.com/samschifman/cpg-to-acp/blob/main/docs/openshell-agent-security.md"><span class="doc-t">Agent Security with OpenShell</span><span class="arrow">→</span><span class="doc-d">Per-agent sandboxes and security policies on OpenShift.</span></a>
+      <a class="doc" href="https://github.com/samschifman/cpg-to-acp/blob/main/docs/mcp-gateway-tool-governance.md"><span class="doc-t">Tool Governance with MCP Gateway</span><span class="arrow">→</span><span class="doc-d">Governing agent tool access with aggregation, prefixing and virtual servers.</span></a>
+      <a class="doc" href="https://github.com/samschifman/cpg-to-acp/blob/main/docs/api-gateway.md"><span class="doc-t">API Gateway</span><span class="arrow">→</span><span class="doc-d">One URL in front of pod-split services with path-based routing.</span></a>
+      <a class="doc" href="https://github.com/samschifman/cpg-to-acp/tree/main/dev_docs"><span class="doc-t">Design docs, spikes &amp; project plan</span><span class="arrow">→</span><span class="doc-d">Internal development documents in <code>dev_docs/</code>. Point-in-time references.</span></a>
+    </div>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Getting started</span>
+      <h2>Run the whole pipeline locally</h2>
+      <p class="lede">CPG PDF, parse, extract DMN, deploy decisions, generate a care plan. The repo ships a synthetic hypertension guideline and two patient bundles so you can see both pathways.</p>
+    </div>
+    <div class="start">
+      <div>
+        <ol>
+          <li>Configure credentials: copy <code>platform/litellm/deploy/.env.example</code> and add your OpenAI key.</li>
+          <li>Start infrastructure with <code>podman-compose up -d</code> (Kogito, ACP Writer, MLflow).</li>
+          <li>Parse the CPG with Docling.</li>
+          <li>Extract DMN tables and deploy them to acp-writer.</li>
+          <li>Register the CPG so the guideline resolver can match patient conditions.</li>
+          <li>Post a FHIR patient bundle and get a CarePlan back.</li>
+        </ol>
+        <div class="prereq">
+          <span class="eyebrow">Prerequisites</span>
+          <span>Podman (preferred) or Docker with compose</span>
+          <span>Python 3.11+</span>
+          <span>OpenAI API key for LLM-driven extraction</span>
+        </div>
+        <p style="margin-top:1.5rem;font-size:0.92rem;color:var(--ink-2)">Full walkthrough in the <a href="https://github.com/samschifman/cpg-to-acp#getting-started">README</a>. Every step is traced in MLflow when running locally.</p>
+      </div>
+      <div class="cmd">
+        <div><div class="lbl">Parse and extract</div>
+<pre><code>cd cpg-ingester
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -e . -e ../shared
+
+cpg-parse data/synthetic-hypertension-cpg.pdf -o output
+cpg-extract-dmn output/synthetic-hypertension-cpg.md -o output \
+  --deploy --acp-writer-url http://localhost:8082</code></pre></div>
+        <div><div class="lbl">Generate a care plan</div>
+<pre><code># Hypertension + diabetes → medication path
+curl -X POST http://localhost:8082/api/v1/careplans \
+  -H "Content-Type: application/fhir+json" \
+  -d @mock-EHR/data/patient-bundle-medication.json
+
+# Mild hypertension only → lifestyle path
+curl -X POST http://localhost:8082/api/v1/careplans \
+  -H "Content-Type: application/fhir+json" \
+  -d @mock-EHR/data/patient-bundle-lifestyle.json</code></pre></div>
+        <div><div class="lbl">Or deploy to OpenShift</div>
+<pre><code>NAMESPACE=my-cpg-to-acp ./deploy/install.sh</code></pre></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="standards">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Standards versions</span>
+      <h2>Pinned on purpose</h2>
+    </div>
+    <div class="standards">
+      <div class="std"><div class="big">DMN <small>1.4</small></div><p>Latest version Drools/Kogito supports at conformance level 3. Namespace <code>DMN/20191111/MODEL</code>. Moves to 1.5 when Kogito does.</p></div>
+      <div class="std"><div class="big">FHIR <small>R4</small></div><p>Via the Medplum FHIR server. IPS bundles in; CarePlan, Provenance and AI-transparency resources out.</p></div>
+      <div class="std"><div class="big">BPMN <small>2.0</small></div><p>The contract between acp-writer and automation. Phase 4 of the project plan.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>Actionable Care Plans · Built by Red Hat · Apache License 2.0</span>
+    <span><a href="https://github.com/samschifman/cpg-to-acp">Repository</a> · <a href="https://github.com/samschifman/cpg-to-acp/blob/main/CONTRIBUTING.md">Contributing</a> · <a href="https://github.com/samschifman/cpg-to-acp/blob/main/SECURITY.md">Security</a> · <a href="https://www.youtube.com/playlist?list=PLBrn0oRf1lNM">YouTube playlist</a></span>
+  </div>
+</footer>
+
+</body>
+</html>
