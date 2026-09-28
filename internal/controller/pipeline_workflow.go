@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"net/url"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -227,6 +228,17 @@ func workflowServiceHost(owner client.Object) string {
 
 func workflowServiceURL(owner client.Object) string {
 	return "http://" + workflowServiceHost(owner) + ":80"
+}
+
+// workflowAPIBaseURL is the origin used by BFF clients, which append the
+// workflow name to start and inspect instances. SonataFlow's published address
+// already includes that name and is used unchanged for callback URLs.
+func workflowAPIBaseURL(address string) string {
+	parsed, err := url.Parse(address)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return strings.TrimRight(address, "/")
+	}
+	return parsed.Scheme + "://" + parsed.Host
 }
 
 func templateWorkflowURL(workflow string) string {

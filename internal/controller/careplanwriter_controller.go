@@ -193,6 +193,11 @@ func carePlanWriterComponents(writer *appsv1alpha1.CarePlanWriter, endpoints map
 	decisionEngineURL := endpoints["decision-engine"]
 	llmReasoningURL := endpoints["llm-reasoning"]
 	fhirServerURL := endpoints["fhir-server"]
+	decisionServiceAccess := networkAccessForURL("decision-service", decisionServiceURL)
+	decisionEngineAccess := networkAccessForURL("decision-engine", decisionEngineURL)
+	llmReasoningAccess := networkAccessForURL("llm-reasoning", llmReasoningURL)
+	fhirServerAccess := networkAccessForURL("fhir-server", fhirServerURL)
+	bffAccess := networkAccessForURL("bff", endpoints["bff"])
 
 	reasoningEnv := llmPythonEnv(writer.Spec.LLMReasoning.PythonComponentSpec)
 	setIfNotEmpty(reasoningEnv, "DECISION_ENGINE_URL", decisionEngineURL)
@@ -239,7 +244,8 @@ func carePlanWriterComponents(writer *appsv1alpha1.CarePlanWriter, endpoints map
 	if writer.Spec.ArtifactStore != nil {
 		setIfNotEmpty(bffEnv, "MINIO_ENDPOINT", writer.Spec.ArtifactStore.URL)
 	}
-	bffEnv["SONATAFLOW_URL"] = strings.TrimRight(workflowURL, "/")
+	bffEnv["SONATAFLOW_URL"] = workflowAPIBaseURL(workflowURL)
+	bffEnv["SONATAFLOW_WORKFLOW_NAME"] = workflowResourceName(writer)
 	setIfNotEmpty(bffEnv, "LLM_REASONING_URL", llmReasoningURL)
 	setIfNotEmpty(bffEnv, "DECISION_ENGINE_URL", decisionEngineURL)
 	setIfNotEmpty(bffEnv, "FHIR_SERVER_URL", fhirServerURL)
@@ -254,13 +260,13 @@ func carePlanWriterComponents(writer *appsv1alpha1.CarePlanWriter, endpoints map
 
 	return []sandboxComponent{
 		{Name: "patient-data", Port: 8080, Spec: writer.Spec.PatientData.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.patient_data:app", "8080"), Env: pythonEnv(writer.Spec.PatientData), Providers: []string{artifactProvider}, Registrations: providerRegistrations(artifactRegistration), NetworkAccess: artifactAccess},
-		{Name: "llm-reasoning", Port: 8080, Spec: writer.Spec.LLMReasoning.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.llm_reasoning:app", "8080"), Env: reasoningEnv, Providers: []string{artifactProvider, llmProvider, embeddingProvider}, Registrations: providerRegistrations(artifactRegistration, llmRegistration, embeddingRegistration), NetworkAccess: combinedNetworkAccess(artifactAccess, inferenceAccess, embeddingAccess)},
-		{Name: "decision-engine", Port: 8080, Spec: writer.Spec.DecisionEngine.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.decision_engine:app", "8080"), Env: decisionEnv, Providers: []string{artifactProvider}, Registrations: providerRegistrations(artifactRegistration), NetworkAccess: artifactAccess},
+		{Name: "llm-reasoning", Port: 8080, Spec: writer.Spec.LLMReasoning.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.llm_reasoning:app", "8080"), Env: reasoningEnv, Providers: []string{artifactProvider, llmProvider, embeddingProvider}, Registrations: providerRegistrations(artifactRegistration, llmRegistration, embeddingRegistration), NetworkAccess: combinedNetworkAccess(artifactAccess, inferenceAccess, embeddingAccess, decisionEngineAccess)},
+		{Name: "decision-engine", Port: 8080, Spec: writer.Spec.DecisionEngine.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.decision_engine:app", "8080"), Env: decisionEnv, Providers: []string{artifactProvider}, Registrations: providerRegistrations(artifactRegistration), NetworkAccess: combinedNetworkAccess(artifactAccess, decisionServiceAccess)},
 		{Name: "fhir-generation", Port: 8080, Spec: writer.Spec.FHIRGeneration.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.fhir_generation:app", "8080"), Env: fhirGenerationEnv, Providers: []string{artifactProvider, llmProvider}, Registrations: providerRegistrations(artifactRegistration, llmRegistration), NetworkAccess: combinedNetworkAccess(artifactAccess, inferenceAccess)},
 		{Name: "fhir-server", Port: 8080, Spec: writer.Spec.FHIRServer.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.fhir_server:app", "8080"), Env: fhirEnv, Providers: []string{artifactProvider, fhirProvider}, Registrations: providerRegistrations(artifactRegistration, fhirRegistration), NetworkAccess: combinedNetworkAccess(artifactAccess, fhirTargetAccess)},
-		{Name: "bff", Port: 8080, Spec: writer.Spec.BFF.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.bff:app", "8080"), Env: bffEnv, Providers: []string{artifactProvider}, Registrations: providerRegistrations(artifactRegistration), NetworkAccess: artifactAccess},
-		{Name: "ui", Port: 8080, Spec: writer.Spec.UI, Command: []string{"/usr/libexec/s2i/run"}, Env: uiEnv},
-		{Name: "mcp", Port: 8090, Spec: writer.Spec.MCP.ComponentSpec, Command: pythonServiceCommand("acp_writer.mcp_proxy:app", "8090"), Env: mcpEnv, Providers: []string{llmProvider}, Registrations: providerRegistrations(llmRegistration), NetworkAccess: inferenceAccess},
+		{Name: "bff", Port: 8080, Spec: writer.Spec.BFF.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.bff:app", "8080"), Env: bffEnv, Providers: []string{artifactProvider}, Registrations: providerRegistrations(artifactRegistration), NetworkAccess: combinedNetworkAccess(artifactAccess, llmReasoningAccess, decisionEngineAccess, fhirServerAccess)},
+		{Name: "ui", Port: 8080, Spec: writer.Spec.UI, Command: []string{"/usr/libexec/s2i/run"}, Env: uiEnv, NetworkAccess: bffAccess},
+		{Name: "mcp", Port: 8090, Spec: writer.Spec.MCP.ComponentSpec, Command: pythonServiceCommand("acp_writer.mcp_proxy:app", "8090"), Env: mcpEnv, Providers: []string{llmProvider}, Registrations: providerRegistrations(llmRegistration), NetworkAccess: combinedNetworkAccess(inferenceAccess, decisionServiceAccess, fhirServerAccess)},
 		{Name: "decision-service", Port: 8081, Spec: writer.Spec.DecisionService.ComponentSpec, Command: []string{"java", "-jar", "/app/quarkus-run.jar"}, Env: decisionServiceEnv},
 	}
 }

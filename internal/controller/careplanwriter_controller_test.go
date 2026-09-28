@@ -192,7 +192,23 @@ var _ = Describe("CarePlanWriter Controller", func() {
 
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-llm-reasoning", Namespace: "default"}, reasoning)).To(Succeed())
 		Expect(reasoning.Spec.Env).To(HaveKeyWithValue("DECISION_ENGINE_URL", "https://decision-engine.gateway.test"))
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-bff", Namespace: "default"}, &appsv1alpha1.SandboxRequest{})).To(Succeed())
+		Expect(reasoning.Spec.NetworkAccess).To(ContainElement(appsv1alpha1.SandboxNetworkAccessSpec{
+			Name: "decision-engine", Host: "decision-engine.gateway.test", Port: 443, Protocol: "rest",
+		}))
+		bff := &appsv1alpha1.SandboxRequest{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-bff", Namespace: "default"}, bff)).To(Succeed())
+		Expect(bff.Spec.Env).To(HaveKeyWithValue("SONATAFLOW_URL", "https://writer-workflow.gateway.test"))
+		Expect(bff.Spec.Env).To(HaveKeyWithValue("SONATAFLOW_WORKFLOW_NAME", workflowResourceName(resource)))
+		for _, peer := range []string{"llm-reasoning", "decision-engine", "fhir-server"} {
+			Expect(bff.Spec.NetworkAccess).To(ContainElement(appsv1alpha1.SandboxNetworkAccessSpec{
+				Name: peer, Host: peer + ".gateway.test", Port: 443, Protocol: "rest",
+			}))
+		}
+		ui := &appsv1alpha1.SandboxRequest{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-ui", Namespace: "default"}, ui)).To(Succeed())
+		Expect(ui.Spec.NetworkAccess).To(ContainElement(appsv1alpha1.SandboxNetworkAccessSpec{
+			Name: "bff", Host: "bff.gateway.test", Port: 443, Protocol: "rest",
+		}))
 
 		Expect(k8sClient.Get(ctx, workflowKey, workflow)).To(Succeed())
 		workflowJSON, err := workflow.MarshalJSON()

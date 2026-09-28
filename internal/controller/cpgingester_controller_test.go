@@ -161,7 +161,8 @@ var _ = Describe("CPGIngester Controller", func() {
 		}))
 		bff := &appsv1alpha1.SandboxRequest{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-bff", Namespace: "default"}, bff)).To(Succeed())
-		Expect(bff.Spec.Env).To(HaveKeyWithValue("SONATAFLOW_URL", "https://workflow.gateway.test/callback"))
+		Expect(bff.Spec.Env).To(HaveKeyWithValue("SONATAFLOW_URL", "https://workflow.gateway.test"))
+		Expect(bff.Spec.Env).To(HaveKeyWithValue("SONATAFLOW_WORKFLOW_NAME", workflowResourceName(resource)))
 
 		updated := &appsv1alpha1.CPGIngester{}
 		Expect(k8sClient.Get(ctx, resourceKey, updated)).To(Succeed())
@@ -199,6 +200,11 @@ var _ = Describe("CPGIngester Controller", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(workflowJSON)).To(ContainSubstring("https://assembly.gateway.test/api/v1/assemble"))
 		Expect(string(workflowJSON)).To(ContainSubstring("https://workflow.gateway.test/callback/wait-parse"))
+		ui := &appsv1alpha1.SandboxRequest{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-ui", Namespace: "default"}, ui)).To(Succeed())
+		Expect(ui.Spec.NetworkAccess).To(ContainElement(appsv1alpha1.SandboxNetworkAccessSpec{
+			Name: "bff", Host: "bff.gateway.test", Port: 443, Protocol: "rest",
+		}))
 		props := &corev1.ConfigMap{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: workflowResourceName(resource) + "-props", Namespace: "default"}, props)).To(Succeed())
 		Expect(props.Data["application.properties"]).To(ContainSubstring("mp.messaging.incoming.parse-done.path=/wait-parse"))

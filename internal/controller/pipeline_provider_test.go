@@ -51,7 +51,7 @@ var _ = Describe("pipeline Secret-backed providers", func() {
 				LLM:           &appsv1alpha1.LLMConfigSpec{Credentials: source("llm-secret", "openai")},
 			},
 		}
-		components := cpgIngesterComponents(ingester, nil, "")
+		components := cpgIngesterComponents(ingester, nil, "", "")
 		ingestion := component(components, "ingestion")
 		analysis := component(components, "llm-analysis")
 		ui := component(components, "ui")
