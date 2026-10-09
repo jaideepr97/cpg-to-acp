@@ -30,3 +30,16 @@ dependencies = [
     "cpg-contracts @ file:///${PROJECT_ROOT}/shared",
 ]
 ```
+
+### MinIO credentials in OpenShell sandboxes
+
+The artifact-store client uses `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`
+when both are present. In an OpenShell sandbox these are provider-supplied
+placeholders; the MinIO endpoint policy must enable proxy-side SigV4 signing
+(`signing_service: s3`, `signing_region: us-east-1`). The client sends ordinary
+boto3 `GetObject`/`PutObject` requests so the proxy can re-sign them. It never
+generates presigned URLs with sandbox placeholders.
+
+Regular deployments such as the BFF continue to use
+`ARTIFACT_STORE_ACCESS_KEY` and `ARTIFACT_STORE_SECRET_KEY` directly. Both AWS
+variables must be present together, or artifact-store initialization fails.
