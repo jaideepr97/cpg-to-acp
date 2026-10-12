@@ -12,7 +12,6 @@ class CPGIngesterState(TypedDict, total=False):
     pdf_path: str
     litellm_url: str
     llm_model: str
-    llm_api_key: str
 
     # Phase 1 outputs
     markdown: str
@@ -45,7 +44,6 @@ class DMNPipelineState(TypedDict, total=False):
     abbreviations: dict[str, str]
     litellm_url: str
     llm_model: str
-    llm_api_key: str
     output_dir: str
     dmn_xml: str
     cpg_metadata: dict
@@ -71,7 +69,6 @@ class RecPipelineState(TypedDict, total=False):
     abbreviations: dict[str, str]
     litellm_url: str
     llm_model: str
-    llm_api_key: str
     output_dir: str
     recommendations: list[dict]
     schema_errors: list[str]

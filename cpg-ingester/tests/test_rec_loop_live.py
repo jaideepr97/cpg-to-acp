@@ -115,7 +115,6 @@ class TestRecLoopLive:
                 "abbreviations": {},
                 "litellm_url": LITELLM_URL,
                 "llm_model": LLM_MODEL,
-                "llm_api_key": LLM_API_KEY,
                 "output_dir": tmpdir,
             })
 

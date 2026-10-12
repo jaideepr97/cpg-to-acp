@@ -64,15 +64,13 @@ def _llm_cfg_from_env():
     """LLM config for figure interpretation. Direct-OpenAI example:
 
         LITELLM_URL=https://api.openai.com LLM_MODEL=gpt-5.6 \\
-        LLM_API_KEY=$OPENAI_API_KEY  run-benchmark.sh --synthetic --interpret
+        OPENAI_API_KEY set in the environment; run-benchmark.sh --synthetic --interpret
     """
     import os
 
     return {
         "litellm_url": os.environ.get("LITELLM_URL", "http://localhost:4000"),
         "llm_model": os.environ.get("LLM_MODEL", "default"),
-        "llm_api_key": os.environ.get("LLM_API_KEY")
-        or os.environ.get("OPENAI_API_KEY", "sk-change-me"),
     }
 
 

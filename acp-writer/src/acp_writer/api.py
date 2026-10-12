@@ -332,7 +332,6 @@ async def generate_careplan(request: Request):
 
     litellm_url = os.environ.get("LITELLM_URL", "http://localhost:4000")
     llm_model = os.environ.get("LLM_MODEL", "default")
-    llm_api_key = os.environ.get("LLM_API_KEY", "sk-change-me")
 
     run_id = str(uuid.uuid4())
     graph = build_pipeline()
@@ -346,7 +345,6 @@ async def generate_careplan(request: Request):
                 "run_id": run_id,
                 "litellm_url": litellm_url,
                 "llm_model": llm_model,
-                "llm_api_key": llm_api_key,
             },
             config={"configurable": {"thread_id": run_id}},
         )

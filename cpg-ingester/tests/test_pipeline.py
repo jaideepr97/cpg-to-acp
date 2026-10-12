@@ -107,7 +107,6 @@ class TestFullPipelineIntegration:
             "pdf_path": str(SYNTHETIC_CPG),
             "litellm_url": os.environ.get("LITELLM_URL", "http://localhost:4000"),
             "llm_model": os.environ.get("LLM_MODEL", "default"),
-            "llm_api_key": os.environ.get("LITELLM_API_KEY", "sk-change-me"),
         }
         config = {"configurable": {"thread_id": "integration-test"}}
         self.result = compiled.invoke(state, config=config)

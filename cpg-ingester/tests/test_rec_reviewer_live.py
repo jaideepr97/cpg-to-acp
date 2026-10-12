@@ -117,7 +117,6 @@ class TestRecReviewerLive:
                 "review_count": 0,
                 "litellm_url": LITELLM_URL,
                 "llm_model": LLM_MODEL,
-                "llm_api_key": LLM_API_KEY,
             }
 
             result = rec_semantic_reviewer(state)

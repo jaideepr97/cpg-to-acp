@@ -9,14 +9,26 @@ LLM_REQUEST_TIMEOUT = int(os.environ.get("LLM_REQUEST_TIMEOUT", "600"))
 
 
 def get_llm(state: dict) -> ChatOpenAI:
-    """Build an LLM client from pipeline state.
+    """Build an LLM client from non-secret pipeline settings.
 
     state['litellm_url'] must be the bare origin (e.g. 'http://localhost:4000')
     — this function appends '/v1'. Do not include '/v1' in the config value.
+    Credentials are read from the environment at construction and must never be
+    passed through state. Prefer LLM_API_KEY (provided by Helm), then
+    LITELLM_API_KEY (provided by compose), then OPENAI_API_KEY (often set on
+    developer machines for unrelated tools).
     """
+    api_key = next(
+        (
+            os.environ[name]
+            for name in ("LLM_API_KEY", "LITELLM_API_KEY", "OPENAI_API_KEY")
+            if os.environ.get(name)
+        ),
+        "sk-change-me",
+    )
     return ChatOpenAI(
         base_url=f"{state.get('litellm_url', 'http://localhost:4000')}/v1",
-        api_key=state.get("llm_api_key", "sk-change-me"),
+        api_key=api_key,
         model=state.get("llm_model", "default"),
         use_responses_api=True,
         max_retries=LLM_MAX_RETRIES,

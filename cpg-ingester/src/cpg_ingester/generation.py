@@ -392,7 +392,6 @@ def generate_all(state: dict) -> dict:
         "abbreviations": state.get("abbreviations", {}),
         "litellm_url": state.get("litellm_url", ""),
         "llm_model": state.get("llm_model", ""),
-        "llm_api_key": state.get("llm_api_key", ""),
         "output_dir": state.get("output_dir", ""),
     }
 

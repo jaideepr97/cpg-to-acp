@@ -23,13 +23,11 @@ except Exception:
 @click.option("--output-dir", "-o", type=click.Path(path_type=Path), default=None)
 @click.option("--litellm-url", envvar="LITELLM_URL", default="http://localhost:4000")
 @click.option("--model", envvar="LLM_MODEL", default="default")
-@click.option("--api-key", envvar="LITELLM_API_KEY", default="sk-change-me")
 def main(
     input_pdf: Path,
     output_dir: Path | None,
     litellm_url: str,
     model: str,
-    api_key: str,
 ):
     """Run the cpg-ingester pipeline on a CPG PDF."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -49,7 +47,6 @@ def main(
         "pdf_path": str(input_pdf),
         "litellm_url": litellm_url,
         "llm_model": model,
-        "llm_api_key": api_key,
     }
 
     config = {"configurable": {"thread_id": run_id}}
