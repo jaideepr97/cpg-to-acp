@@ -82,7 +82,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: manager
-          image: quay.io/carewright/carewright-operator:0d099a7
+          image: quay.io/carewright/carewright-operator:4c76131
           imagePullPolicy: IfNotPresent
           args:
             - --controllers=sandboxrequest

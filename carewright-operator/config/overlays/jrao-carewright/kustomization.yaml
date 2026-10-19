@@ -8,7 +8,7 @@ resources:
 
 images:
   - name: quay.io/carewright/carewright-operator
-    newTag: dev-20260928-41dae38
+    newTag: 4c76131
 
 patches:
   - target:
