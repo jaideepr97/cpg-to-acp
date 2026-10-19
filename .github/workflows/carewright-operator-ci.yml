@@ -33,7 +33,7 @@ jobs:
           cache-dependency-path: carewright-operator/go.sum
       - uses: golangci/golangci-lint-action@v8
         with:
-          version: v2.1.0
+          version: v2.4.0
           working-directory: carewright-operator
 
   e2e:
