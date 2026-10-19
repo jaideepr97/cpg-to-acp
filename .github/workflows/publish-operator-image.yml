@@ -44,3 +44,10 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=carewright-operator
           cache-to: type=gha,mode=min,scope=carewright-operator
+
+      - name: Update latest tag
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker buildx imagetools create \
+            --tag quay.io/carewright/carewright-operator:latest \
+            quay.io/carewright/carewright-operator:${{ steps.tag.outputs.value }}

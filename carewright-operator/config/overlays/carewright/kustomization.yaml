@@ -9,7 +9,7 @@ resources:
 images:
   - name: controller
     newName: quay.io/carewright/carewright-operator
-    newTag: 4c76131
+    newTag: latest
 
 patches:
   - path: manager_patch.yaml

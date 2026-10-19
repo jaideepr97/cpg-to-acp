@@ -25,10 +25,10 @@ spec:
       secretRef:
         name: carewright-llm-credentials
   patientData:
-    image: quay.io/carewright/acp-writer-patient-data:7687008
+    image: quay.io/carewright/acp-writer-patient-data:latest
     pythonPath: /app/src
   llmReasoning:
-    image: quay.io/carewright/acp-writer-llm:7687008
+    image: quay.io/carewright/acp-writer-llm:latest
     pythonPath: /app/src
     embedding:
       provider: openai
@@ -39,22 +39,22 @@ spec:
       # the embedding client from falling back to the EnMaaS LLM_API_KEY.
       EMBEDDING_API_KEY: unused
   decisionEngine:
-    image: quay.io/carewright/acp-writer-decision:7687008
+    image: quay.io/carewright/acp-writer-decision:latest
     pythonPath: /app/src
   fhirGeneration:
-    image: quay.io/carewright/acp-writer-fhir-gen:7687008
+    image: quay.io/carewright/acp-writer-fhir-gen:latest
     pythonPath: /app/src
   fhirServer:
-    image: quay.io/carewright/acp-writer-fhir-srv:7687008
+    image: quay.io/carewright/acp-writer-fhir-srv:latest
     pythonPath: /app/src
   bff:
-    image: quay.io/carewright/acp-writer-bff:f917d07
+    image: quay.io/carewright/acp-writer-bff:latest
     pythonPath: /app/src
   ui:
-    image: quay.io/carewright/acp-writer-ui:f917d07
+    image: quay.io/carewright/acp-writer-ui:latest
   mcp:
-    image: quay.io/carewright/acp-writer-mcp:f917d07
+    image: quay.io/carewright/acp-writer-mcp:latest
     pythonPath: /app/src
   decisionService:
-    image: quay.io/carewright/decision-service:f917d07
+    image: quay.io/carewright/decision-service:latest
     javaOptions: -Dquarkus.http.host=0.0.0.0
