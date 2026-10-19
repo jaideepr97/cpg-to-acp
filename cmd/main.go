@@ -29,9 +29,11 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -77,6 +79,15 @@ func parseControllerSelection(value string) (map[string]bool, error) {
 		selected[name] = true
 	}
 	return selected, nil
+}
+
+// cacheOptionsForNamespace keeps the existing cluster-wide behavior when no scope is set.
+func cacheOptionsForNamespace(namespace string) cache.Options {
+	namespace = strings.TrimSpace(namespace)
+	if namespace == "" {
+		return cache.Options{}
+	}
+	return cache.Options{DefaultNamespaces: map[string]cache.Config{namespace: {}}}
 }
 
 func init() {
@@ -220,6 +231,7 @@ func main() {
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
+		Cache:                  cacheOptionsForNamespace(os.Getenv("WATCH_NAMESPACE")),
 		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
@@ -262,8 +274,9 @@ func main() {
 	}
 	if selectedControllers[controllerSandboxRequest] {
 		if err := (&controller.SandboxRequestReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			OwnerUID: types.UID(os.Getenv("SANDBOXREQUEST_OWNER_UID")),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "SandboxRequest")
 			os.Exit(1)

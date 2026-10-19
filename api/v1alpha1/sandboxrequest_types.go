@@ -259,6 +259,11 @@ type SandboxRequestStatus struct {
 	// +optional
 	ManagedProviders []ManagedProviderStatus `json:"managedProviders,omitempty"`
 
+	// ProviderSyncMarkers record the provider ID and Secret version last synced
+	// by this request. OpenShell does not persist annotation changes on provider updates.
+	// +optional
+	ProviderSyncMarkers map[string]string `json:"providerSyncMarkers,omitempty"`
+
 	// Conditions describe whether the sandbox is available or reconciliation failed.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`

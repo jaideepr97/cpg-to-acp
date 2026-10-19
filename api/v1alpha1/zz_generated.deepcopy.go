@@ -801,6 +801,13 @@ func (in *SandboxRequestStatus) DeepCopyInto(out *SandboxRequestStatus) {
 		*out = make([]ManagedProviderStatus, len(*in))
 		copy(*out, *in)
 	}
+	if in.ProviderSyncMarkers != nil {
+		in, out := &in.ProviderSyncMarkers, &out.ProviderSyncMarkers
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make([]metav1.Condition, len(*in))

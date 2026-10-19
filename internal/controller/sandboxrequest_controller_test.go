@@ -124,6 +124,32 @@ var _ = Describe("SandboxRequest Controller", func() {
 	key := types.NamespacedName{Name: resourceName, Namespace: "default"}
 	policyKey := types.NamespacedName{Name: policyName, Namespace: "default"}
 
+	It("ignores requests owned by another pipeline when scoped", func() {
+		otherKey := types.NamespacedName{Name: "other-pipeline-sandbox", Namespace: "default"}
+		request := &appsv1alpha1.SandboxRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: otherKey.Name, Namespace: otherKey.Namespace,
+				OwnerReferences: []metav1.OwnerReference{{
+					APIVersion: "apps.carewright.io/v1alpha1", Kind: "CPGIngester",
+					Name: "other-pipeline", UID: types.UID("other-pipeline"),
+				}},
+			},
+			Spec: appsv1alpha1.SandboxRequestSpec{Image: "example.test/worker:latest"},
+		}
+		Expect(k8sClient.Create(ctx, request)).To(Succeed())
+		DeferCleanup(func() { Expect(k8sClient.Delete(ctx, request)).To(Succeed()) })
+
+		reconciler := &SandboxRequestReconciler{
+			Client: k8sClient, Scheme: k8sClient.Scheme(), OwnerUID: types.UID("selected-pipeline"),
+		}
+		result, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: otherKey})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).To(Equal(reconcile.Result{}))
+		Expect(k8sClient.Get(ctx, otherKey, request)).To(Succeed())
+		Expect(request.Finalizers).To(BeEmpty())
+		Expect(request.Status.Phase).To(BeEmpty())
+	})
+
 	It("creates, replaces, observes, and deletes a sandbox through the SDK", func() {
 		policy := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Name: policyName, Namespace: "default"},
@@ -322,11 +348,13 @@ filesystem_policy:
 		Expect(openshellv1.IsNotFound(err)).To(BeTrue())
 
 		Expect(k8sClient.Create(ctx, secret)).To(Succeed())
+		originalSecretVersion := secret.ResourceVersion
 		_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: requestKey})
 		Expect(err).NotTo(HaveOccurred())
 		provider, err := sdkClient.Providers().Get(ctx, "pipelines", "managed-llm")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(provider.Spec.Credentials).To(HaveKeyWithValue("api_key", "first-key"))
+		Expect(provider.Spec.ProfileWorkspace).To(Equal("pipelines"))
 		Expect(provider.Annotations[providerSourceKey]).To(Equal("default/" + secretName))
 		sandbox, err := sdkClient.Sandboxes().Get(ctx, "pipelines", requestName)
 		Expect(err).NotTo(HaveOccurred())
@@ -341,9 +369,21 @@ filesystem_policy:
 		provider, err = sdkClient.Providers().Get(ctx, "pipelines", "managed-llm")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(provider.Spec.Credentials).To(HaveKeyWithValue("api_key", "rotated-key"))
+		Expect(provider.Spec.ProfileWorkspace).To(Equal("pipelines"))
 		sandbox, err = sdkClient.Sandboxes().Get(ctx, "pipelines", requestName)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(sandbox.ID).To(Equal(originalID))
+
+		By("not updating again when the gateway retains the old annotation on update")
+		provider.Annotations[providerSecretVersion] = originalSecretVersion
+		provider, err = sdkClient.Providers().Update(ctx, "pipelines", provider)
+		Expect(err).NotTo(HaveOccurred())
+		providerVersion := provider.ResourceVersion
+		_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: requestKey})
+		Expect(err).NotTo(HaveOccurred())
+		provider, err = sdkClient.Providers().Get(ctx, "pipelines", "managed-llm")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(provider.ResourceVersion).To(Equal(providerVersion))
 
 		By("retaining a shared provider while another request still uses it")
 		Expect(k8sClient.Get(ctx, requestKey, request)).To(Succeed())

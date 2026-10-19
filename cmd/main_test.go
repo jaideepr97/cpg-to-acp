@@ -19,6 +19,8 @@ package main
 import (
 	"reflect"
 	"testing"
+
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 )
 
 func TestParseControllerSelection(t *testing.T) {
@@ -71,5 +73,16 @@ func TestParseControllerSelection(t *testing.T) {
 				t.Fatalf("selection = %#v, want %#v", got, test.want)
 			}
 		})
+	}
+}
+
+func TestCacheOptionsForNamespace(t *testing.T) {
+	if got := cacheOptionsForNamespace(" "); len(got.DefaultNamespaces) != 0 {
+		t.Fatalf("empty scope should watch all namespaces, got %#v", got.DefaultNamespaces)
+	}
+	got := cacheOptionsForNamespace(" jrao-carewright ")
+	want := map[string]cache.Config{"jrao-carewright": {}}
+	if !reflect.DeepEqual(got.DefaultNamespaces, want) {
+		t.Fatalf("namespace scope = %#v, want %#v", got.DefaultNamespaces, want)
 	}
 }

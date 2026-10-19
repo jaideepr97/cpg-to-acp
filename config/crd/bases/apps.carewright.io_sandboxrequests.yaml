@@ -411,6 +411,13 @@ spec:
               phase:
                 description: Phase is the state reported by OpenShell.
                 type: string
+              providerSyncMarkers:
+                additionalProperties:
+                  type: string
+                description: |-
+                  ProviderSyncMarkers record the provider ID and Secret version last synced
+                  by this request. OpenShell does not persist annotation changes on provider updates.
+                type: object
               sandboxID:
                 description: SandboxID is the identifier reported by OpenShell.
                 type: string

@@ -110,6 +110,9 @@ type SandboxRequestReconciler struct {
 	client.Client
 	Scheme        *runtime.Scheme
 	ClientFactory OpenShellClientFactory
+	// OwnerUID limits local reconciliation to requests owned by one pipeline.
+	// An empty UID preserves the normal behavior of reconciling all requests.
+	OwnerUID types.UID
 }
 
 // +kubebuilder:rbac:groups=apps.carewright.io,resources=sandboxrequests,verbs=get;list;watch;create;update;patch;delete
@@ -125,6 +128,18 @@ func (r *SandboxRequestReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	var request appsv1alpha1.SandboxRequest
 	if err := r.Get(ctx, req.NamespacedName, &request); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	if r.OwnerUID != "" {
+		owned := false
+		for _, owner := range request.OwnerReferences {
+			if owner.UID == r.OwnerUID {
+				owned = true
+				break
+			}
+		}
+		if !owned {
+			return ctrl.Result{}, nil
+		}
 	}
 
 	if !request.DeletionTimestamp.IsZero() {
@@ -311,6 +326,7 @@ func (r *SandboxRequestReconciler) registerProviders(ctx context.Context, reques
 			credentials[name] = string(value)
 		}
 		source := key.String()
+		secretMarker := string(secret.UID) + "/" + secret.ResourceVersion
 		existing, err := session.Client.Providers().Get(ctx, workspace(request), registration.Name)
 		if err != nil && !openshellv1.IsNotFound(err) {
 			return fmt.Errorf("get OpenShell provider %q: %w", registration.Name, err)
@@ -319,11 +335,15 @@ func (r *SandboxRequestReconciler) registerProviders(ctx context.Context, reques
 			if existing.Annotations[providerSourceKey] != source {
 				return fmt.Errorf("OpenShell provider %q already exists and is not managed from Secret %s", registration.Name, source)
 			}
-			if existing.Annotations[providerSecretUID] == string(secret.UID) &&
-				existing.Annotations[providerSecretVersion] == secret.ResourceVersion &&
+			providerMarker := existing.ID + "/" + secretMarker
+			secretSynced := (existing.Annotations[providerSecretUID] == string(secret.UID) &&
+				existing.Annotations[providerSecretVersion] == secret.ResourceVersion) ||
+				request.Status.ProviderSyncMarkers[registration.Name] == providerMarker
+			if secretSynced &&
 				existing.Type == registration.Type &&
+				existing.Spec.ProfileWorkspace == workspace(request) &&
 				maps.Equal(existing.Spec.Config, registration.Config) {
-				if err := r.trackManagedProvider(ctx, request, managedProviderStatus(request, registration)); err != nil {
+				if err := r.trackManagedProvider(ctx, request, managedProviderStatus(request, registration), providerMarker); err != nil {
 					return err
 				}
 				continue
@@ -338,12 +358,14 @@ func (r *SandboxRequestReconciler) registerProviders(ctx context.Context, reques
 				providerSecretVersion: secret.ResourceVersion,
 			},
 			Spec: openshellv1.ProviderSpec{
-				Credentials: credentials,
-				Config:      maps.Clone(registration.Config),
+				Credentials:      credentials,
+				Config:           maps.Clone(registration.Config),
+				ProfileWorkspace: workspace(request),
 			},
 		}
+		var registered *openshellv1.Provider
 		if existing == nil {
-			_, err = session.Client.Providers().Create(ctx, workspace(request), provider)
+			registered, err = session.Client.Providers().Create(ctx, workspace(request), provider)
 		} else {
 			provider.ID = existing.ID
 			provider.ResourceVersion = existing.ResourceVersion
@@ -353,12 +375,12 @@ func (r *SandboxRequestReconciler) registerProviders(ctx context.Context, reques
 					provider.Annotations[name] = value
 				}
 			}
-			_, err = session.Client.Providers().Update(ctx, workspace(request), provider)
+			registered, err = session.Client.Providers().Update(ctx, workspace(request), provider)
 		}
 		if err != nil {
 			return fmt.Errorf("register OpenShell provider %q: %w", registration.Name, err)
 		}
-		if err := r.trackManagedProvider(ctx, request, managedProviderStatus(request, registration)); err != nil {
+		if err := r.trackManagedProvider(ctx, request, managedProviderStatus(request, registration), registered.ID+"/"+secretMarker); err != nil {
 			return err
 		}
 	}
@@ -409,12 +431,18 @@ func sameProviderLocation(left, right appsv1alpha1.ManagedProviderStatus) bool {
 		providerGatewayAddress(left.Gateway) == providerGatewayAddress(right.Gateway)
 }
 
-func (r *SandboxRequestReconciler) trackManagedProvider(ctx context.Context, request *appsv1alpha1.SandboxRequest, registration appsv1alpha1.ManagedProviderStatus) error {
-	if slices.Contains(request.Status.ManagedProviders, registration) {
+func (r *SandboxRequestReconciler) trackManagedProvider(ctx context.Context, request *appsv1alpha1.SandboxRequest, registration appsv1alpha1.ManagedProviderStatus, marker string) error {
+	if slices.Contains(request.Status.ManagedProviders, registration) && request.Status.ProviderSyncMarkers[registration.Name] == marker {
 		return nil
 	}
 	before := request.DeepCopy()
-	request.Status.ManagedProviders = append(request.Status.ManagedProviders, registration)
+	if !slices.Contains(request.Status.ManagedProviders, registration) {
+		request.Status.ManagedProviders = append(request.Status.ManagedProviders, registration)
+	}
+	if request.Status.ProviderSyncMarkers == nil {
+		request.Status.ProviderSyncMarkers = make(map[string]string)
+	}
+	request.Status.ProviderSyncMarkers[registration.Name] = marker
 	return r.Status().Patch(ctx, request, client.MergeFrom(before))
 }
 
