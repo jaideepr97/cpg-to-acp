@@ -51,7 +51,7 @@ var _ = Describe("pipeline Secret-backed providers", func() {
 				LLM:           &appsv1alpha1.LLMConfigSpec{Credentials: source("llm-secret", "openai")},
 			},
 		}
-		components := cpgIngesterComponents(ingester, nil, "", "")
+		components := cpgIngesterComponents(ingester)
 		ingestion := component(components, "ingestion")
 		analysis := component(components, "llm-analysis")
 		Expect(ingestion.Registrations).To(HaveLen(1))
@@ -78,7 +78,7 @@ var _ = Describe("pipeline Secret-backed providers", func() {
 				FHIRTarget: &appsv1alpha1.FHIRTargetSpec{Credentials: source("fhir-secret", "fhir")},
 			},
 		}
-		components := carePlanWriterComponents(writer, nil, "")
+		components := carePlanWriterComponents(writer, nil)
 		reasoning := component(components, "llm-reasoning")
 		fhir := component(components, "fhir-server")
 		Expect(reasoning.Registrations).To(HaveLen(3))

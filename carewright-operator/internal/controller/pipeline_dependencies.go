@@ -36,7 +36,10 @@ import (
 
 var objectStoreGVK = schema.GroupVersionKind{Group: "aistor.min.io", Version: "v1", Kind: "ObjectStore"}
 
-const artifactStoreManagedByValue = "artifact-store-controller"
+const (
+	artifactStoreManagedByValue = "artifact-store-controller"
+	maxDNS1123LabelLength       = 63
+)
 
 type artifactStoreSummary struct {
 	Spec  *appsv1alpha1.ArtifactStoreSpec
@@ -64,11 +67,11 @@ func reconcileArtifactStore(
 
 	name := managed.Name
 	if name == "" {
-		name = dependencyResourceName(owner.GetName(), "artifacts", 63)
+		name = dependencyResourceName(owner.GetName(), "artifacts")
 	}
-	serviceName := dependencyResourceName(name, "api", 63)
-	secretName := dependencyResourceName(name, "configuration", 63)
-	credentialSecretName := dependencyResourceName(name, "credentials", 63)
+	serviceName := dependencyResourceName(name, "api")
+	secretName := dependencyResourceName(name, "configuration")
+	credentialSecretName := dependencyResourceName(name, "credentials")
 	effective.URL = fmt.Sprintf("http://%s.%s.svc.cluster.local:9000", serviceName, owner.GetNamespace())
 	// The provider Secret contains only credentials, not MinIO's config.env.
 	effective.CredentialsProvider = ""
@@ -82,7 +85,7 @@ func reconcileArtifactStore(
 	configuration.Namespace = owner.GetNamespace()
 	_, err := controllerutil.CreateOrUpdate(ctx, k8sClient, configuration, func() error {
 		if configuration.ResourceVersion != "" && configuration.Labels[managedByLabel] != artifactStoreManagedByValue {
-			return fmt.Errorf("Secret %s/%s already exists and is not managed by CareWright", configuration.Namespace, configuration.Name)
+			return fmt.Errorf("secret %s/%s already exists and is not managed by CareWright", configuration.Namespace, configuration.Name)
 		}
 		if configuration.Labels == nil {
 			configuration.Labels = map[string]string{}
@@ -116,7 +119,7 @@ func reconcileArtifactStore(
 	credentialSecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: credentialSecretName, Namespace: owner.GetNamespace()}}
 	_, err = controllerutil.CreateOrUpdate(ctx, k8sClient, credentialSecret, func() error {
 		if credentialSecret.ResourceVersion != "" && credentialSecret.Labels[managedByLabel] != artifactStoreManagedByValue {
-			return fmt.Errorf("Secret %s/%s already exists and is not managed by CareWright", credentialSecret.Namespace, credentialSecret.Name)
+			return fmt.Errorf("secret %s/%s already exists and is not managed by CareWright", credentialSecret.Namespace, credentialSecret.Name)
 		}
 		if credentialSecret.Labels == nil {
 			credentialSecret.Labels = map[string]string{}
@@ -125,8 +128,8 @@ func reconcileArtifactStore(
 		credentialSecret.Data = map[string][]byte{
 			"ARTIFACT_STORE_ACCESS_KEY": []byte(credentials["MINIO_ROOT_USER"]),
 			"ARTIFACT_STORE_SECRET_KEY": []byte(credentials["MINIO_ROOT_PASSWORD"]),
-			"AWS_ACCESS_KEY_ID":        []byte(credentials["MINIO_ROOT_USER"]),
-			"AWS_SECRET_ACCESS_KEY":    []byte(credentials["MINIO_ROOT_PASSWORD"]),
+			"AWS_ACCESS_KEY_ID":         []byte(credentials["MINIO_ROOT_USER"]),
+			"AWS_SECRET_ACCESS_KEY":     []byte(credentials["MINIO_ROOT_PASSWORD"]),
 		}
 		return nil
 	})
@@ -176,7 +179,7 @@ func reconcileArtifactStore(
 			"podManagementPolicy": "Parallel",
 			"services": map[string]any{
 				"minio":   map[string]any{"name": serviceName, "serviceType": "ClusterIP"},
-				"console": map[string]any{"name": dependencyResourceName(name, "console", 63), "serviceType": "ClusterIP"},
+				"console": map[string]any{"name": dependencyResourceName(name, "console"), "serviceType": "ClusterIP"},
 			},
 			"pools": []any{map[string]any{
 				"name":             "pool-0",
@@ -208,15 +211,15 @@ func objectStoreObject() *unstructured.Unstructured {
 	return object
 }
 
-func dependencyResourceName(base, suffix string, maxLength int) string {
+func dependencyResourceName(base, suffix string) string {
 	candidate := strings.Trim(base+"-"+suffix, "-")
-	if len(candidate) <= maxLength && len(validation.IsDNS1123Label(candidate)) == 0 {
+	if len(candidate) <= maxDNS1123LabelLength && len(validation.IsDNS1123Label(candidate)) == 0 {
 		return candidate
 	}
 	hash := shortHash(candidate)
-	maxPrefix := maxLength - len(hash) - len(suffix) - 2
+	maxPrefix := maxDNS1123LabelLength - len(hash) - len(suffix) - 2
 	if maxPrefix < 1 {
-		maxPrefix = maxLength - len(hash) - 1
+		maxPrefix = maxDNS1123LabelLength - len(hash) - 1
 		suffix = ""
 	}
 	prefix := strings.Trim(base[:min(len(base), maxPrefix)], "-")

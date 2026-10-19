@@ -203,7 +203,7 @@ filesystem_policy:
 		By("adding the cleanup finalizer before creating an external resource")
 		result, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(result.Requeue).To(BeTrue())
+		Expect(result.RequeueAfter).To(Equal(time.Second))
 		Expect(factory.gateways).To(BeEmpty())
 
 		By("creating the requested sandbox")

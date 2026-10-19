@@ -106,7 +106,7 @@ func (r *CPGIngesterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		},
 		LiteralReplacements: literals,
 	}
-	components := cpgIngesterComponents(effective, knownEndpoints, workflowServiceURL(&ingester), writerBFFURL)
+	components := cpgIngesterComponents(effective)
 	workflow, err := reconcilePipelineWorkflow(ctx, r.Client, r.Scheme, &ingester, template, knownEndpoints, len(components)+1)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -114,7 +114,7 @@ func (r *CPGIngesterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if !workflow.Ready {
 		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 	}
-	components = cpgIngesterComponents(effective, knownEndpoints, workflow.URL, writerBFFURL)
+	components = cpgIngesterComponents(effective)
 
 	summary, err := reconcileComponentSandboxes(ctx, r.Client, r.Scheme, &ingester, ingester.Spec.Sandbox, workflow.URL, components)
 	if err != nil {
@@ -202,7 +202,7 @@ func (r *CPGIngesterReconciler) ingestersForWriter(ctx context.Context, writer c
 	return requests
 }
 
-func cpgIngesterComponents(ingester *appsv1alpha1.CPGIngester, endpoints map[string]string, workflowURL, writerBFFURL string) []sandboxComponent {
+func cpgIngesterComponents(ingester *appsv1alpha1.CPGIngester) []sandboxComponent {
 	artifactEnv, externalArtifactProvider := artifactStoreInputs(ingester.Spec.ArtifactStore)
 	var artifactSource *appsv1alpha1.ProviderSourceSpec
 	if ingester.Spec.ArtifactStore != nil {

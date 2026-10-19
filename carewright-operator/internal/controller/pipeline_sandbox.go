@@ -212,6 +212,7 @@ func sandboxServiceProxyURL(ctx context.Context, k8sClient client.Client, namesp
 	return fmt.Sprintf("http://openshell-service-proxy.%s.svc.cluster.local:8080", namespace), nil
 }
 
+//nolint:unparam // Keep service selection generic for pipelines that expose named services.
 func sandboxServiceURL(services []appsv1alpha1.SandboxServiceStatus, name, proxy string) string {
 	for _, service := range services {
 		if service.Name == name {

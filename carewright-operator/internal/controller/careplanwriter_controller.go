@@ -91,7 +91,7 @@ func (r *CarePlanWriterReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			"http://acp-bff:8080":             "bff",
 		},
 	}
-	components := carePlanWriterComponents(effective, knownEndpoints, workflowServiceURL(&writer))
+	components := carePlanWriterComponents(effective, knownEndpoints)
 	workflow, err := reconcilePipelineWorkflow(ctx, r.Client, r.Scheme, &writer, template, knownEndpoints, len(components)+1)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -99,7 +99,7 @@ func (r *CarePlanWriterReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if !workflow.Ready {
 		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 	}
-	components = carePlanWriterComponents(effective, knownEndpoints, workflow.URL)
+	components = carePlanWriterComponents(effective, knownEndpoints)
 
 	summary, err := reconcileComponentSandboxes(ctx, r.Client, r.Scheme, &writer, writer.Spec.Sandbox, workflow.URL, components)
 	if err != nil {
@@ -170,7 +170,7 @@ func (r *CarePlanWriterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func carePlanWriterComponents(writer *appsv1alpha1.CarePlanWriter, endpoints map[string]string, workflowURL string) []sandboxComponent {
+func carePlanWriterComponents(writer *appsv1alpha1.CarePlanWriter, endpoints map[string]string) []sandboxComponent {
 	artifactEnv, externalArtifactProvider := artifactStoreInputs(writer.Spec.ArtifactStore)
 	var artifactSource *appsv1alpha1.ProviderSourceSpec
 	if writer.Spec.ArtifactStore != nil {

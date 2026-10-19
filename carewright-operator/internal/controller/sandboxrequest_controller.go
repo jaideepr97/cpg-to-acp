@@ -152,7 +152,7 @@ func (r *SandboxRequestReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if err := r.Patch(ctx, &request, client.MergeFrom(before)); err != nil {
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
 	policy, err := r.policy(ctx, &request)

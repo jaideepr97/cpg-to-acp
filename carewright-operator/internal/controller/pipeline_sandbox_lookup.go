@@ -31,6 +31,8 @@ const openshellSandboxIDLabel = "openshell.ai/sandbox-id"
 // Sandbox resource. The gateway's logical sandbox name is not necessarily the
 // Kubernetes resource name (shared workspaces prefix it with the workspace).
 // A missing ID or resource means the Sandbox has not appeared yet.
+//
+//nolint:unparam // Namespace must remain explicit so this lookup is reusable across namespaces.
 func kubernetesSandboxByID(
 	ctx context.Context,
 	k8sClient client.Client,

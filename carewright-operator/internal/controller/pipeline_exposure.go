@@ -58,7 +58,7 @@ type bffDeploymentSummary struct {
 // reconcileBFFDeployment runs the BFF outside OpenShell and gives the UI and
 // workflow a stable in-cluster endpoint.
 func reconcileBFFDeployment(ctx context.Context, k8sClient client.Client, scheme *runtime.Scheme, owner client.Object, component sandboxComponent, artifactStore *appsv1alpha1.ArtifactStoreSpec) (bffDeploymentSummary, error) {
-	name := dependencyResourceName(owner.GetName(), "bff", 63)
+	name := dependencyResourceName(owner.GetName(), "bff")
 	selector := pipelineComponentSelector(owner, "bff")
 	resources, err := componentResourceRequirements(component.Spec.Resources)
 	if err != nil {
@@ -89,12 +89,12 @@ func reconcileBFFDeployment(ctx context.Context, k8sClient client.Client, scheme
 	deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: owner.GetNamespace()}}
 	_, err = controllerutil.CreateOrUpdate(ctx, k8sClient, deployment, func() error {
 		if deployment.ResourceVersion != "" && !metav1.IsControlledBy(deployment, owner) {
-			return fmt.Errorf("Deployment %s/%s already exists and is not managed by CareWright", deployment.Namespace, deployment.Name)
+			return fmt.Errorf("deployment %s/%s already exists and is not managed by CareWright", deployment.Namespace, deployment.Name)
 		}
 		setPipelineResourceLabels(deployment, owner, "bff")
 		deployment.Spec.Replicas = ptrTo(int32(1))
 		deployment.Spec.Selector = &metav1.LabelSelector{MatchLabels: selector}
-		deployment.Spec.Template.ObjectMeta.Labels = maps.Clone(selector)
+		deployment.Spec.Template.Labels = maps.Clone(selector)
 		deployment.Spec.Template.Spec.Containers = []corev1.Container{{
 			Name: "bff", Image: component.Spec.Image, Command: slices.Clone(command), Env: env, Resources: resources,
 			Ports:          []corev1.ContainerPort{{Name: "http", ContainerPort: 8080, Protocol: corev1.ProtocolTCP}},
@@ -108,7 +108,7 @@ func reconcileBFFDeployment(ctx context.Context, k8sClient client.Client, scheme
 	service := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: owner.GetNamespace()}}
 	_, err = controllerutil.CreateOrUpdate(ctx, k8sClient, service, func() error {
 		if service.ResourceVersion != "" && !metav1.IsControlledBy(service, owner) {
-			return fmt.Errorf("Service %s/%s already exists and is not managed by CareWright", service.Namespace, service.Name)
+			return fmt.Errorf("service %s/%s already exists and is not managed by CareWright", service.Namespace, service.Name)
 		}
 		setPipelineResourceLabels(service, owner, "bff")
 		service.Spec.Type = corev1.ServiceTypeClusterIP
@@ -121,7 +121,7 @@ func reconcileBFFDeployment(ctx context.Context, k8sClient client.Client, scheme
 	}
 	// Remove the ingress exception previously needed for the sandboxed BFF.
 	policy := &networkingv1.NetworkPolicy{}
-	if err := k8sClient.Get(ctx, client.ObjectKey{Name: dependencyResourceName(owner.GetName(), "ui-to-bff", 63), Namespace: owner.GetNamespace()}, policy); err == nil {
+	if err := k8sClient.Get(ctx, client.ObjectKey{Name: dependencyResourceName(owner.GetName(), "ui-to-bff"), Namespace: owner.GetNamespace()}, policy); err == nil {
 		if metav1.IsControlledBy(policy, owner) {
 			if err := k8sClient.Delete(ctx, policy); err != nil && !apierrors.IsNotFound(err) {
 				return bffDeploymentSummary{}, fmt.Errorf("delete obsolete UI-to-BFF NetworkPolicy: %w", err)
@@ -134,7 +134,7 @@ func reconcileBFFDeployment(ctx context.Context, k8sClient client.Client, scheme
 }
 
 func bffServiceURL(owner client.Object) string {
-	return fmt.Sprintf("http://%s.%s.svc.cluster.local", dependencyResourceName(owner.GetName(), "bff", 63), owner.GetNamespace())
+	return fmt.Sprintf("http://%s.%s.svc.cluster.local", dependencyResourceName(owner.GetName(), "bff"), owner.GetNamespace())
 }
 
 // reconcileUIExposure runs the browser-facing UI as a regular Kubernetes workload.
@@ -145,9 +145,9 @@ func reconcileUIExposure(
 	owner client.Object,
 	spec appsv1alpha1.ComponentSpec,
 ) (uiExposureSummary, error) {
-	name := dependencyResourceName(owner.GetName(), "ui", 63)
+	name := dependencyResourceName(owner.GetName(), "ui")
 	selector := pipelineComponentSelector(owner, "ui")
-	bffName := dependencyResourceName(owner.GetName(), "bff", 63)
+	bffName := dependencyResourceName(owner.GetName(), "bff")
 
 	resources, err := componentResourceRequirements(spec.Resources)
 	if err != nil {
@@ -162,12 +162,12 @@ func reconcileUIExposure(
 	deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: owner.GetNamespace()}}
 	_, err = controllerutil.CreateOrUpdate(ctx, k8sClient, deployment, func() error {
 		if deployment.ResourceVersion != "" && !metav1.IsControlledBy(deployment, owner) {
-			return fmt.Errorf("Deployment %s/%s already exists and is not managed by CareWright", deployment.Namespace, deployment.Name)
+			return fmt.Errorf("deployment %s/%s already exists and is not managed by CareWright", deployment.Namespace, deployment.Name)
 		}
 		setPipelineResourceLabels(deployment, owner, "ui")
 		deployment.Spec.Replicas = ptrTo(int32(1))
 		deployment.Spec.Selector = &metav1.LabelSelector{MatchLabels: selector}
-		deployment.Spec.Template.ObjectMeta.Labels = maps.Clone(selector)
+		deployment.Spec.Template.Labels = maps.Clone(selector)
 		deployment.Spec.Template.Spec.Containers = []corev1.Container{{
 			Name:      "ui",
 			Image:     spec.Image,
@@ -192,7 +192,7 @@ func reconcileUIExposure(
 	service := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: owner.GetNamespace()}}
 	_, err = controllerutil.CreateOrUpdate(ctx, k8sClient, service, func() error {
 		if service.ResourceVersion != "" && !metav1.IsControlledBy(service, owner) {
-			return fmt.Errorf("Service %s/%s already exists and is not managed by CareWright", service.Namespace, service.Name)
+			return fmt.Errorf("service %s/%s already exists and is not managed by CareWright", service.Namespace, service.Name)
 		}
 		setPipelineResourceLabels(service, owner, "ui")
 		service.Spec.Type = corev1.ServiceTypeClusterIP
@@ -211,7 +211,7 @@ func reconcileUIExposure(
 	route.SetNamespace(owner.GetNamespace())
 	_, err = controllerutil.CreateOrUpdate(ctx, k8sClient, route, func() error {
 		if route.GetResourceVersion() != "" && !metav1.IsControlledBy(route, owner) {
-			return fmt.Errorf("Route %s/%s already exists and is not managed by CareWright", route.GetNamespace(), route.GetName())
+			return fmt.Errorf("route %s/%s already exists and is not managed by CareWright", route.GetNamespace(), route.GetName())
 		}
 		setPipelineResourceLabels(route, owner, "ui")
 		route.Object["spec"] = map[string]any{

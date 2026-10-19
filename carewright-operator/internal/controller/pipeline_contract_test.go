@@ -45,7 +45,7 @@ func TestIngesterWriterWatchMapping(t *testing.T) {
 	reconciler := &CPGIngesterReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(matching, other).Build()}
 	writer := &appsv1alpha1.CarePlanWriter{ObjectMeta: metav1.ObjectMeta{Name: "writer", Namespace: "pipelines"}}
 	requests := reconciler.ingestersForWriter(context.Background(), writer)
-	if len(requests) != 1 || requests[0].NamespacedName.Namespace != "pipelines" || requests[0].NamespacedName.Name != "matching" {
+	if len(requests) != 1 || requests[0].Namespace != "pipelines" || requests[0].Name != "matching" {
 		t.Fatalf("unexpected CPGIngester requests for writer: %+v", requests)
 	}
 }
@@ -72,7 +72,7 @@ func TestPipelineComponentContracts(t *testing.T) {
 	}
 
 	ingester := &appsv1alpha1.CPGIngester{ObjectMeta: metav1.ObjectMeta{Name: "ingester", Namespace: "pipelines"}}
-	ingesterComponents := cpgIngesterComponents(ingester, map[string]string{"bff": "https://ingester-bff.example.test"}, "https://workflow.example.test/wingesterworkflow", "https://writer-bff.example.test")
+	ingesterComponents := cpgIngesterComponents(ingester)
 	ingesterBFF := cpgIngesterBFFComponent(ingester, "https://workflow.example.test/wingesterworkflow", "https://writer-bff.example.test")
 	if ingesterBFF.Env["SONATAFLOW_URL"] != "https://workflow.example.test" || ingesterBFF.Env["SONATAFLOW_WORKFLOW_NAME"] != "wingesterworkflow" || ingesterBFF.Env["ACP_WRITER_BFF_URL"] != "https://writer-bff.example.test" {
 		t.Errorf("incorrect CPG BFF workflow and writer inputs: %+v", ingesterBFF.Env)
@@ -86,7 +86,7 @@ func TestPipelineComponentContracts(t *testing.T) {
 		"bff": "https://writer-bff.example.test", "llm-reasoning": "https://reasoning.example.test",
 		"decision-engine": "https://decision.example.test", "decision-service": "https://dmn.example.test",
 		"fhir-server": "https://fhir.example.test",
-	}, "https://workflow.example.test/wwriterworkflow")
+	})
 	writerBFF := carePlanWriterBFFComponent(writer, map[string]string{
 		"llm-reasoning": "https://reasoning.example.test", "decision-engine": "https://decision.example.test", "fhir-server": "https://fhir.example.test",
 	}, "https://workflow.example.test/wwriterworkflow")
@@ -143,8 +143,8 @@ func TestArtifactStoreNetworkAccessUsesProviderPolicy(t *testing.T) {
 				components []sandboxComponent
 				consumers  map[string]bool
 			}{
-				{"ingester", cpgIngesterComponents(ingester, nil, "", ""), map[string]bool{"ingestion": true, "llm-analysis": true, "assembly": true, "delivery": true}},
-				{"writer", carePlanWriterComponents(writer, nil, ""), map[string]bool{"patient-data": true, "llm-reasoning": true, "decision-engine": true, "fhir-generation": true, "fhir-server": true}},
+				{"ingester", cpgIngesterComponents(ingester), map[string]bool{"ingestion": true, "llm-analysis": true, "assembly": true, "delivery": true}},
+				{"writer", carePlanWriterComponents(writer, nil), map[string]bool{"patient-data": true, "llm-reasoning": true, "decision-engine": true, "fhir-generation": true, "fhir-server": true}},
 			} {
 				for _, component := range pipeline.components {
 					count := 0

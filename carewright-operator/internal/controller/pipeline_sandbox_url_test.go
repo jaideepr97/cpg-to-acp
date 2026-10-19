@@ -11,13 +11,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+const testServiceProxyURL = "http://openshell-service-proxy.test.svc.cluster.local:8080"
+
 func TestSandboxServiceURLThroughInternalProxy(t *testing.T) {
-	proxy := "http://openshell-service-proxy.test.svc.cluster.local:8080"
+	proxy := testServiceProxyURL
 	services := []appsv1alpha1.SandboxServiceStatus{{
 		Name: "http",
 		URL:  "http://default--ingestion-fb0af8b3--http.openshell.localhost:8080/",
 	}}
-	want := "http://openshell-service-proxy.test.svc.cluster.local:8080/default--ingestion-fb0af8b3--http"
+	want := testServiceProxyURL + "/default--ingestion-fb0af8b3--http"
 	if got := sandboxServiceURL(services, "http", proxy); got != want {
 		t.Fatalf("sandboxServiceURL() = %q, want %q", got, want)
 	}
@@ -47,7 +49,7 @@ func TestSandboxServiceProxyURLFromBootstrapService(t *testing.T) {
 }
 
 func TestSandboxServiceURLPreservesOtherGatewayDomains(t *testing.T) {
-	proxy := "http://openshell-service-proxy.test.svc.cluster.local:8080"
+	proxy := testServiceProxyURL
 	services := []appsv1alpha1.SandboxServiceStatus{{Name: "http", URL: "https://ingestion.example.test/"}}
 	if got := sandboxServiceURL(services, "http", proxy); got != "https://ingestion.example.test" {
 		t.Fatalf("sandboxServiceURL() = %q, want original URL", got)
