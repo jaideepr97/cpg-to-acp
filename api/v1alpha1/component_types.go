@@ -50,15 +50,15 @@ type ComponentSpec struct {
 	// +optional
 	Command []string `json:"command,omitempty"`
 
-	// PolicyRef selects the OpenShell policy for this component.
+	// PolicyRef selects the OpenShell policy for a sandboxed component; it has no effect on UI or BFF Deployments.
 	// +optional
 	PolicyRef *corev1.ConfigMapKeySelector `json:"policyRef,omitempty"`
 
-	// Resources requests CPU, memory, and GPU resources for this component's sandbox.
+	// Resources sets CPU, memory, and GPU limits for this component's workload.
 	// +optional
 	Resources SandboxResources `json:"resources,omitempty"`
 
-	// ExtraProviders attaches additional OpenShell credential providers to this component.
+	// ExtraProviders attaches additional OpenShell credential providers to a sandboxed component.
 	// Domain-specific providers should be configured on their corresponding integration.
 	// +optional
 	ExtraProviders []string `json:"extraProviders,omitempty"`

@@ -190,7 +190,7 @@ spec:
                     type: object
                   extraProviders:
                     description: |-
-                      ExtraProviders attaches additional OpenShell credential providers to this component.
+                      ExtraProviders attaches additional OpenShell credential providers to a sandboxed component.
                       Domain-specific providers should be configured on their corresponding integration.
                     items:
                       type: string
@@ -201,7 +201,8 @@ spec:
                     minLength: 1
                     type: string
                   policyRef:
-                    description: PolicyRef selects the OpenShell policy for this component.
+                    description: PolicyRef selects the OpenShell policy for a sandboxed
+                      component; it has no effect on UI or BFF Deployments.
                     properties:
                       key:
                         description: The key to select.
@@ -227,8 +228,8 @@ spec:
                     description: PythonPath is translated to PYTHONPATH.
                     type: string
                   resources:
-                    description: Resources requests CPU, memory, and GPU resources
-                      for this component's sandbox.
+                    description: Resources sets CPU, memory, and GPU limits for this
+                      component's workload.
                     properties:
                       cpu:
                         description: CPU is an OpenShell CPU quantity, for example
@@ -265,7 +266,7 @@ spec:
                     type: object
                   extraProviders:
                     description: |-
-                      ExtraProviders attaches additional OpenShell credential providers to this component.
+                      ExtraProviders attaches additional OpenShell credential providers to a sandboxed component.
                       Domain-specific providers should be configured on their corresponding integration.
                     items:
                       type: string
@@ -276,7 +277,8 @@ spec:
                     minLength: 1
                     type: string
                   policyRef:
-                    description: PolicyRef selects the OpenShell policy for this component.
+                    description: PolicyRef selects the OpenShell policy for a sandboxed
+                      component; it has no effect on UI or BFF Deployments.
                     properties:
                       key:
                         description: The key to select.
@@ -302,8 +304,8 @@ spec:
                     description: PythonPath is translated to PYTHONPATH.
                     type: string
                   resources:
-                    description: Resources requests CPU, memory, and GPU resources
-                      for this component's sandbox.
+                    description: Resources sets CPU, memory, and GPU limits for this
+                      component's workload.
                     properties:
                       cpu:
                         description: CPU is an OpenShell CPU quantity, for example
@@ -340,7 +342,7 @@ spec:
                     type: object
                   extraProviders:
                     description: |-
-                      ExtraProviders attaches additional OpenShell credential providers to this component.
+                      ExtraProviders attaches additional OpenShell credential providers to a sandboxed component.
                       Domain-specific providers should be configured on their corresponding integration.
                     items:
                       type: string
@@ -354,7 +356,8 @@ spec:
                     description: JavaOptions contains additional JVM options.
                     type: string
                   policyRef:
-                    description: PolicyRef selects the OpenShell policy for this component.
+                    description: PolicyRef selects the OpenShell policy for a sandboxed
+                      component; it has no effect on UI or BFF Deployments.
                     properties:
                       key:
                         description: The key to select.
@@ -377,8 +380,8 @@ spec:
                     type: object
                     x-kubernetes-map-type: atomic
                   resources:
-                    description: Resources requests CPU, memory, and GPU resources
-                      for this component's sandbox.
+                    description: Resources sets CPU, memory, and GPU limits for this
+                      component's workload.
                     properties:
                       cpu:
                         description: CPU is an OpenShell CPU quantity, for example
@@ -414,7 +417,7 @@ spec:
                     type: object
                   extraProviders:
                     description: |-
-                      ExtraProviders attaches additional OpenShell credential providers to this component.
+                      ExtraProviders attaches additional OpenShell credential providers to a sandboxed component.
                       Domain-specific providers should be configured on their corresponding integration.
                     items:
                       type: string
@@ -425,7 +428,8 @@ spec:
                     minLength: 1
                     type: string
                   policyRef:
-                    description: PolicyRef selects the OpenShell policy for this component.
+                    description: PolicyRef selects the OpenShell policy for a sandboxed
+                      component; it has no effect on UI or BFF Deployments.
                     properties:
                       key:
                         description: The key to select.
@@ -451,8 +455,8 @@ spec:
                     description: PythonPath is translated to PYTHONPATH.
                     type: string
                   resources:
-                    description: Resources requests CPU, memory, and GPU resources
-                      for this component's sandbox.
+                    description: Resources sets CPU, memory, and GPU limits for this
+                      component's workload.
                     properties:
                       cpu:
                         description: CPU is an OpenShell CPU quantity, for example
@@ -489,7 +493,7 @@ spec:
                     type: object
                   extraProviders:
                     description: |-
-                      ExtraProviders attaches additional OpenShell credential providers to this component.
+                      ExtraProviders attaches additional OpenShell credential providers to a sandboxed component.
                       Domain-specific providers should be configured on their corresponding integration.
                     items:
                       type: string
@@ -500,7 +504,8 @@ spec:
                     minLength: 1
                     type: string
                   policyRef:
-                    description: PolicyRef selects the OpenShell policy for this component.
+                    description: PolicyRef selects the OpenShell policy for a sandboxed
+                      component; it has no effect on UI or BFF Deployments.
                     properties:
                       key:
                         description: The key to select.
@@ -526,8 +531,8 @@ spec:
                     description: PythonPath is translated to PYTHONPATH.
                     type: string
                   resources:
-                    description: Resources requests CPU, memory, and GPU resources
-                      for this component's sandbox.
+                    description: Resources sets CPU, memory, and GPU limits for this
+                      component's workload.
                     properties:
                       cpu:
                         description: CPU is an OpenShell CPU quantity, for example
@@ -734,7 +739,7 @@ spec:
                     type: object
                   extraProviders:
                     description: |-
-                      ExtraProviders attaches additional OpenShell credential providers to this component.
+                      ExtraProviders attaches additional OpenShell credential providers to a sandboxed component.
                       Domain-specific providers should be configured on their corresponding integration.
                     items:
                       type: string
@@ -745,7 +750,8 @@ spec:
                     minLength: 1
                     type: string
                   policyRef:
-                    description: PolicyRef selects the OpenShell policy for this component.
+                    description: PolicyRef selects the OpenShell policy for a sandboxed
+                      component; it has no effect on UI or BFF Deployments.
                     properties:
                       key:
                         description: The key to select.
@@ -771,8 +777,8 @@ spec:
                     description: PythonPath is translated to PYTHONPATH.
                     type: string
                   resources:
-                    description: Resources requests CPU, memory, and GPU resources
-                      for this component's sandbox.
+                    description: Resources sets CPU, memory, and GPU limits for this
+                      component's workload.
                     properties:
                       cpu:
                         description: CPU is an OpenShell CPU quantity, for example
@@ -809,7 +815,7 @@ spec:
                     type: object
                   extraProviders:
                     description: |-
-                      ExtraProviders attaches additional OpenShell credential providers to this component.
+                      ExtraProviders attaches additional OpenShell credential providers to a sandboxed component.
                       Domain-specific providers should be configured on their corresponding integration.
                     items:
                       type: string
@@ -820,7 +826,8 @@ spec:
                     minLength: 1
                     type: string
                   policyRef:
-                    description: PolicyRef selects the OpenShell policy for this component.
+                    description: PolicyRef selects the OpenShell policy for a sandboxed
+                      component; it has no effect on UI or BFF Deployments.
                     properties:
                       key:
                         description: The key to select.
@@ -846,8 +853,8 @@ spec:
                     description: PythonPath is translated to PYTHONPATH.
                     type: string
                   resources:
-                    description: Resources requests CPU, memory, and GPU resources
-                      for this component's sandbox.
+                    description: Resources sets CPU, memory, and GPU limits for this
+                      component's workload.
                     properties:
                       cpu:
                         description: CPU is an OpenShell CPU quantity, for example
@@ -891,7 +898,7 @@ spec:
                     type: object
                   extraProviders:
                     description: |-
-                      ExtraProviders attaches additional OpenShell credential providers to this component.
+                      ExtraProviders attaches additional OpenShell credential providers to a sandboxed component.
                       Domain-specific providers should be configured on their corresponding integration.
                     items:
                       type: string
@@ -902,7 +909,8 @@ spec:
                     minLength: 1
                     type: string
                   policyRef:
-                    description: PolicyRef selects the OpenShell policy for this component.
+                    description: PolicyRef selects the OpenShell policy for a sandboxed
+                      component; it has no effect on UI or BFF Deployments.
                     properties:
                       key:
                         description: The key to select.
@@ -928,8 +936,8 @@ spec:
                     description: PythonPath is translated to PYTHONPATH.
                     type: string
                   resources:
-                    description: Resources requests CPU, memory, and GPU resources
-                      for this component's sandbox.
+                    description: Resources sets CPU, memory, and GPU limits for this
+                      component's workload.
                     properties:
                       cpu:
                         description: CPU is an OpenShell CPU quantity, for example
@@ -1002,7 +1010,7 @@ spec:
                     type: object
                   extraProviders:
                     description: |-
-                      ExtraProviders attaches additional OpenShell credential providers to this component.
+                      ExtraProviders attaches additional OpenShell credential providers to a sandboxed component.
                       Domain-specific providers should be configured on their corresponding integration.
                     items:
                       type: string
@@ -1013,7 +1021,8 @@ spec:
                     minLength: 1
                     type: string
                   policyRef:
-                    description: PolicyRef selects the OpenShell policy for this component.
+                    description: PolicyRef selects the OpenShell policy for a sandboxed
+                      component; it has no effect on UI or BFF Deployments.
                     properties:
                       key:
                         description: The key to select.
@@ -1036,8 +1045,8 @@ spec:
                     type: object
                     x-kubernetes-map-type: atomic
                   resources:
-                    description: Resources requests CPU, memory, and GPU resources
-                      for this component's sandbox.
+                    description: Resources sets CPU, memory, and GPU limits for this
+                      component's workload.
                     properties:
                       cpu:
                         description: CPU is an OpenShell CPU quantity, for example

@@ -19,7 +19,6 @@ spec:
       volumesPerServer: 1
     artifactBucket: cpg-artifacts
     phiBucket: cpg-phi
-    credentialsProvider: minio-credentials
   observability:
     mlflowTrackingURI: http://mlflow:5000
   llm:

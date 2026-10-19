@@ -20,9 +20,9 @@ import (
 	"context"
 	"maps"
 	"strconv"
-	"strings"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
@@ -49,10 +49,12 @@ type CarePlanWriterReconciler struct {
 // +kubebuilder:rbac:groups=aistor.min.io,resources=objectstores,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=configmaps;secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;delete
 // +kubebuilder:rbac:groups=agents.x-k8s.io,resources=sandboxes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 
-// Reconcile creates and manages one SandboxRequest for each Care Plan Writer component.
+// Reconcile manages sandboxed processing components and regular UI/BFF Deployments.
 func (r *CarePlanWriterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
@@ -61,11 +63,6 @@ func (r *CarePlanWriterReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
-		return ctrl.Result{}, err
-	}
-
-	exposure, err := reconcileUIExposure(ctx, r.Client, r.Scheme, &writer)
-	if err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -80,6 +77,7 @@ func (r *CarePlanWriterReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	knownEndpoints["bff"] = bffServiceURL(&writer)
 
 	template := pipelineWorkflowTemplate{
 		WorkflowYAML: carePlanWriterWorkflowYAML,
@@ -94,20 +92,29 @@ func (r *CarePlanWriterReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		},
 	}
 	components := carePlanWriterComponents(effective, knownEndpoints, workflowServiceURL(&writer))
-	workflow, err := reconcilePipelineWorkflow(ctx, r.Client, r.Scheme, &writer, template, knownEndpoints, len(components))
+	workflow, err := reconcilePipelineWorkflow(ctx, r.Client, r.Scheme, &writer, template, knownEndpoints, len(components)+1)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	if !workflow.Ready {
 		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 	}
-	if template.LiteralReplacements == nil {
-		template.LiteralReplacements = map[string]string{}
-	}
-	template.LiteralReplacements[templateWorkflowURL(template.WorkflowYAML)] = strings.TrimRight(workflow.URL, "/")
 	components = carePlanWriterComponents(effective, knownEndpoints, workflow.URL)
 
 	summary, err := reconcileComponentSandboxes(ctx, r.Client, r.Scheme, &writer, writer.Spec.Sandbox, workflow.URL, components)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	bff, err := reconcileBFFDeployment(ctx, r.Client, r.Scheme, &writer, carePlanWriterBFFComponent(effective, summary.Endpoints, workflow.URL), effective.Spec.ArtifactStore)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	summary.Desired++
+	summary.Endpoints["bff"] = bff.URL
+	if bff.Ready {
+		summary.Ready++
+	}
+	exposure, err := reconcileUIExposure(ctx, r.Client, r.Scheme, &writer, writer.Spec.UI)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -132,17 +139,18 @@ func (r *CarePlanWriterReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		Status:             metav1.ConditionTrue,
 		ObservedGeneration: writer.Generation,
 		Reason:             "SpecAccepted",
-		Message:            "The CarePlanWriter component sandboxes have been reconciled",
+		Message:            "The CarePlanWriter components have been reconciled",
 	})
 	setPipelineReadyCondition(&writer.Status.Conditions, writer.Generation, summary, workflow)
+	exposure.Ready = exposure.Ready && bff.Ready
 	setUIExposureCondition(&writer.Status.Conditions, writer.Generation, exposure)
 	if err := r.Status().Patch(ctx, &writer, client.MergeFrom(before)); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	log.Info("reconciled CarePlanWriter sandboxes", "generation", writer.Generation, "ready", summary.Ready, "desired", summary.Desired)
+	log.Info("reconciled CarePlanWriter components", "generation", writer.Generation, "ready", summary.Ready, "desired", summary.Desired)
 
-	if exposure.URL == "" {
+	if exposure.URL == "" || !exposure.Ready {
 		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 	}
 	return ctrl.Result{}, nil
@@ -156,6 +164,7 @@ func (r *CarePlanWriterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(sonataFlowObject()).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.Service{}).
+		Owns(&appsv1.Deployment{}).
 		Owns(routeObject()).
 		Named("careplanwriter").
 		Complete(r)
@@ -168,7 +177,7 @@ func carePlanWriterComponents(writer *appsv1alpha1.CarePlanWriter, endpoints map
 		artifactSource = writer.Spec.ArtifactStore.Credentials
 	}
 	artifactProvider, artifactRegistration := managedProvider(writer, "artifact", externalArtifactProvider, artifactSource)
-	artifactAccess := networkAccessForURL("artifact-store", artifactEnv["ARTIFACT_STORE_URL"])
+	artifactAccess := artifactStoreNetworkAccess(artifactEnv["ARTIFACT_STORE_URL"], artifactProvider)
 	observabilityEnv := observabilityInputs(writer.Spec.Observability)
 	llmEnv, externalLLMProvider := llmInputs(writer.Spec.LLM)
 	var llmSource *appsv1alpha1.ProviderSourceSpec
@@ -191,14 +200,10 @@ func carePlanWriterComponents(writer *appsv1alpha1.CarePlanWriter, endpoints map
 
 	decisionServiceURL := endpoints["decision-service"]
 	decisionEngineURL := endpoints["decision-engine"]
-	llmReasoningURL := endpoints["llm-reasoning"]
 	fhirServerURL := endpoints["fhir-server"]
 	decisionServiceAccess := networkAccessForURL("decision-service", decisionServiceURL)
 	decisionEngineAccess := networkAccessForURL("decision-engine", decisionEngineURL)
-	llmReasoningAccess := networkAccessForURL("llm-reasoning", llmReasoningURL)
 	fhirServerAccess := networkAccessForURL("fhir-server", fhirServerURL)
-	bffAccess := networkAccessForURL("bff", endpoints["bff"])
-
 	reasoningEnv := llmPythonEnv(writer.Spec.LLMReasoning.PythonComponentSpec)
 	setIfNotEmpty(reasoningEnv, "DECISION_ENGINE_URL", decisionEngineURL)
 	embeddingProvider := ""
@@ -240,18 +245,6 @@ func carePlanWriterComponents(writer *appsv1alpha1.CarePlanWriter, endpoints map
 		setIfNotEmpty(fhirEnv, "ACP_REVIEWER_ID_VALUE", reviewer.IdentifierValue)
 	}
 
-	bffEnv := pythonEnv(writer.Spec.BFF)
-	if writer.Spec.ArtifactStore != nil {
-		setIfNotEmpty(bffEnv, "MINIO_ENDPOINT", writer.Spec.ArtifactStore.URL)
-	}
-	bffEnv["SONATAFLOW_URL"] = workflowAPIBaseURL(workflowURL)
-	bffEnv["SONATAFLOW_WORKFLOW_NAME"] = workflowResourceName(writer)
-	setIfNotEmpty(bffEnv, "LLM_REASONING_URL", llmReasoningURL)
-	setIfNotEmpty(bffEnv, "DECISION_ENGINE_URL", decisionEngineURL)
-	setIfNotEmpty(bffEnv, "FHIR_SERVER_URL", fhirServerURL)
-
-	uiEnv := map[string]string{}
-	setIfNotEmpty(uiEnv, "BFF_HOST", endpointHost(endpoints["bff"]))
 	mcpEnv := llmPythonEnv(writer.Spec.MCP)
 	setIfNotEmpty(mcpEnv, "KOGITO_URL", decisionServiceURL)
 	setIfNotEmpty(mcpEnv, "FHIR_SERVER_URL", fhirServerURL)
@@ -264,9 +257,22 @@ func carePlanWriterComponents(writer *appsv1alpha1.CarePlanWriter, endpoints map
 		{Name: "decision-engine", Port: 8080, Spec: writer.Spec.DecisionEngine.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.decision_engine:app", "8080"), Env: decisionEnv, Providers: []string{artifactProvider}, Registrations: providerRegistrations(artifactRegistration), NetworkAccess: combinedNetworkAccess(artifactAccess, decisionServiceAccess)},
 		{Name: "fhir-generation", Port: 8080, Spec: writer.Spec.FHIRGeneration.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.fhir_generation:app", "8080"), Env: fhirGenerationEnv, Providers: []string{artifactProvider, llmProvider}, Registrations: providerRegistrations(artifactRegistration, llmRegistration), NetworkAccess: combinedNetworkAccess(artifactAccess, inferenceAccess)},
 		{Name: "fhir-server", Port: 8080, Spec: writer.Spec.FHIRServer.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.fhir_server:app", "8080"), Env: fhirEnv, Providers: []string{artifactProvider, fhirProvider}, Registrations: providerRegistrations(artifactRegistration, fhirRegistration), NetworkAccess: combinedNetworkAccess(artifactAccess, fhirTargetAccess)},
-		{Name: "bff", Port: 8080, Spec: writer.Spec.BFF.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.bff:app", "8080"), Env: bffEnv, Providers: []string{artifactProvider}, Registrations: providerRegistrations(artifactRegistration), NetworkAccess: combinedNetworkAccess(artifactAccess, llmReasoningAccess, decisionEngineAccess, fhirServerAccess)},
-		{Name: "ui", Port: 8080, Spec: writer.Spec.UI, Command: []string{"/usr/libexec/s2i/run"}, Env: uiEnv, NetworkAccess: bffAccess},
 		{Name: "mcp", Port: 8090, Spec: writer.Spec.MCP.ComponentSpec, Command: pythonServiceCommand("acp_writer.mcp_proxy:app", "8090"), Env: mcpEnv, Providers: []string{llmProvider}, Registrations: providerRegistrations(llmRegistration), NetworkAccess: combinedNetworkAccess(inferenceAccess, decisionServiceAccess, fhirServerAccess)},
 		{Name: "decision-service", Port: 8081, Spec: writer.Spec.DecisionService.ComponentSpec, Command: []string{"java", "-jar", "/app/quarkus-run.jar"}, Env: decisionServiceEnv},
 	}
+}
+
+func carePlanWriterBFFComponent(writer *appsv1alpha1.CarePlanWriter, endpoints map[string]string, workflowURL string) sandboxComponent {
+	artifactEnv, _ := artifactStoreInputs(writer.Spec.ArtifactStore)
+	env := mergedEnv(artifactEnv, observabilityInputs(writer.Spec.Observability))
+	setIfNotEmpty(env, "PYTHONPATH", writer.Spec.BFF.PythonPath)
+	if writer.Spec.ArtifactStore != nil {
+		setIfNotEmpty(env, "MINIO_ENDPOINT", writer.Spec.ArtifactStore.URL)
+	}
+	env["SONATAFLOW_URL"] = workflowOriginURL(workflowURL)
+	env["SONATAFLOW_WORKFLOW_NAME"] = workflowResourceName(writer)
+	setIfNotEmpty(env, "LLM_REASONING_URL", endpoints["llm-reasoning"])
+	setIfNotEmpty(env, "DECISION_ENGINE_URL", endpoints["decision-engine"])
+	setIfNotEmpty(env, "FHIR_SERVER_URL", endpoints["fhir-server"])
+	return sandboxComponent{Name: "bff", Port: 8080, Spec: writer.Spec.BFF.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.bff:app", "8080"), Env: env}
 }

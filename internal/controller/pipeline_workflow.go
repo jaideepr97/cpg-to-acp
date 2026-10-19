@@ -81,10 +81,12 @@ func reconcilePipelineWorkflow(
 	workflow := sonataFlowObject()
 	workflow.SetName(name)
 	workflow.SetNamespace(owner.GetNamespace())
-	callbackURL := workflowServiceURL(owner)
+	callbackBaseURL := workflowServiceURL(owner)
 	if err := k8sClient.Get(ctx, client.ObjectKey{Name: name, Namespace: owner.GetNamespace()}, workflow); err == nil {
 		if publishedURL, _, _ := unstructured.NestedString(workflow.Object, "status", "address", "url"); publishedURL != "" {
-			callbackURL = publishedURL
+			// The published address includes the workflow REST path, but the
+			// quarkus-http callback channels are mounted at the route origin.
+			callbackBaseURL = workflowOriginURL(publishedURL)
 		}
 	} else if !apierrors.IsNotFound(err) {
 		return summary, fmt.Errorf("get SonataFlow %s: %w", name, err)
@@ -102,10 +104,13 @@ func reconcilePipelineWorkflow(
 		}
 		replacements[placeholder] = strings.TrimRight(endpoint, "/")
 	}
-	replacements[templateWorkflowURL(template.WorkflowYAML)] = strings.TrimRight(callbackURL, "/")
 	for placeholder, replacement := range template.LiteralReplacements {
 		replacements[placeholder] = replacement
 	}
+	// Keep callback bases authoritative even when other literal endpoints are
+	// supplied by a pipeline during its second reconciliation pass. The
+	// workflow template keeps each channel's /wait-* suffix.
+	replacements[templateWorkflowURL(template.WorkflowYAML)] = strings.TrimRight(callbackBaseURL, "/")
 
 	workflowYAML := template.WorkflowYAML
 	for placeholder, replacement := range replacements {
@@ -230,10 +235,10 @@ func workflowServiceURL(owner client.Object) string {
 	return "http://" + workflowServiceHost(owner) + ":80"
 }
 
-// workflowAPIBaseURL is the origin used by BFF clients, which append the
-// workflow name to start and inspect instances. SonataFlow's published address
-// already includes that name and is used unchanged for callback URLs.
-func workflowAPIBaseURL(address string) string {
+// workflowOriginURL extracts the origin shared by the workflow REST API and
+// the root-mounted CloudEvent callback channels. BFF clients append the
+// workflow name; callback URLs append their configured /wait-* paths.
+func workflowOriginURL(address string) string {
 	parsed, err := url.Parse(address)
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
 		return strings.TrimRight(address, "/")
@@ -261,8 +266,8 @@ func setPipelineReadyCondition(conditions *[]metav1.Condition, generation int64,
 		Type:               readyCondition,
 		Status:             metav1.ConditionFalse,
 		ObservedGeneration: generation,
-		Reason:             "SandboxesPending",
-		Message:            fmt.Sprintf("%d of %d component sandboxes are ready", sandboxes.Ready, sandboxes.Desired),
+		Reason:             "ComponentsPending",
+		Message:            fmt.Sprintf("%d of %d backend components are ready", sandboxes.Ready, sandboxes.Desired),
 	}
 	if sandboxes.Ready == sandboxes.Desired && !workflow.Created {
 		condition.Reason = "WorkflowPending"
@@ -275,7 +280,7 @@ func setPipelineReadyCondition(conditions *[]metav1.Condition, generation int64,
 	if sandboxes.Ready == sandboxes.Desired && workflow.Ready {
 		condition.Status = metav1.ConditionTrue
 		condition.Reason = "PipelineReady"
-		condition.Message = fmt.Sprintf("All %d component sandboxes and SonataFlow workflow %q are ready", sandboxes.Desired, workflow.Name)
+		condition.Message = fmt.Sprintf("All %d backend components and SonataFlow workflow %q are ready", sandboxes.Desired, workflow.Name)
 	}
 	meta.SetStatusCondition(conditions, condition)
 }

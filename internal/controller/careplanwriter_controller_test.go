@@ -22,6 +22,7 @@ import (
 
 	appsv1alpha1 "carewright.io/carewright-operator/api/v1alpha1"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
@@ -46,6 +47,13 @@ var _ = Describe("CarePlanWriter Controller", func() {
 		}
 		resource := &appsv1alpha1.CarePlanWriter{}
 		if err := k8sClient.Get(ctx, resourceKey, resource); err == nil {
+			var policies corev1.ConfigMapList
+			Expect(k8sClient.List(ctx, &policies, client.InNamespace("default"), client.MatchingLabels{pipelineLabel: string(resource.UID)})).To(Succeed())
+			for index := range policies.Items {
+				if metav1.IsControlledBy(&policies.Items[index], resource) {
+					Expect(k8sClient.Delete(ctx, &policies.Items[index])).To(Succeed())
+				}
+			}
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		}
 	})
@@ -58,7 +66,7 @@ var _ = Describe("CarePlanWriter Controller", func() {
 			ObjectMeta: metav1.ObjectMeta{Name: resourceName, Namespace: "default"},
 			Spec: appsv1alpha1.CarePlanWriterSpec{
 				Sandbox:       appsv1alpha1.PipelineSandboxSpec{Gateway: appsv1alpha1.SandboxGatewaySpec{Endpoint: "https://openshell.test"}, ApprovalMode: "auto"},
-				ArtifactStore: &appsv1alpha1.ArtifactStoreSpec{URL: "http://minio.test:9000", ArtifactBucket: "artifacts", PHIBucket: "phi", CredentialsProvider: "minio-provider"},
+				ArtifactStore: &appsv1alpha1.ArtifactStoreSpec{URL: "http://minio.test:9000", ArtifactBucket: "artifacts", PHIBucket: "phi", Credentials: &appsv1alpha1.ProviderSourceSpec{Type: "carewright-minio", SecretRef: corev1.LocalObjectReference{Name: "artifact-secret"}}},
 				Observability: &appsv1alpha1.ObservabilitySpec{MLflowTrackingURI: "http://mlflow.test:5000"},
 				LLM:           &appsv1alpha1.LLMConfigSpec{URL: "http://litellm.test:4000", Model: "model", CredentialsProvider: "llm-provider", RequestTimeoutSeconds: 60},
 				FHIRTarget:    &appsv1alpha1.FHIRTargetSpec{URL: "https://fhir.test/R4", CredentialsProvider: "fhir-provider"},
@@ -82,10 +90,11 @@ var _ = Describe("CarePlanWriter Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+		artifactProvider, _ := managedProvider(resource, "artifact", "", resource.Spec.ArtifactStore.Credentials)
 
 		stale := &appsv1alpha1.SandboxRequest{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      resourceName + "-removed",
+				Name:      resourceName + "-bff",
 				Namespace: "default",
 				Labels:    map[string]string{managedByLabel: managedByValue, pipelineLabel: string(resource.UID)},
 			},
@@ -103,7 +112,7 @@ var _ = Describe("CarePlanWriter Controller", func() {
 		Expect(k8sClient.Get(ctx, workflowKey, bootstrapWorkflow)).To(Succeed())
 		bootstrapWorkflow.Object["status"] = map[string]any{
 			"observedGeneration": bootstrapWorkflow.GetGeneration(),
-			"address":            map[string]any{"url": "https://writer-workflow.gateway.test"},
+			"address":            map[string]any{"url": "https://writer-workflow.gateway.test/" + workflowResourceName(resource)},
 			"conditions": []any{map[string]any{
 				"type": "Running", "status": "True",
 			}},
@@ -114,7 +123,7 @@ var _ = Describe("CarePlanWriter Controller", func() {
 		Expect(k8sClient.Get(ctx, workflowKey, bootstrapWorkflow)).To(Succeed())
 		bootstrapWorkflow.Object["status"] = map[string]any{
 			"observedGeneration": bootstrapWorkflow.GetGeneration(),
-			"address":            map[string]any{"url": "https://writer-workflow.gateway.test"},
+			"address":            map[string]any{"url": "https://writer-workflow.gateway.test/" + workflowResourceName(resource)},
 			"conditions": []any{map[string]any{
 				"type": "Running", "status": "True",
 			}},
@@ -125,25 +134,44 @@ var _ = Describe("CarePlanWriter Controller", func() {
 
 		var requests appsv1alpha1.SandboxRequestList
 		Expect(k8sClient.List(ctx, &requests, client.InNamespace("default"), client.MatchingLabels{pipelineLabel: string(resource.UID)})).To(Succeed())
-		Expect(requests.Items).To(HaveLen(9))
+		Expect(requests.Items).To(HaveLen(7))
+		defaultPolicyName := ""
+		for index := range requests.Items {
+			request := &requests.Items[index]
+			Expect(request.Spec.PolicyRef).NotTo(BeNil())
+			Expect(request.Spec.PolicyRef.Key).To(Equal(defaultComponentPolicyKey))
+			if defaultPolicyName == "" {
+				defaultPolicyName = request.Spec.PolicyRef.Name
+			} else {
+				Expect(request.Spec.PolicyRef.Name).To(Equal(defaultPolicyName))
+			}
+		}
+		defaultPolicy := &corev1.ConfigMap{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: defaultPolicyName, Namespace: "default"}, defaultPolicy)).To(Succeed())
+		Expect(metav1.IsControlledBy(defaultPolicy, resource)).To(BeTrue())
+		Expect(defaultPolicy.Data).To(HaveKeyWithValue(defaultComponentPolicyKey, defaultComponentPolicy))
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: stale.Name, Namespace: "default"}, stale)).To(Satisfy(apierrors.IsNotFound))
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-ui", Namespace: "default"}, &appsv1alpha1.SandboxRequest{})).To(Satisfy(apierrors.IsNotFound))
+
+		uiDeployment := &appsv1.Deployment{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-ui", Namespace: "default"}, uiDeployment)).To(Succeed())
+		Expect(uiDeployment.Spec.Template.Spec.Containers[0].Image).To(Equal("example.invalid/ui:latest"))
 
 		reasoning := &appsv1alpha1.SandboxRequest{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-llm-reasoning", Namespace: "default"}, reasoning)).To(Succeed())
 		Expect(reasoning.Spec.ApprovalMode).To(Equal("auto"))
-		Expect(reasoning.Spec.Providers).To(ConsistOf("minio-provider", "llm-provider", "embedding-provider"))
+		Expect(reasoning.Spec.Providers).To(ConsistOf(artifactProvider, "llm-provider", "embedding-provider"))
 		Expect(reasoning.Spec.Env).To(HaveKeyWithValue("EMBEDDING_BASE_URL", "https://embedding.test"))
 		Expect(reasoning.Spec.Env).NotTo(HaveKey("DECISION_ENGINE_URL"))
 		Expect(reasoning.Spec.NetworkAccess).To(ConsistOf(
 			appsv1alpha1.SandboxNetworkAccessSpec{Name: "sonataflow", Host: "writer-workflow.gateway.test", Port: 443, Protocol: "rest"},
-			appsv1alpha1.SandboxNetworkAccessSpec{Name: "artifact-store", Host: "minio.test", Port: 9000, Protocol: "rest"},
 			appsv1alpha1.SandboxNetworkAccessSpec{Name: "inference", Host: "litellm.test", Port: 4000, Protocol: "rest"},
 			appsv1alpha1.SandboxNetworkAccessSpec{Name: "embedding", Host: "embedding.test", Port: 443, Protocol: "rest"},
 		))
 
 		fhir := &appsv1alpha1.SandboxRequest{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-fhir-server", Namespace: "default"}, fhir)).To(Succeed())
-		Expect(fhir.Spec.Providers).To(ConsistOf("minio-provider", "fhir-provider"))
+		Expect(fhir.Spec.Providers).To(ConsistOf(artifactProvider, "fhir-provider"))
 		Expect(fhir.Spec.Env).To(HaveKeyWithValue("FHIR_SERVER_URL", "https://fhir.test/R4"))
 		Expect(fhir.Spec.Env).To(HaveKeyWithValue("ACP_REVIEWER_DISPLAY", "Clinician"))
 		Expect(fhir.Spec.NetworkAccess).To(ContainElement(appsv1alpha1.SandboxNetworkAccessSpec{
@@ -181,7 +209,7 @@ var _ = Describe("CarePlanWriter Controller", func() {
 		Expect(k8sClient.Get(ctx, workflowKey, workflow)).To(Succeed())
 		workflow.Object["status"] = map[string]any{
 			"observedGeneration": workflow.GetGeneration(),
-			"address":            map[string]any{"url": "https://writer-workflow.gateway.test"},
+			"address":            map[string]any{"url": "https://writer-workflow.gateway.test/" + workflowResourceName(resource)},
 			"conditions": []any{map[string]any{
 				"type": "Running", "status": "True",
 			}},
@@ -195,28 +223,32 @@ var _ = Describe("CarePlanWriter Controller", func() {
 		Expect(reasoning.Spec.NetworkAccess).To(ContainElement(appsv1alpha1.SandboxNetworkAccessSpec{
 			Name: "decision-engine", Host: "decision-engine.gateway.test", Port: 443, Protocol: "rest",
 		}))
-		bff := &appsv1alpha1.SandboxRequest{}
+		bff := &appsv1.Deployment{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-bff", Namespace: "default"}, bff)).To(Succeed())
-		Expect(bff.Spec.Env).To(HaveKeyWithValue("SONATAFLOW_URL", "https://writer-workflow.gateway.test"))
-		Expect(bff.Spec.Env).To(HaveKeyWithValue("SONATAFLOW_WORKFLOW_NAME", workflowResourceName(resource)))
-		for _, peer := range []string{"llm-reasoning", "decision-engine", "fhir-server"} {
-			Expect(bff.Spec.NetworkAccess).To(ContainElement(appsv1alpha1.SandboxNetworkAccessSpec{
-				Name: peer, Host: peer + ".gateway.test", Port: 443, Protocol: "rest",
-			}))
+		bffEnv := bff.Spec.Template.Spec.Containers[0].Env
+		Expect(bffEnv).To(ContainElement(corev1.EnvVar{Name: "SONATAFLOW_URL", Value: "https://writer-workflow.gateway.test"}))
+		Expect(bffEnv).To(ContainElement(corev1.EnvVar{Name: "SONATAFLOW_WORKFLOW_NAME", Value: workflowResourceName(resource)}))
+		for _, peer := range []struct{ name, value string }{{"LLM_REASONING_URL", "https://llm-reasoning.gateway.test"}, {"DECISION_ENGINE_URL", "https://decision-engine.gateway.test"}, {"FHIR_SERVER_URL", "https://fhir-server.gateway.test"}} {
+			Expect(bffEnv).To(ContainElement(corev1.EnvVar{Name: peer.name, Value: peer.value}))
 		}
-		ui := &appsv1alpha1.SandboxRequest{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-ui", Namespace: "default"}, ui)).To(Succeed())
-		Expect(ui.Spec.NetworkAccess).To(ContainElement(appsv1alpha1.SandboxNetworkAccessSpec{
-			Name: "bff", Host: "bff.gateway.test", Port: 443, Protocol: "rest",
-		}))
-
 		Expect(k8sClient.Get(ctx, workflowKey, workflow)).To(Succeed())
 		workflowJSON, err := workflow.MarshalJSON()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(workflowJSON)).To(ContainSubstring("https://patient-data.gateway.test/api/v1/scan-async"))
-		Expect(string(workflowJSON)).To(ContainSubstring("https://writer-workflow.gateway.test/wait-review"))
+		for _, path := range []string{
+			"wait-scan", "wait-resolve", "wait-execute-dmn", "wait-retrieve", "wait-compose", "wait-generate", "wait-review",
+		} {
+			Expect(string(workflowJSON)).To(ContainSubstring("https://writer-workflow.gateway.test/" + path))
+			Expect(string(workflowJSON)).NotTo(ContainSubstring("https://writer-workflow.gateway.test/" + workflowResourceName(resource) + "/" + path))
+		}
 		props := &corev1.ConfigMap{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: workflowResourceName(resource) + "-props", Namespace: "default"}, props)).To(Succeed())
-		Expect(props.Data["application.properties"]).To(ContainSubstring("mp.messaging.incoming.careplan-reviewed.path=/wait-careplan-review"))
+		for channel, path := range map[string]string{
+			"scan-done": "wait-scan", "resolve-done": "wait-resolve", "execute-dmn-done": "wait-execute-dmn",
+			"retrieve-done": "wait-retrieve", "compose-done": "wait-compose", "generate-done": "wait-generate",
+			"review-done": "wait-review", "careplan-reviewed": "wait-careplan-review",
+		} {
+			Expect(props.Data["application.properties"]).To(ContainSubstring("mp.messaging.incoming." + channel + ".path=/" + path))
+		}
 	})
 })

@@ -19,10 +19,15 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,66 +46,149 @@ var (
 
 type uiExposureSummary struct {
 	Created bool
+	Ready   bool
 	URL     string
 }
 
-// reconcileUIExposure creates a stable cluster Service in front of the UI
-// sandbox pod and an edge-terminated OpenShift Route in front of that Service.
-// OpenShell owns the Sandbox and pod; the aggregate pipeline resource owns the
-// Service and Route.
+type bffDeploymentSummary struct {
+	URL   string
+	Ready bool
+}
+
+// reconcileBFFDeployment runs the BFF outside OpenShell and gives the UI and
+// workflow a stable in-cluster endpoint.
+func reconcileBFFDeployment(ctx context.Context, k8sClient client.Client, scheme *runtime.Scheme, owner client.Object, component sandboxComponent, artifactStore *appsv1alpha1.ArtifactStoreSpec) (bffDeploymentSummary, error) {
+	name := dependencyResourceName(owner.GetName(), "bff", 63)
+	selector := pipelineComponentSelector(owner, "bff")
+	resources, err := componentResourceRequirements(component.Spec.Resources)
+	if err != nil {
+		return bffDeploymentSummary{}, fmt.Errorf("resolve BFF resources: %w", err)
+	}
+	command := component.Command
+	if len(component.Spec.Command) != 0 {
+		command = component.Spec.Command
+	}
+	if artifactStore != nil && artifactStore.CredentialsProvider != "" && artifactStore.Credentials == nil {
+		return bffDeploymentSummary{}, fmt.Errorf("artifactStore.credentialsProvider cannot supply credentials to a BFF Deployment; configure artifactStore.credentials.secretRef instead")
+	}
+	envValues := mergedEnv(component.Spec.ExtraEnv, component.Env)
+	if artifactStore != nil && artifactStore.Credentials != nil {
+		delete(envValues, "ARTIFACT_STORE_ACCESS_KEY")
+		delete(envValues, "ARTIFACT_STORE_SECRET_KEY")
+	}
+	env := environmentVariables(envValues)
+	if artifactStore != nil && artifactStore.Credentials != nil {
+		secretName := artifactStore.Credentials.SecretRef.Name
+		if secretName == "" {
+			return bffDeploymentSummary{}, fmt.Errorf("BFF artifactStore.credentials.secretRef.name is required")
+		}
+		for _, key := range []string{"ARTIFACT_STORE_ACCESS_KEY", "ARTIFACT_STORE_SECRET_KEY"} {
+			env = append(env, corev1.EnvVar{Name: key, ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: secretName}, Key: key}}})
+		}
+	}
+	deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: owner.GetNamespace()}}
+	_, err = controllerutil.CreateOrUpdate(ctx, k8sClient, deployment, func() error {
+		if deployment.ResourceVersion != "" && !metav1.IsControlledBy(deployment, owner) {
+			return fmt.Errorf("Deployment %s/%s already exists and is not managed by CareWright", deployment.Namespace, deployment.Name)
+		}
+		setPipelineResourceLabels(deployment, owner, "bff")
+		deployment.Spec.Replicas = ptrTo(int32(1))
+		deployment.Spec.Selector = &metav1.LabelSelector{MatchLabels: selector}
+		deployment.Spec.Template.ObjectMeta.Labels = maps.Clone(selector)
+		deployment.Spec.Template.Spec.Containers = []corev1.Container{{
+			Name: "bff", Image: component.Spec.Image, Command: slices.Clone(command), Env: env, Resources: resources,
+			Ports:          []corev1.ContainerPort{{Name: "http", ContainerPort: 8080, Protocol: corev1.ProtocolTCP}},
+			ReadinessProbe: &corev1.Probe{ProbeHandler: corev1.ProbeHandler{HTTPGet: &corev1.HTTPGetAction{Path: "/health", Port: intstr.FromString("http")}}, InitialDelaySeconds: 2, PeriodSeconds: 5},
+		}}
+		return controllerutil.SetControllerReference(owner, deployment, scheme)
+	})
+	if err != nil {
+		return bffDeploymentSummary{}, fmt.Errorf("reconcile BFF Deployment: %w", err)
+	}
+	service := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: owner.GetNamespace()}}
+	_, err = controllerutil.CreateOrUpdate(ctx, k8sClient, service, func() error {
+		if service.ResourceVersion != "" && !metav1.IsControlledBy(service, owner) {
+			return fmt.Errorf("Service %s/%s already exists and is not managed by CareWright", service.Namespace, service.Name)
+		}
+		setPipelineResourceLabels(service, owner, "bff")
+		service.Spec.Type = corev1.ServiceTypeClusterIP
+		service.Spec.Selector = maps.Clone(selector)
+		service.Spec.Ports = []corev1.ServicePort{{Name: "http", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: intstr.FromString("http")}}
+		return controllerutil.SetControllerReference(owner, service, scheme)
+	})
+	if err != nil {
+		return bffDeploymentSummary{}, fmt.Errorf("reconcile BFF Service: %w", err)
+	}
+	// Remove the ingress exception previously needed for the sandboxed BFF.
+	policy := &networkingv1.NetworkPolicy{}
+	if err := k8sClient.Get(ctx, client.ObjectKey{Name: dependencyResourceName(owner.GetName(), "ui-to-bff", 63), Namespace: owner.GetNamespace()}, policy); err == nil {
+		if metav1.IsControlledBy(policy, owner) {
+			if err := k8sClient.Delete(ctx, policy); err != nil && !apierrors.IsNotFound(err) {
+				return bffDeploymentSummary{}, fmt.Errorf("delete obsolete UI-to-BFF NetworkPolicy: %w", err)
+			}
+		}
+	} else if !apierrors.IsNotFound(err) {
+		return bffDeploymentSummary{}, fmt.Errorf("get obsolete UI-to-BFF NetworkPolicy: %w", err)
+	}
+	return bffDeploymentSummary{URL: bffServiceURL(owner), Ready: deployment.Status.ObservedGeneration >= deployment.Generation && deployment.Status.AvailableReplicas > 0}, nil
+}
+
+func bffServiceURL(owner client.Object) string {
+	return fmt.Sprintf("http://%s.%s.svc.cluster.local", dependencyResourceName(owner.GetName(), "bff", 63), owner.GetNamespace())
+}
+
+// reconcileUIExposure runs the browser-facing UI as a regular Kubernetes workload.
 func reconcileUIExposure(
 	ctx context.Context,
 	k8sClient client.Client,
 	scheme *runtime.Scheme,
 	owner client.Object,
+	spec appsv1alpha1.ComponentSpec,
 ) (uiExposureSummary, error) {
-	request := &appsv1alpha1.SandboxRequest{}
-	requestKey := client.ObjectKey{
-		Name:      componentRequestName(owner.GetName(), "ui"),
-		Namespace: owner.GetNamespace(),
-	}
-	if err := k8sClient.Get(ctx, requestKey, request); err != nil {
-		if apierrors.IsNotFound(err) {
-			return uiExposureSummary{}, nil
-		}
-		return uiExposureSummary{}, fmt.Errorf("get UI SandboxRequest: %w", err)
-	}
-	if request.Status.SandboxName == "" {
-		return uiExposureSummary{}, nil
-	}
-
-	sandbox := sandboxObject()
-	if err := k8sClient.Get(ctx, client.ObjectKey{Name: request.Status.SandboxName, Namespace: owner.GetNamespace()}, sandbox); err != nil {
-		if apierrors.IsNotFound(err) {
-			return uiExposureSummary{}, nil
-		}
-		return uiExposureSummary{}, fmt.Errorf("get UI Sandbox %s: %w", request.Status.SandboxName, err)
-	}
-	selectorText, _, err := unstructured.NestedString(sandbox.Object, "status", "selector")
-	if err != nil {
-		return uiExposureSummary{}, fmt.Errorf("read UI Sandbox selector: %w", err)
-	}
-	if selectorText == "" {
-		return uiExposureSummary{}, nil
-	}
-	labelSelector, err := metav1.ParseToLabelSelector(selectorText)
-	if err != nil {
-		return uiExposureSummary{}, fmt.Errorf("parse UI Sandbox selector %q: %w", selectorText, err)
-	}
-	selector, err := metav1.LabelSelectorAsMap(labelSelector)
-	if err != nil {
-		return uiExposureSummary{}, fmt.Errorf("convert UI Sandbox selector %q: %w", selectorText, err)
-	}
-
-	targetPort := sandboxServiceTargetPort(request.Status.Services, "http")
-	if targetPort == 0 {
-		targetPort = sandboxServiceSpecTargetPort(request.Spec.Services, "http")
-	}
-	if targetPort == 0 {
-		return uiExposureSummary{}, nil
-	}
-
 	name := dependencyResourceName(owner.GetName(), "ui", 63)
+	selector := pipelineComponentSelector(owner, "ui")
+	bffName := dependencyResourceName(owner.GetName(), "bff", 63)
+
+	resources, err := componentResourceRequirements(spec.Resources)
+	if err != nil {
+		return uiExposureSummary{}, fmt.Errorf("resolve UI resources: %w", err)
+	}
+	env := maps.Clone(spec.ExtraEnv)
+	if env == nil {
+		env = map[string]string{}
+	}
+	env["BFF_HOST"] = bffName
+
+	deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: owner.GetNamespace()}}
+	_, err = controllerutil.CreateOrUpdate(ctx, k8sClient, deployment, func() error {
+		if deployment.ResourceVersion != "" && !metav1.IsControlledBy(deployment, owner) {
+			return fmt.Errorf("Deployment %s/%s already exists and is not managed by CareWright", deployment.Namespace, deployment.Name)
+		}
+		setPipelineResourceLabels(deployment, owner, "ui")
+		deployment.Spec.Replicas = ptrTo(int32(1))
+		deployment.Spec.Selector = &metav1.LabelSelector{MatchLabels: selector}
+		deployment.Spec.Template.ObjectMeta.Labels = maps.Clone(selector)
+		deployment.Spec.Template.Spec.Containers = []corev1.Container{{
+			Name:      "ui",
+			Image:     spec.Image,
+			Command:   slices.Clone(spec.Command),
+			Env:       environmentVariables(env),
+			Resources: resources,
+			Ports: []corev1.ContainerPort{{
+				Name: "http", ContainerPort: 8080, Protocol: corev1.ProtocolTCP,
+			}},
+			ReadinessProbe: &corev1.Probe{
+				ProbeHandler:        corev1.ProbeHandler{HTTPGet: &corev1.HTTPGetAction{Path: "/health", Port: intstr.FromString("http")}},
+				InitialDelaySeconds: 2,
+				PeriodSeconds:       5,
+			},
+		}}
+		return controllerutil.SetControllerReference(owner, deployment, scheme)
+	})
+	if err != nil {
+		return uiExposureSummary{}, fmt.Errorf("reconcile UI Deployment: %w", err)
+	}
+
 	service := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: owner.GetNamespace()}}
 	_, err = controllerutil.CreateOrUpdate(ctx, k8sClient, service, func() error {
 		if service.ResourceVersion != "" && !metav1.IsControlledBy(service, owner) {
@@ -108,12 +196,9 @@ func reconcileUIExposure(
 		}
 		setPipelineResourceLabels(service, owner, "ui")
 		service.Spec.Type = corev1.ServiceTypeClusterIP
-		service.Spec.Selector = selector
+		service.Spec.Selector = maps.Clone(selector)
 		service.Spec.Ports = []corev1.ServicePort{{
-			Name:       "http",
-			Protocol:   corev1.ProtocolTCP,
-			Port:       80,
-			TargetPort: intstr.FromInt32(targetPort),
+			Name: "http", Protocol: corev1.ProtocolTCP, Port: 80, TargetPort: intstr.FromString("http"),
 		}}
 		return controllerutil.SetControllerReference(owner, service, scheme)
 	})
@@ -148,7 +233,52 @@ func reconcileUIExposure(
 		return uiExposureSummary{}, fmt.Errorf("reconcile UI Route: %w", err)
 	}
 
-	return uiExposureSummary{Created: true, URL: routeURL(route)}, nil
+	deploymentReady := deployment.Status.ObservedGeneration >= deployment.Generation && deployment.Status.AvailableReplicas > 0
+	return uiExposureSummary{
+		Created: true,
+		Ready:   deploymentReady,
+		URL:     routeURL(route),
+	}, nil
+}
+
+func pipelineComponentSelector(owner client.Object, component string) map[string]string {
+	return map[string]string{
+		managedByLabel: managedByValue,
+		pipelineLabel:  string(owner.GetUID()),
+		componentLabel: component,
+	}
+}
+
+func environmentVariables(values map[string]string) []corev1.EnvVar {
+	keys := slices.Sorted(maps.Keys(values))
+	result := make([]corev1.EnvVar, 0, len(keys))
+	for _, key := range keys {
+		result = append(result, corev1.EnvVar{Name: key, Value: values[key]})
+	}
+	return result
+}
+
+func componentResourceRequirements(resources appsv1alpha1.SandboxResources) (corev1.ResourceRequirements, error) {
+	limits := corev1.ResourceList{}
+	for name, value := range map[corev1.ResourceName]string{
+		corev1.ResourceCPU: resources.CPU, corev1.ResourceMemory: resources.Memory,
+	} {
+		if value == "" {
+			continue
+		}
+		quantity, err := resource.ParseQuantity(value)
+		if err != nil {
+			return corev1.ResourceRequirements{}, fmt.Errorf("parse %s quantity %q: %w", name, value, err)
+		}
+		limits[name] = quantity
+	}
+	if resources.GPU != nil && *resources.GPU > 0 {
+		limits[corev1.ResourceName("nvidia.com/gpu")] = *resource.NewQuantity(int64(*resources.GPU), resource.DecimalSI)
+	}
+	if len(limits) == 0 {
+		limits = nil
+	}
+	return corev1.ResourceRequirements{Limits: limits}, nil
 }
 
 func sandboxObject() *unstructured.Unstructured {
@@ -161,24 +291,6 @@ func routeObject() *unstructured.Unstructured {
 	object := &unstructured.Unstructured{}
 	object.SetGroupVersionKind(routeGVK)
 	return object
-}
-
-func sandboxServiceTargetPort(services []appsv1alpha1.SandboxServiceStatus, name string) int32 {
-	for _, service := range services {
-		if service.Name == name {
-			return service.TargetPort
-		}
-	}
-	return 0
-}
-
-func sandboxServiceSpecTargetPort(services []appsv1alpha1.SandboxServiceSpec, name string) int32 {
-	for _, service := range services {
-		if service.Name == name {
-			return service.TargetPort
-		}
-	}
-	return 0
 }
 
 func setPipelineResourceLabels(object client.Object, owner client.Object, component string) {
@@ -212,17 +324,25 @@ func setUIExposureCondition(conditions *[]metav1.Condition, generation int64, ex
 		Type:               "Exposed",
 		Status:             metav1.ConditionFalse,
 		ObservedGeneration: generation,
-		Reason:             "UISandboxPending",
-		Message:            "Waiting for the UI sandbox selector before creating its Service and Route",
+		Reason:             "UIDeploymentPending",
+		Message:            "Waiting for the UI and BFF Deployments",
 	}
-	if exposure.Created {
+	if exposure.Created && exposure.URL == "" {
 		condition.Reason = "RoutePending"
-		condition.Message = "The UI Service and Route exist; waiting for OpenShift to assign a route host"
+		condition.Message = "The UI Deployment, Service, and Route exist; waiting for OpenShift to assign a route host"
 	}
-	if exposure.URL != "" {
+	if exposure.URL != "" && !exposure.Ready {
+		condition.Reason = "UIProgressing"
+		condition.Message = "The UI Route exists; waiting for the UI and BFF Deployments to become ready"
+	}
+	if exposure.URL != "" && exposure.Ready {
 		condition.Status = metav1.ConditionTrue
 		condition.Reason = "RouteReady"
 		condition.Message = fmt.Sprintf("The UI is available at %s", exposure.URL)
 	}
 	meta.SetStatusCondition(conditions, condition)
+}
+
+func ptrTo[T any](value T) *T {
+	return &value
 }

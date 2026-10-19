@@ -38,6 +38,7 @@ var _ = Describe("Pipeline dependencies", func() {
 		store.SetNamespace("default")
 		_ = k8sClient.Delete(ctx, store)
 		_ = k8sClient.Delete(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: storeName + "-configuration", Namespace: "default"}})
+		_ = k8sClient.Delete(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: storeName + "-credentials", Namespace: "default"}})
 	})
 
 	It("creates a MinIO ObjectStore and configuration Secret", func() {
@@ -61,6 +62,20 @@ var _ = Describe("Pipeline dependencies", func() {
 		configuration := &corev1.Secret{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: storeName + "-configuration", Namespace: "default"}, configuration)).To(Succeed())
 		Expect(string(configuration.Data["config.env"])).To(ContainSubstring("MINIO_ROOT_PASSWORD="))
+		credentialSecret := &corev1.Secret{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: storeName + "-credentials", Namespace: "default"}, credentialSecret)).To(Succeed())
+		Expect(credentialSecret.Data).To(HaveLen(4))
+		Expect(string(credentialSecret.Data["ARTIFACT_STORE_ACCESS_KEY"])).To(Equal("carewright"))
+		Expect(credentialSecret.Data["ARTIFACT_STORE_SECRET_KEY"]).NotTo(BeEmpty())
+		Expect(credentialSecret.Data["AWS_ACCESS_KEY_ID"]).To(Equal(credentialSecret.Data["ARTIFACT_STORE_ACCESS_KEY"]))
+		Expect(credentialSecret.Data["AWS_SECRET_ACCESS_KEY"]).To(Equal(credentialSecret.Data["ARTIFACT_STORE_SECRET_KEY"]))
+		Expect(summary.Spec.Credentials.SecretRef.Name).To(Equal(credentialSecret.Name))
+		Expect(summary.Spec.Credentials.Type).To(Equal("carewright-minio"))
+		password := string(credentialSecret.Data["ARTIFACT_STORE_SECRET_KEY"])
+		_, err = reconcileArtifactStore(ctx, k8sClient, owner, requested)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: credentialSecret.Name, Namespace: "default"}, credentialSecret)).To(Succeed())
+		Expect(string(credentialSecret.Data["ARTIFACT_STORE_SECRET_KEY"])).To(Equal(password))
 
 		store := objectStoreObject()
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: storeName, Namespace: "default"}, store)).To(Succeed())

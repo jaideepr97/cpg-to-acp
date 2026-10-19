@@ -54,7 +54,6 @@ var _ = Describe("pipeline Secret-backed providers", func() {
 		components := cpgIngesterComponents(ingester, nil, "", "")
 		ingestion := component(components, "ingestion")
 		analysis := component(components, "llm-analysis")
-		ui := component(components, "ui")
 		Expect(ingestion.Registrations).To(HaveLen(1))
 		Expect(ingestion.Registrations[0].SecretRef.Name).To(Equal("artifact-secret"))
 		Expect(ingestion.Providers).To(ContainElement(ingestion.Registrations[0].Name))
@@ -64,7 +63,7 @@ var _ = Describe("pipeline Secret-backed providers", func() {
 			Type:      "openai",
 			SecretRef: corev1.LocalObjectReference{Name: "llm-secret"},
 		}))
-		Expect(ui.Registrations).To(BeEmpty())
+		Expect(components).NotTo(ContainElement(HaveField("Name", "bff")))
 	})
 
 	It("passes embedding and FHIR Secret references only to their writer consumers", func() {
@@ -82,11 +81,10 @@ var _ = Describe("pipeline Secret-backed providers", func() {
 		components := carePlanWriterComponents(writer, nil, "")
 		reasoning := component(components, "llm-reasoning")
 		fhir := component(components, "fhir-server")
-		ui := component(components, "ui")
 		Expect(reasoning.Registrations).To(HaveLen(3))
 		Expect(reasoning.Registrations[2].SecretRef.Name).To(Equal("embedding-secret"))
 		Expect(fhir.Registrations).To(HaveLen(2))
 		Expect(fhir.Registrations[1].SecretRef.Name).To(Equal("fhir-secret"))
-		Expect(ui.Registrations).To(BeEmpty())
+		Expect(components).NotTo(ContainElement(HaveField("Name", "bff")))
 	})
 })

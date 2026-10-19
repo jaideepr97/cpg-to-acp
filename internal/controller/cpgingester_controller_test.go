@@ -22,6 +22,7 @@ import (
 
 	appsv1alpha1 "carewright.io/carewright-operator/api/v1alpha1"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,6 +45,13 @@ var _ = Describe("CPGIngester Controller", func() {
 		}
 		resource := &appsv1alpha1.CPGIngester{}
 		if err := k8sClient.Get(ctx, resourceKey, resource); err == nil {
+			var policies corev1.ConfigMapList
+			Expect(k8sClient.List(ctx, &policies, client.InNamespace("default"), client.MatchingLabels{pipelineLabel: string(resource.UID)})).To(Succeed())
+			for index := range policies.Items {
+				if metav1.IsControlledBy(&policies.Items[index], resource) {
+					Expect(k8sClient.Delete(ctx, &policies.Items[index])).To(Succeed())
+				}
+			}
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		}
 	})
@@ -60,9 +68,9 @@ var _ = Describe("CPGIngester Controller", func() {
 					Workspace: "pipelines",
 				},
 				ArtifactStore: &appsv1alpha1.ArtifactStoreSpec{
-					URL:                 "http://minio.test:9000",
-					ArtifactBucket:      "artifacts",
-					CredentialsProvider: "minio-provider",
+					URL:            "http://minio.test:9000",
+					ArtifactBucket: "artifacts",
+					Credentials:    &appsv1alpha1.ProviderSourceSpec{Type: "carewright-minio", SecretRef: corev1.LocalObjectReference{Name: "artifact-secret"}},
 				},
 				Observability: &appsv1alpha1.ObservabilitySpec{MLflowTrackingURI: "http://mlflow.test:5000"},
 				LLM: &appsv1alpha1.LLMConfigSpec{
@@ -94,6 +102,7 @@ var _ = Describe("CPGIngester Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+		artifactProvider, _ := managedProvider(resource, "artifact", "", resource.Spec.ArtifactStore.Credentials)
 
 		reconciler := &CPGIngesterReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
 		_, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: resourceKey})
@@ -127,7 +136,34 @@ var _ = Describe("CPGIngester Controller", func() {
 
 		var requests appsv1alpha1.SandboxRequestList
 		Expect(k8sClient.List(ctx, &requests, client.InNamespace("default"), client.MatchingLabels{pipelineLabel: string(resource.UID)})).To(Succeed())
-		Expect(requests.Items).To(HaveLen(6))
+		Expect(requests.Items).To(HaveLen(4))
+		defaultPolicyName := ""
+		for index := range requests.Items {
+			request := &requests.Items[index]
+			if request.Labels[componentLabel] == "assembly" {
+				continue
+			}
+			Expect(request.Spec.PolicyRef).NotTo(BeNil())
+			Expect(request.Spec.PolicyRef.Key).To(Equal(defaultComponentPolicyKey))
+			if defaultPolicyName == "" {
+				defaultPolicyName = request.Spec.PolicyRef.Name
+			} else {
+				Expect(request.Spec.PolicyRef.Name).To(Equal(defaultPolicyName))
+			}
+		}
+		defaultPolicy := &corev1.ConfigMap{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: defaultPolicyName, Namespace: "default"}, defaultPolicy)).To(Succeed())
+		Expect(metav1.IsControlledBy(defaultPolicy, resource)).To(BeTrue())
+		Expect(defaultPolicy.Data).To(HaveKeyWithValue(defaultComponentPolicyKey, defaultComponentPolicy))
+		decodedPolicy, err := decodeSandboxPolicy([]byte(defaultPolicy.Data[defaultComponentPolicyKey]))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(decodedPolicy.Filesystem.ReadOnly).To(ContainElement("/opt"))
+		Expect(decodedPolicy.Filesystem.ReadWrite).To(ContainElements("/app", "/run", "/var"))
+		Expect(decodedPolicy.Filesystem.ReadWrite).NotTo(ContainElement("/opt/app-root/etc"))
+
+		uiDeployment := &appsv1.Deployment{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-ui", Namespace: "default"}, uiDeployment)).To(Succeed())
+		Expect(uiDeployment.Spec.Template.Spec.Containers[0].Image).To(Equal("example.invalid/ui:latest"))
 
 		assembly := &appsv1alpha1.SandboxRequest{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-assembly", Namespace: "default"}, assembly)).To(Succeed())
@@ -142,9 +178,8 @@ var _ = Describe("CPGIngester Controller", func() {
 		Expect(assembly.Spec.Services).To(Equal([]appsv1alpha1.SandboxServiceSpec{{Name: "http", TargetPort: 8080}}))
 		Expect(assembly.Spec.NetworkAccess).To(ConsistOf(
 			appsv1alpha1.SandboxNetworkAccessSpec{Name: "sonataflow", Host: "workflow.gateway.test", Port: 443, Protocol: "rest"},
-			appsv1alpha1.SandboxNetworkAccessSpec{Name: "artifact-store", Host: "minio.test", Port: 9000, Protocol: "rest"},
 		))
-		Expect(assembly.Spec.Providers).To(ConsistOf("minio-provider", "extra-provider"))
+		Expect(assembly.Spec.Providers).To(ConsistOf(artifactProvider, "extra-provider", "minio-provider"))
 		Expect(assembly.Spec.Env).To(HaveKeyWithValue("ARTIFACT_STORE_URL", "http://minio.test:9000"))
 		Expect(assembly.Spec.Env).To(HaveKeyWithValue("MLFLOW_TRACKING_URI", "http://mlflow.test:5000"))
 		Expect(assembly.Spec.Env).To(HaveKeyWithValue("PYTHONPATH", "/app/src"))
@@ -153,16 +188,16 @@ var _ = Describe("CPGIngester Controller", func() {
 
 		analysis := &appsv1alpha1.SandboxRequest{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-llm-analysis", Namespace: "default"}, analysis)).To(Succeed())
-		Expect(analysis.Spec.Providers).To(ConsistOf("minio-provider", "llm-provider"))
+		Expect(analysis.Spec.Providers).To(ConsistOf(artifactProvider, "llm-provider"))
 		Expect(analysis.Spec.Env).To(HaveKeyWithValue("LITELLM_URL", "http://litellm.test:4000"))
 		Expect(analysis.Spec.Env).To(HaveKeyWithValue("FIGURE_INTERPRETATION_MAX_FIGURES", "12"))
 		Expect(analysis.Spec.NetworkAccess).To(ContainElement(appsv1alpha1.SandboxNetworkAccessSpec{
 			Name: "inference", Host: "litellm.test", Port: 4000, Protocol: "rest",
 		}))
-		bff := &appsv1alpha1.SandboxRequest{}
+		bff := &appsv1.Deployment{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-bff", Namespace: "default"}, bff)).To(Succeed())
-		Expect(bff.Spec.Env).To(HaveKeyWithValue("SONATAFLOW_URL", "https://workflow.gateway.test"))
-		Expect(bff.Spec.Env).To(HaveKeyWithValue("SONATAFLOW_WORKFLOW_NAME", workflowResourceName(resource)))
+		Expect(bff.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: "SONATAFLOW_URL", Value: "https://workflow.gateway.test"}))
+		Expect(bff.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: "SONATAFLOW_WORKFLOW_NAME", Value: workflowResourceName(resource)}))
 
 		updated := &appsv1alpha1.CPGIngester{}
 		Expect(k8sClient.Get(ctx, resourceKey, updated)).To(Succeed())
@@ -199,19 +234,23 @@ var _ = Describe("CPGIngester Controller", func() {
 		workflowJSON, err := workflow.MarshalJSON()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(workflowJSON)).To(ContainSubstring("https://assembly.gateway.test/api/v1/assemble"))
-		Expect(string(workflowJSON)).To(ContainSubstring("https://workflow.gateway.test/callback/wait-parse"))
-		ui := &appsv1alpha1.SandboxRequest{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-ui", Namespace: "default"}, ui)).To(Succeed())
-		Expect(ui.Spec.NetworkAccess).To(ContainElement(appsv1alpha1.SandboxNetworkAccessSpec{
-			Name: "bff", Host: "bff.gateway.test", Port: 443, Protocol: "rest",
-		}))
+		for _, path := range []string{"wait-parse", "wait-analyze", "wait-generate"} {
+			Expect(string(workflowJSON)).To(ContainSubstring("https://workflow.gateway.test/" + path))
+			Expect(string(workflowJSON)).NotTo(ContainSubstring("https://workflow.gateway.test/callback/" + path))
+		}
 		props := &corev1.ConfigMap{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: workflowResourceName(resource) + "-props", Namespace: "default"}, props)).To(Succeed())
-		Expect(props.Data["application.properties"]).To(ContainSubstring("mp.messaging.incoming.parse-done.path=/wait-parse"))
+		for channel, path := range map[string]string{
+			"parse-done": "wait-parse", "analyze-done": "wait-analyze", "generate-done": "wait-generate",
+			"manifest-reviewed": "wait-manifest-review", "artifacts-reviewed": "wait-artifact-review",
+		} {
+			Expect(props.Data["application.properties"]).To(ContainSubstring("mp.messaging.incoming." + channel + ".path=/" + path))
+		}
 
 		Expect(k8sClient.Get(ctx, resourceKey, updated)).To(Succeed())
 		Expect(meta.IsStatusConditionTrue(updated.Status.Conditions, readyCondition)).To(BeFalse())
 		Expect(updated.Status.Endpoints).To(HaveKeyWithValue("assembly", "https://assembly.gateway.test"))
+		Expect(updated.Status.Endpoints).To(HaveKeyWithValue("bff", bffServiceURL(resource)))
 		Expect(updated.Status.Endpoints).To(HaveKeyWithValue("workflow", "https://workflow.gateway.test/callback"))
 
 		Expect(k8sClient.List(ctx, &requests, client.InNamespace("default"), client.MatchingLabels{pipelineLabel: string(resource.UID)})).To(Succeed())
@@ -231,6 +270,12 @@ var _ = Describe("CPGIngester Controller", func() {
 			}},
 		}
 		Expect(k8sClient.Status().Update(ctx, workflow)).To(Succeed())
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-bff", Namespace: "default"}, bff)).To(Succeed())
+		bff.Status.ObservedGeneration = bff.Generation
+		bff.Status.Replicas = 1
+		bff.Status.ReadyReplicas = 1
+		bff.Status.AvailableReplicas = 1
+		Expect(k8sClient.Status().Update(ctx, bff)).To(Succeed())
 		_, err = reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: resourceKey})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(k8sClient.Get(ctx, resourceKey, updated)).To(Succeed())

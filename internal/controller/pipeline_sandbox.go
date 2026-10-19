@@ -23,10 +23,13 @@ import (
 	"fmt"
 	"maps"
 	"net/url"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -72,14 +75,26 @@ func reconcileComponentSandboxes(
 ) (sandboxSummary, error) {
 	desired := make(map[string]struct{}, len(components))
 	summary := sandboxSummary{Desired: len(components), Endpoints: map[string]string{}}
+	serviceProxy, err := sandboxServiceProxyURL(ctx, k8sClient, owner.GetNamespace())
+	if err != nil {
+		return summary, err
+	}
 	workflowAccess := networkAccessForURL("sonataflow", workflowURL)
 	if len(workflowAccess) == 0 {
 		workflowAccess = networkAccessForURL("sonataflow", workflowServiceURL(owner))
+	}
+	defaultPolicyRef, err := reconcileDefaultComponentPolicy(ctx, k8sClient, scheme, owner, components)
+	if err != nil {
+		return summary, err
 	}
 
 	for _, component := range components {
 		requestName := componentRequestName(owner.GetName(), component.Name)
 		desired[requestName] = struct{}{}
+		policyRef := component.Spec.PolicyRef.DeepCopy()
+		if policyRef == nil {
+			policyRef = defaultPolicyRef.DeepCopy()
+		}
 		request := &appsv1alpha1.SandboxRequest{
 			ObjectMeta: metav1.ObjectMeta{Name: requestName, Namespace: owner.GetNamespace()},
 		}
@@ -104,7 +119,7 @@ func reconcileComponentSandboxes(
 				Workspace:             config.Workspace,
 				Image:                 component.Spec.Image,
 				Command:               slices.Clone(command),
-				PolicyRef:             component.Spec.PolicyRef.DeepCopy(),
+				PolicyRef:             policyRef,
 				Providers:             uniqueStrings(providers),
 				ProviderRegistrations: slices.Clone(component.Registrations),
 				Env:                   mergedEnv(component.Spec.ExtraEnv, component.Env),
@@ -126,7 +141,7 @@ func reconcileComponentSandboxes(
 		if err != nil {
 			return summary, fmt.Errorf("reconcile %s SandboxRequest: %w", component.Name, err)
 		}
-		if endpoint := sandboxServiceURL(request.Status.Services, "http"); endpoint != "" {
+		if endpoint := sandboxServiceURL(request.Status.Services, "http", serviceProxy); endpoint != "" {
 			summary.Endpoints[component.Name] = endpoint
 		}
 		ready := meta.FindStatusCondition(request.Status.Conditions, readyCondition)
@@ -156,6 +171,10 @@ func reconcileComponentSandboxes(
 }
 
 func componentServiceURLs(ctx context.Context, k8sClient client.Client, owner client.Object) (map[string]string, error) {
+	serviceProxy, err := sandboxServiceProxyURL(ctx, k8sClient, owner.GetNamespace())
+	if err != nil {
+		return nil, err
+	}
 	var requests appsv1alpha1.SandboxRequestList
 	if err := k8sClient.List(ctx, &requests,
 		client.InNamespace(owner.GetNamespace()),
@@ -169,28 +188,50 @@ func componentServiceURLs(ctx context.Context, k8sClient client.Client, owner cl
 		if !metav1.IsControlledBy(request, owner) {
 			continue
 		}
-		if endpoint := sandboxServiceURL(request.Status.Services, "http"); endpoint != "" {
+		if endpoint := sandboxServiceURL(request.Status.Services, "http", serviceProxy); endpoint != "" {
 			result[request.Labels[componentLabel]] = endpoint
 		}
 	}
 	return result, nil
 }
 
-func sandboxServiceURL(services []appsv1alpha1.SandboxServiceStatus, name string) string {
+func sandboxServiceProxyURL(ctx context.Context, k8sClient client.Client, namespace string) (string, error) {
+	if override := strings.TrimRight(os.Getenv("OPENSHELL_SERVICE_PROXY_URL"), "/"); override != "" {
+		return override, nil
+	}
+	var service corev1.Service
+	if err := k8sClient.Get(ctx, client.ObjectKey{Namespace: namespace, Name: "openshell-service-proxy"}, &service); err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", nil
+		}
+		return "", fmt.Errorf("get OpenShell service proxy: %w", err)
+	}
+	if service.Labels["app.kubernetes.io/managed-by"] != "carewright-bootstrap" {
+		return "", fmt.Errorf("OpenShell service proxy Service is not bootstrap-managed")
+	}
+	return fmt.Sprintf("http://openshell-service-proxy.%s.svc.cluster.local:8080", namespace), nil
+}
+
+func sandboxServiceURL(services []appsv1alpha1.SandboxServiceStatus, name, proxy string) string {
 	for _, service := range services {
 		if service.Name == name {
-			return strings.TrimRight(service.URL, "/")
+			endpoint := strings.TrimRight(service.URL, "/")
+			if proxy == "" {
+				return endpoint
+			}
+			parsed, err := url.Parse(endpoint)
+			if err != nil || !strings.HasSuffix(parsed.Hostname(), ".openshell.localhost") {
+				return endpoint
+			}
+			serviceHost := strings.TrimSuffix(parsed.Hostname(), ".openshell.localhost")
+			if serviceHost == "" || strings.Contains(serviceHost, ".") {
+				return endpoint
+			}
+			// The in-cluster proxy restores the gateway's virtual Host header.
+			return proxy + "/" + serviceHost
 		}
 	}
 	return ""
-}
-
-func endpointHost(endpoint string) string {
-	parsed, err := url.Parse(endpoint)
-	if err == nil && parsed.Host != "" {
-		return parsed.Host
-	}
-	return strings.TrimRight(endpoint, "/")
 }
 
 func networkAccessForURL(name, endpoint string) []appsv1alpha1.SandboxNetworkAccessSpec {
@@ -213,6 +254,15 @@ func networkAccessForURL(name, endpoint string) []appsv1alpha1.SandboxNetworkAcc
 	return []appsv1alpha1.SandboxNetworkAccessSpec{{
 		Name: name, Host: parsed.Hostname(), Port: port, Protocol: protocol,
 	}}
+}
+
+func artifactStoreNetworkAccess(endpoint, provider string) []appsv1alpha1.SandboxNetworkAccessSpec {
+	// A provider profile supplies its own endpoint policy, including credential
+	// signing. An additional unsigned rule for the same host conflicts with it.
+	if provider != "" {
+		return nil
+	}
+	return networkAccessForURL("artifact-store", endpoint)
 }
 
 func combinedNetworkAccess(groups ...[]appsv1alpha1.SandboxNetworkAccessSpec) []appsv1alpha1.SandboxNetworkAccessSpec {

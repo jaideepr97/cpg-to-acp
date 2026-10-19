@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
@@ -52,10 +53,12 @@ type CPGIngesterReconciler struct {
 // +kubebuilder:rbac:groups=aistor.min.io,resources=objectstores,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=configmaps;secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;delete
 // +kubebuilder:rbac:groups=agents.x-k8s.io,resources=sandboxes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 
-// Reconcile creates and manages one SandboxRequest for each CPG Ingester component.
+// Reconcile manages sandboxed processing components and regular UI/BFF Deployments.
 func (r *CPGIngesterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
@@ -64,11 +67,6 @@ func (r *CPGIngesterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
-		return ctrl.Result{}, err
-	}
-
-	exposure, err := reconcileUIExposure(ctx, r.Client, r.Scheme, &ingester)
-	if err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -83,6 +81,7 @@ func (r *CPGIngesterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	knownEndpoints["bff"] = bffServiceURL(&ingester)
 
 	literals := map[string]string{}
 	writerBFFURL := ""
@@ -108,17 +107,29 @@ func (r *CPGIngesterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		LiteralReplacements: literals,
 	}
 	components := cpgIngesterComponents(effective, knownEndpoints, workflowServiceURL(&ingester), writerBFFURL)
-	workflow, err := reconcilePipelineWorkflow(ctx, r.Client, r.Scheme, &ingester, template, knownEndpoints, len(components))
+	workflow, err := reconcilePipelineWorkflow(ctx, r.Client, r.Scheme, &ingester, template, knownEndpoints, len(components)+1)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	if !workflow.Ready {
 		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 	}
-	template.LiteralReplacements[templateWorkflowURL(template.WorkflowYAML)] = strings.TrimRight(workflow.URL, "/")
 	components = cpgIngesterComponents(effective, knownEndpoints, workflow.URL, writerBFFURL)
 
 	summary, err := reconcileComponentSandboxes(ctx, r.Client, r.Scheme, &ingester, ingester.Spec.Sandbox, workflow.URL, components)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	bff, err := reconcileBFFDeployment(ctx, r.Client, r.Scheme, &ingester, cpgIngesterBFFComponent(effective, workflow.URL, writerBFFURL), effective.Spec.ArtifactStore)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	summary.Desired++
+	summary.Endpoints["bff"] = bff.URL
+	if bff.Ready {
+		summary.Ready++
+	}
+	exposure, err := reconcileUIExposure(ctx, r.Client, r.Scheme, &ingester, ingester.Spec.UI)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -143,17 +154,18 @@ func (r *CPGIngesterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		Status:             metav1.ConditionTrue,
 		ObservedGeneration: ingester.Generation,
 		Reason:             "SpecAccepted",
-		Message:            "The CPGIngester component sandboxes have been reconciled",
+		Message:            "The CPGIngester components have been reconciled",
 	})
 	setPipelineReadyCondition(&ingester.Status.Conditions, ingester.Generation, summary, workflow)
+	exposure.Ready = exposure.Ready && bff.Ready
 	setUIExposureCondition(&ingester.Status.Conditions, ingester.Generation, exposure)
 	if err := r.Status().Patch(ctx, &ingester, client.MergeFrom(before)); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	log.Info("reconciled CPGIngester sandboxes", "generation", ingester.Generation, "ready", summary.Ready, "desired", summary.Desired)
+	log.Info("reconciled CPGIngester components", "generation", ingester.Generation, "ready", summary.Ready, "desired", summary.Desired)
 
-	if exposure.URL == "" {
+	if exposure.URL == "" || !exposure.Ready {
 		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 	}
 	return ctrl.Result{}, nil
@@ -168,6 +180,7 @@ func (r *CPGIngesterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(sonataFlowObject()).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.Service{}).
+		Owns(&appsv1.Deployment{}).
 		Owns(routeObject()).
 		Named("cpgingester").
 		Complete(r)
@@ -196,7 +209,7 @@ func cpgIngesterComponents(ingester *appsv1alpha1.CPGIngester, endpoints map[str
 		artifactSource = ingester.Spec.ArtifactStore.Credentials
 	}
 	artifactProvider, artifactRegistration := managedProvider(ingester, "artifact", externalArtifactProvider, artifactSource)
-	artifactAccess := networkAccessForURL("artifact-store", artifactEnv["ARTIFACT_STORE_URL"])
+	artifactAccess := artifactStoreNetworkAccess(artifactEnv["ARTIFACT_STORE_URL"], artifactProvider)
 	observabilityEnv := observabilityInputs(ingester.Spec.Observability)
 	llmEnv, externalLLMProvider := llmInputs(ingester.Spec.LLM)
 	var llmSource *appsv1alpha1.ProviderSourceSpec
@@ -227,22 +240,23 @@ func cpgIngesterComponents(ingester *appsv1alpha1.CPGIngester, endpoints map[str
 		setIfNotEmpty(env, "PYTHONPATH", spec.PythonPath)
 		return env
 	}
-	bffEnv := pythonEnv(ingester.Spec.BFF)
-	bffEnv["SONATAFLOW_URL"] = workflowAPIBaseURL(workflowURL)
-	bffEnv["SONATAFLOW_WORKFLOW_NAME"] = workflowResourceName(ingester)
-	setIfNotEmpty(bffEnv, "ACP_WRITER_BFF_URL", writerBFFURL)
-	if ingester.Spec.ArtifactStore != nil {
-		setIfNotEmpty(bffEnv, "MINIO_ENDPOINT", ingester.Spec.ArtifactStore.URL)
-	}
-	uiEnv := map[string]string{}
-	setIfNotEmpty(uiEnv, "BFF_HOST", endpointHost(endpoints["bff"]))
-
 	return []sandboxComponent{
 		{Name: "ingestion", Port: 8080, Spec: ingester.Spec.Ingestion.ComponentSpec, Command: pythonServiceCommand("cpg_ingester.services.ingestion:app", "8080"), Env: ingestionEnv, Providers: []string{artifactProvider}, Registrations: providerRegistrations(artifactRegistration), NetworkAccess: artifactAccess},
 		{Name: "llm-analysis", Port: 8080, Spec: ingester.Spec.LLMAnalysis.ComponentSpec, Command: pythonServiceCommand("cpg_ingester.services.llm_analysis:app", "8080"), Env: analysisEnv, Providers: []string{artifactProvider, llmProvider}, Registrations: providerRegistrations(artifactRegistration, llmRegistration), NetworkAccess: combinedNetworkAccess(artifactAccess, inferenceAccess)},
 		{Name: "assembly", Port: 8080, Spec: ingester.Spec.Assembly.ComponentSpec, Command: pythonServiceCommand("cpg_ingester.services.assembly_svc:app", "8080"), Env: pythonEnv(ingester.Spec.Assembly), Providers: []string{artifactProvider}, Registrations: providerRegistrations(artifactRegistration), NetworkAccess: artifactAccess},
 		{Name: "delivery", Port: 8080, Spec: ingester.Spec.Delivery.ComponentSpec, Command: pythonServiceCommand("cpg_ingester.services.delivery_svc:app", "8080"), Env: pythonEnv(ingester.Spec.Delivery), Providers: []string{artifactProvider}, Registrations: providerRegistrations(artifactRegistration), NetworkAccess: artifactAccess},
-		{Name: "bff", Port: 8080, Spec: ingester.Spec.BFF.ComponentSpec, Command: pythonServiceCommand("cpg_ingester.services.bff:app", "8080"), Env: bffEnv, Providers: []string{artifactProvider}, Registrations: providerRegistrations(artifactRegistration), NetworkAccess: artifactAccess},
-		{Name: "ui", Port: 8080, Spec: ingester.Spec.UI, Command: []string{"/usr/libexec/s2i/run"}, Env: uiEnv, NetworkAccess: networkAccessForURL("bff", endpoints["bff"])},
 	}
+}
+
+func cpgIngesterBFFComponent(ingester *appsv1alpha1.CPGIngester, workflowURL, writerBFFURL string) sandboxComponent {
+	artifactEnv, _ := artifactStoreInputs(ingester.Spec.ArtifactStore)
+	env := mergedEnv(artifactEnv, observabilityInputs(ingester.Spec.Observability))
+	setIfNotEmpty(env, "PYTHONPATH", ingester.Spec.BFF.PythonPath)
+	env["SONATAFLOW_URL"] = workflowOriginURL(workflowURL)
+	env["SONATAFLOW_WORKFLOW_NAME"] = workflowResourceName(ingester)
+	setIfNotEmpty(env, "ACP_WRITER_BFF_URL", writerBFFURL)
+	if ingester.Spec.ArtifactStore != nil {
+		setIfNotEmpty(env, "MINIO_ENDPOINT", ingester.Spec.ArtifactStore.URL)
+	}
+	return sandboxComponent{Name: "bff", Port: 8080, Spec: ingester.Spec.BFF.ComponentSpec, Command: pythonServiceCommand("cpg_ingester.services.bff:app", "8080"), Env: env}
 }
