@@ -1,5 +1,7 @@
 # carewright-operator
 
+This project lives in the [`carewright-operator/`](../) directory of the CareWright monorepo. The Go module path remains `carewright.io/carewright-operator`; build commands and the Docker build context are relative to this directory.
+
 ## Description
 
 The carewright operator manages the CPG Ingester and Care Plan Writer pipelines.
@@ -132,15 +134,13 @@ for pipeline CRs. It does not create provider instances or install this operator
 - Access to a Kubernetes v1.11.3+ cluster.
 
 ### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+**Build and push your image to CareWright Quay** (run these commands from the `carewright-operator/` directory):
 
 ```sh
-make docker-build docker-push IMG=<some-registry>/carewright-operator:tag
+make docker-buildx IMG=quay.io/carewright/carewright-operator:<tag>
 ```
 
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
+The `docker-buildx` target publishes both `linux/amd64` and `linux/arm64`. In the monorepo, `.github/workflows/publish-operator-image.yml` publishes a short-commit-SHA tag to this repository when changes under `carewright-operator/` reach `main`, or when manually dispatched. Ensure the Quay credentials have write access to `carewright/carewright-operator`.
 
 **Install the CRDs into the cluster:**
 
@@ -151,7 +151,7 @@ make install
 **Deploy the Manager to the cluster with the image specified by `IMG`:**
 
 ```sh
-make deploy IMG=<some-registry>/carewright-operator:tag
+make deploy IMG=quay.io/carewright/carewright-operator:<tag>
 ```
 
 > **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
@@ -194,7 +194,7 @@ Following the options to release and provide this solution to the users.
 1. Build the installer for the image built and published in the registry:
 
 ```sh
-make build-installer IMG=<some-registry>/carewright-operator:tag
+make build-installer IMG=quay.io/carewright/carewright-operator:<tag>
 ```
 
 **NOTE:** The makefile target mentioned above generates an 'install.yaml'
@@ -208,7 +208,7 @@ Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
 the project, i.e.:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/carewright-operator/<tag or branch>/dist/install.yaml
+kubectl apply -f https://raw.githubusercontent.com/samschifman/carewright/<tag or branch>/carewright-operator/dist/install.yaml
 ```
 
 ### By providing a Helm Chart
