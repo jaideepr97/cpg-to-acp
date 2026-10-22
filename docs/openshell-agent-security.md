@@ -184,7 +184,7 @@ SonataFlow orchestrates calls to pod services via Kubernetes DNS. Since OpenShel
 
 ### S3-compatible storage
 
-The OpenShell CONNECT proxy handles HTTP GET requests correctly but drops boto3 PUT responses, causing `ProxyConnectionError`. The artifact store uses presigned URLs with `requests.put()` instead of boto3's `put_object()` for all S3 write operations. GET operations remain on boto3.
+OpenShell-managed credentials are placeholders inside a sandbox, so they cannot be used to generate a valid presigned S3 URL locally. For sandbox writes, the shared artifact-store client instead sends an ordinary boto3 `PutObject` request with path-style addressing and unsigned payloads; the OpenShell proxy re-signs the request using the provider's real SigV4 credentials. Direct-credential deployments, such as the BFF, continue to use presigned URLs with `requests.put()`. S3-compatible endpoints other than MinIO need an equivalent OpenShell signing policy.
 
 ### Network policy configuration
 

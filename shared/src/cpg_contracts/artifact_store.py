@@ -29,11 +29,13 @@ class ArtifactStore:
         bucket: str = _BUCKET_ARTIFACTS,
         access_key: str = "minioadmin",
         secret_key: str = "minioadmin",
+        proxy_signing: bool = False,
     ):
         self.bucket = bucket
         self._endpoint_url = endpoint_url
         self._access_key = access_key
         self._secret_key = secret_key
+        self._proxy_signing = proxy_signing
         self._client = None
 
     def _get_client(self):
@@ -41,12 +43,22 @@ class ArtifactStore:
             import boto3
             from botocore.config import Config
 
+            config_kwargs = {"signature_version": "s3v4"}
+            if self._proxy_signing:
+                # OpenShell re-signs the SDK's Authorization header. Avoid a
+                # chunk-signed/checksum-trailer upload that its proxy cannot replay.
+                config_kwargs["s3"] = {
+                    "addressing_style": "path",
+                    "payload_signing_enabled": False,
+                }
+                config_kwargs["request_checksum_calculation"] = "when_required"
+
             self._client = boto3.client(
                 "s3",
                 endpoint_url=self._endpoint_url,
                 aws_access_key_id=self._access_key,
                 aws_secret_access_key=self._secret_key,
-                config=Config(signature_version="s3v4"),
+                config=Config(**config_kwargs),
                 region_name="us-east-1",
             )
             self._ensure_bucket()
@@ -62,8 +74,16 @@ class ArtifactStore:
             except Exception:
                 pass
 
-    def _put_via_presigned(self, key: str, body: bytes, content_type: str) -> None:
-        """PUT using a presigned URL + requests to avoid proxy incompatibility with boto3."""
+    def _put_bytes(self, key: str, body: bytes, content_type: str) -> None:
+        """Write through the proxy, or use a presigned URL with direct credentials."""
+        if self._proxy_signing:
+            self._get_client().put_object(
+                Bucket=self.bucket, Key=key, Body=body, ContentType=content_type
+            )
+            return
+
+        # A direct MinIO client (such as the regular BFF deployment) has real
+        # credentials and can generate a valid presigned URL locally.
         import requests as _requests
 
         url = self._get_client().generate_presigned_url(
@@ -76,7 +96,7 @@ class ArtifactStore:
 
     def put(self, key: str, data: dict | list) -> str:
         """Store a JSON artifact. Returns a qualified ref: 'bucket:key'."""
-        self._put_via_presigned(key, json.dumps(data).encode(), "application/json")
+        self._put_bytes(key, json.dumps(data).encode(), "application/json")
         ref = f"{self.bucket}:{key}"
         logger.debug("Stored artifact: %s", ref)
         return ref
@@ -92,7 +112,7 @@ class ArtifactStore:
 
     def put_raw(self, key: str, data: bytes, content_type: str = "application/octet-stream") -> str:
         """Store raw bytes. Returns a qualified ref: 'bucket:key'."""
-        self._put_via_presigned(key, data, content_type)
+        self._put_bytes(key, data, content_type)
         return f"{self.bucket}:{key}"
 
     def get(self, ref: str) -> dict | list:
@@ -110,11 +130,17 @@ class ArtifactStore:
 def _build_store(url: str, bucket: str) -> ArtifactStore | None:
     if not url:
         return None
+    aws_access_key = os.environ.get("AWS_ACCESS_KEY_ID")
+    aws_secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
+    if bool(aws_access_key) != bool(aws_secret_key):
+        raise ValueError("AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be set together")
+    proxy_signing = bool(aws_access_key)
     return ArtifactStore(
         endpoint_url=url,
         bucket=bucket,
-        access_key=os.environ.get("ARTIFACT_STORE_ACCESS_KEY", "minioadmin"),
-        secret_key=os.environ.get("ARTIFACT_STORE_SECRET_KEY", "minioadmin"),
+        access_key=aws_access_key or os.environ.get("ARTIFACT_STORE_ACCESS_KEY", "minioadmin"),
+        secret_key=aws_secret_key or os.environ.get("ARTIFACT_STORE_SECRET_KEY", "minioadmin"),
+        proxy_signing=proxy_signing,
     )
 
 
