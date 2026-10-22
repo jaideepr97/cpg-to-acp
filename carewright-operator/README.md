@@ -118,72 +118,46 @@ finalizers can complete. Referenced Kubernetes Secrets remain user-owned.
 See `config/samples/apps_v1alpha1_sandboxrequest.yaml` for a minimal request and
 ConfigMap-backed policy.
 
-## Bootstrap prerequisites on OpenShift
+## OpenShift deployment
 
-Before installing this operator on a fresh OpenShift cluster, run the
-[external-prerequisites bootstrap](docs/bootstrap-prerequisites.md). It prepares
-MinIO, Agent Sandbox, OpenShell, and SonataFlow, then prints the values needed
-for pipeline CRs. It does not create provider instances or install this operator.
+Follow the [tested end-to-end guide](docs/openshift-e2e.md), starting from a
+fresh namespace. It explains the exact bootstrap command, where to configure
+the Enmaas endpoint and model, Secret and provider handling, CRD/operator/CR
+installation order, sample runs, review gates, validation, and recovery from
+endpoint mismatches. The [bootstrap reference](docs/bootstrap-prerequisites.md)
+documents every script override. A [dated cluster snapshot](docs/jrao-carewright-observed-state.md)
+records the live configuration and remaining gaps without secret values.
 
-## Getting Started
+The tested path is, from the monorepo root: run
+`carewright-operator/scripts/bootstrap-prerequisites.sh`, apply
+`carewright-operator/config/crd`, apply the namespace-specific operator
+overlay, then apply the two pipeline CR files. Do not apply generic
+`config/samples` as an end-to-end deployment or mix this path with the
+component deployment scripts in the same namespace.
 
-### Prerequisites
-- go version v1.25.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
-
-### To Deploy on the cluster
-**Build and push your image to CareWright Quay** (run these commands from the `carewright-operator/` directory):
+The operator image is built by
+`.github/workflows/publish-operator-image.yml` when
+`carewright-operator/**` changes on `main` (or on manual dispatch). It
+publishes both `linux/amd64` and `linux/arm64`, with short-SHA and
+`:latest` tags. Component images have a separate build workflow and may
+carry a different SHA. For a manual build from `carewright-operator/`, use:
 
 ```sh
 make docker-buildx IMG=quay.io/carewright/carewright-operator:<tag>
 ```
 
-The `docker-buildx` target publishes both `linux/amd64` and `linux/arm64`. In the monorepo, `.github/workflows/publish-operator-image.yml` publishes a short-commit-SHA tag to this repository when changes under `carewright-operator/` reach `main`, or when manually dispatched. Ensure the Quay credentials have write access to `carewright/carewright-operator`.
+Delete pipeline CRs before removing the operator or gateway so their
+SandboxRequest finalizers can remove sandboxes and provider registrations.
+Deleting CRDs also deletes all instances; do not use `make uninstall` as
+routine cleanup.
 
-**Install the CRDs into the cluster:**
+## Local development
 
-```sh
-make install
-```
-
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
-
-```sh
-make deploy IMG=quay.io/carewright/carewright-operator:<tag>
-```
-
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
-
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
-
-```sh
-kubectl apply -k config/samples/
-```
-
->**NOTE**: Ensure that the samples has default values to test it out.
-
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
-
-```sh
-kubectl delete -k config/samples/
-```
-
-**Delete the APIs(CRDs) from the cluster:**
-
-```sh
-make uninstall
-```
-
-**UnDeploy the controller from the cluster:**
-
-```sh
-make undeploy
-```
+Go 1.25+ is required. From `carewright-operator/`, run `make test` and
+`make run` against a development cluster whose prerequisites are already
+installed. For a local controller process, set `WATCH_NAMESPACE` to avoid
+reconciling unrelated namespaces. The individual-controller and
+`SANDBOXREQUEST_OWNER_UID` options above remain available for focused tests.
 
 ## Project Distribution
 
