@@ -182,9 +182,7 @@ change a CR's spec, so it does not replace an existing sandbox. For an
 upgrade, change every relevant `spec.<component>.image` to the newly built
 immutable short-SHA tag, apply the CRs, and wait for replacement
 SandboxRequests. Conversely, applying these `:latest` samples to the
-SHA-pinned validation namespace *will* change its CR specs and trigger another
-rollout. The [dated cluster snapshot](jrao-carewright-observed-state.md)
-records the exact image tags used for the successful test.
+SHA-pinned namespace *will* change its CR specs and trigger another rollout.
 
 If an ingester run stops at LLM analysis, check the workflow and
 `cpg-ingester-llm-analysis` sandbox logs for an error before changing

@@ -104,7 +104,7 @@ oc -n jrao-carewright get route cpg-ingester-ui care-plan-writer-ui
 oc -n jrao-carewright get deployment/minio,statefulset/jrao-carewright-openshell
 ```
 
-The ingester and writer CR status report component readiness and generated endpoints. A Ready CR means its components are available, **not** that a pipeline run completed. In the [dated validation run](docs/jrao-carewright-observed-state.md), the writer MCP image had an unrelated import failure, so the core writer workflow worked while `CarePlanWriter Ready=False`. Investigate any failed component before treating a deployment as ready.
+The ingester and writer CR status report component readiness and generated endpoints. A Ready CR means its components are available, **not** that a pipeline run completed. Investigate any failed component before treating a deployment as ready; the [detailed guide](docs/openshift-e2e.md) notes a known writer MCP image failure.
 
 ## 6. Run a synthetic end-to-end test
 
@@ -121,7 +121,7 @@ curl -fsS -F 'pdf=@cpg-ingester/data/synthetic-hypertension-cpg.pdf;type=applica
 
 Open the `cpg-ingester-ui` Route from step 5 and submit the manifest/artifact review gates. The upload response contains a `runId`; poll `GET /api/v1/runs/<runId>` until it reports `completed`. That delivers the guideline to Care Plan Writer. Then use the [writer smoke-test commands](docs/openshift-e2e.md#3-run-the-synthetic-cpg-to-careplan-smoke-test) to submit the synthetic IPS bundle, complete its review gate in the `care-plan-writer-ui` Route, and verify a completed run with a `careplanId`.
 
-For upgrades and failures—including provider endpoint mismatches and image tag behavior—use the [detailed guide](docs/openshift-e2e.md). The [dated validation snapshot](docs/jrao-carewright-observed-state.md) records what was actually observed in-cluster, without secret values. Delete pipeline CRs before removing the operator or gateway so the SandboxRequest finalizers can clean up sandboxes and providers.
+For upgrades and failures—including provider endpoint mismatches and image tag behavior—use the [detailed guide](docs/openshift-e2e.md). Delete pipeline CRs before removing the operator or gateway so the SandboxRequest finalizers can clean up sandboxes and providers.
 
 ## Local development
 
