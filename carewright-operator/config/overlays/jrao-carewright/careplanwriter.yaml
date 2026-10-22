@@ -19,7 +19,8 @@ spec:
         name: carewright-artifact-credentials
   llm:
     url: https://api.enmaas.devshift.net
-    model: rits/zai-org/glm-5-3
+    model: gpt-6-sol
+    requestTimeoutSeconds: 600
     credentials:
       type: carewright-openai
       secretRef:
