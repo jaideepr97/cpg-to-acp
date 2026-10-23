@@ -7,7 +7,11 @@ context for future BPMN generation.
 
 import json
 import logging
+import os
+import re
 import time
+from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 import mlflow
@@ -22,14 +26,279 @@ from acp_writer.planning_brief import (
     normalize_review_history,
     render_clinician_directives,
     render_feedback_history,
+    stamp_activity_ids,
 )
 from acp_writer.prompts.plan_composer import (
     PLAN_COMPOSER_USER,
     compose_system_prompt,
 )
 from acp_writer.state import CarePlanComposerState
+from acp_writer.tools.concept_resolver import resolve
 
 logger = logging.getLogger(__name__)
+
+_CREDENTIAL_ASSIGNMENT_RE = re.compile(
+    r"(?i)\b(?:OPENAI_API_KEY|LITELLM_API_KEY|LLM_API_KEY)\b\s*[:=]\s*[\"']?[^\s,;\"']+"
+)
+_API_KEY_RE = re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b")
+_SENSITIVE_FIELD_RE = re.compile(r"(?i)(?:api[_-]?key|secret|token|password|credential)")
+
+
+def _artifact_component(value: Any, fallback: str) -> str:
+    component = re.sub(r"[^a-zA-Z0-9_-]+", "-", str(value or "")).strip("-")
+    return component[:100] or fallback
+
+
+def _patient_values(demographics: Mapping[str, Any], patient_reference: str) -> list[str]:
+    values: list[str] = [patient_reference] if patient_reference else []
+    if not isinstance(demographics, Mapping):
+        return values
+
+    def add(value: Any) -> None:
+        if isinstance(value, str) and value.strip():
+            values.append(value.strip())
+        elif isinstance(value, Mapping):
+            for child in value.values():
+                add(child)
+        elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+            for child in value:
+                add(child)
+
+    for key in ("name", "names", "identifiers", "birth_date", "birthDate"):
+        add(demographics.get(key))
+    return list(dict.fromkeys(values))
+
+
+def _sanitize_artifact_value(value: Any, patient_values: Sequence[str]) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            str(key): "[REDACTED_CREDENTIAL]" if _SENSITIVE_FIELD_RE.search(str(key))
+            else _sanitize_artifact_value(child, patient_values)
+            for key, child in value.items()
+        }
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return [_sanitize_artifact_value(child, patient_values) for child in value]
+    if not isinstance(value, str):
+        return value
+
+    sanitized = value
+    for name in ("OPENAI_API_KEY", "LITELLM_API_KEY", "LLM_API_KEY"):
+        secret = os.environ.get(name)
+        if secret:
+            sanitized = sanitized.replace(secret, "[REDACTED_CREDENTIAL]")
+    sanitized = _CREDENTIAL_ASSIGNMENT_RE.sub("[REDACTED_CREDENTIAL]", sanitized)
+    sanitized = _API_KEY_RE.sub("[REDACTED_CREDENTIAL]", sanitized)
+    for patient_value in sorted((v for v in patient_values if len(v) >= 2), key=len, reverse=True):
+        sanitized = re.sub(re.escape(patient_value), "[redacted]", sanitized, flags=re.IGNORECASE)
+    return sanitized
+
+
+def _record_composer_round(
+    output_dir: str,
+    run_id: Any,
+    round_number: int,
+    request: dict[str, Any],
+    response: Any | None,
+    patient_values: Sequence[str],
+) -> None:
+    if not output_dir:
+        return
+    output_path = Path(output_dir)
+    root = output_path.parent.parent if output_path.parent.name == "careplans" else output_path
+    directory = root / "acp-writer" / _artifact_component(run_id, "run") / "plan-composer"
+    directory.mkdir(parents=True, exist_ok=True)
+    stem = f"round-{round_number}"
+    safe_request = _sanitize_artifact_value(request, patient_values)
+    (directory / f"{stem}.request.json").write_text(
+        json.dumps(safe_request, ensure_ascii=False, indent=2, default=str) + "\n"
+    )
+    if response is not None:
+        safe_response = _sanitize_artifact_value(response, patient_values)
+        (directory / f"{stem}.response.json").write_text(
+            json.dumps(safe_response, ensure_ascii=False, indent=2, default=str) + "\n"
+        )
+
+
+def _offending_fragment(brief_data: Any, raw_response: str) -> str:
+    if isinstance(brief_data, Mapping):
+        for field in ("goals", "activities"):
+            items = brief_data.get(field)
+            if isinstance(items, list):
+                for item in items:
+                    if not isinstance(item, Mapping):
+                        return json.dumps(item, ensure_ascii=False, default=str)
+    return raw_response
+
+def _source_recommendation_ids(item: dict) -> list[str]:
+    values = [item.get("source_recommendation_id"), *(item.get("source_recommendation_ids") or [])]
+    return list(dict.fromkeys(value for value in values if isinstance(value, str) and value.strip()))
+
+
+@mlflow.trace(name="resolve_missing_medication_codes")
+def _resolve_missing_medication_codes(brief_data: dict[str, Any]) -> None:
+    """Resolve missing medication coding through the shared concept path."""
+    for activity in brief_data.get("activities") or []:
+        if activity.get("type") != "medication" or activity.get("code"):
+            continue
+        concept = resolve(str(activity.get("description") or ""))
+        if (
+            concept is None
+            or concept.action != "extract_medication"
+            or not concept.system
+            or not concept.code
+        ):
+            continue
+        activity["code"] = {"system": concept.system, "code": concept.code}
+
+
+def _merge_same_cpg_medication_regimens(brief_data: dict[str, Any]) -> dict[tuple[str, str, str, str, str], list[str]]:
+    """Collapse duplicate same-CPG rows that prescribe the same regimen.
+
+    The returned keys map each regimen to all source recommendation ids so
+    related goals can be consolidated without losing provenance.
+    """
+    activities = brief_data.get("activities") or []
+    groups: dict[tuple[str, str, str, str, str], list[dict]] = {}
+    first_indices: dict[tuple[str, str, str, str, str], int] = {}
+    activity_keys: dict[int, tuple[str, str, str, str, str]] = {}
+    for index, activity in enumerate(activities):
+        if activity.get("type") != "medication" or not activity.get("code"):
+            continue
+        code = activity["code"]
+        key = (
+            str(activity.get("source_cpg") or ""),
+            str(code.get("system") or ""),
+            str(code.get("code") or ""),
+            re.sub(r"\s+", "", str(activity.get("dose") or "")).lower(),
+            "|".join(
+                re.sub(r"\s+", " ", str(activity.get(field) or "")).strip().lower()
+                for field in ("route", "frequency")
+            ),
+        )
+        groups.setdefault(key, []).append(activity)
+        first_indices.setdefault(key, index)
+        activity_keys[index] = key
+
+    rec_groups: dict[tuple[str, str, str, str, str], list[str]] = {}
+    merged: list[dict] = []
+    merged_items: dict[tuple[str, str, str, str, str], dict] = {}
+    for key, group in groups.items():
+        rec_ids = list(dict.fromkeys(
+            rec_id for activity in group for rec_id in _source_recommendation_ids(activity)
+        ))
+        rec_groups[key] = rec_ids
+        primary = dict(group[0])
+        primary["source_recommendation_ids"] = rec_ids
+        if rec_ids:
+            primary["source_recommendation_id"] = rec_ids[0]
+        if len(group) > 1:
+            conditions = list(dict.fromkeys(
+                str(activity.get("description") or "").strip().rstrip(".")
+                for activity in group
+                if activity.get("description")
+            ))
+            code = primary["code"]
+            regimen = " ".join(
+                part for part in [
+                    code.get("display"),
+                    primary.get("dose"),
+                    primary.get("route"),
+                    primary.get("frequency"),
+                ] if part
+            )
+            primary["description"] = (
+                f"Use one {regimen} regimen when either applicable same-CPG decision condition is met: "
+                + " OR ".join(f"({condition})" for condition in conditions)
+                + "."
+            )
+            rationales = list(dict.fromkeys(
+                str(activity.get("clinical_rationale") or "").strip()
+                for activity in group
+                if activity.get("clinical_rationale")
+            ))
+            if rationales:
+                primary["clinical_rationale"] = " ".join(rationales)
+            workflows = [activity.get("workflow") or {} for activity in group]
+            for field in ("escalation", "monitoring_trigger"):
+                values = list(dict.fromkeys(
+                    str(workflow.get(field) or "").strip()
+                    for workflow in workflows
+                    if workflow.get(field)
+                ))
+                if values:
+                    primary.setdefault("workflow", {})[field] = " ".join(values)
+        merged_items[key] = primary
+    for index, activity in enumerate(activities):
+        key = activity_keys.get(index)
+        if key is None:
+            merged.append(activity)
+        elif first_indices[key] == index:
+            merged.append(merged_items[key])
+    brief_data["activities"] = merged
+    return rec_groups
+
+
+def _merge_goals_for_merged_regimens(
+    brief_data: dict[str, Any],
+    medication_groups: dict[tuple[str, str, str, str, str], list[str]],
+) -> None:
+    merged_rec_sets = [set(ids) for ids in medication_groups.values() if len(ids) > 1]
+    if not merged_rec_sets:
+        return
+    goals = brief_data.get("goals") or []
+    consumed: set[int] = set()
+    merged_goals: list[dict] = []
+    for rec_ids in merged_rec_sets:
+        matching = [
+            (index, goal) for index, goal in enumerate(goals)
+            if rec_ids.intersection(_source_recommendation_ids(goal))
+        ]
+        if len(matching) < 2:
+            continue
+        first_index, first = matching[0]
+        result = dict(first)
+        all_rec_ids = list(dict.fromkeys(
+            rec_id for _, goal in matching for rec_id in _source_recommendation_ids(goal)
+        ))
+        result["source_recommendation_ids"] = all_rec_ids
+        if all_rec_ids:
+            result["source_recommendation_id"] = all_rec_ids[0]
+        descriptions = list(dict.fromkeys(
+            str(goal.get("description") or "").strip().rstrip(".")
+            for _, goal in matching if goal.get("description")
+        ))
+        result["description"] = "One medication initiation goal covers the applicable criteria: " + " OR ".join(
+            f"({description})" for description in descriptions
+        ) + "."
+        consumed.update(index for index, _ in matching)
+        merged_goals.append(result)
+    if consumed:
+        brief_data["goals"] = [goal for i, goal in enumerate(goals) if i not in consumed] + merged_goals
+
+
+def _neutralize_unprovided_pronouns(
+    brief_data: dict[str, Any], patient_demographics: dict[str, Any]
+) -> None:
+    """Use neutral patient wording unless explicit pronouns were supplied."""
+    if patient_demographics.get("pronouns"):
+        return
+
+    def normalize(value: str) -> str:
+        value = re.sub(r"\bhimself\b", "the patient", value, flags=re.IGNORECASE)
+        value = re.sub(r"\bhis\b", "the patient's", value, flags=re.IGNORECASE)
+        return re.sub(r"\b(?:he|him)\b", "the patient", value, flags=re.IGNORECASE)
+
+    for key in ("goals", "activities"):
+        for item in brief_data.get(key) or []:
+            for field in ("description", "clinical_rationale"):
+                value = item.get(field)
+                if isinstance(value, str):
+                    item[field] = normalize(value)
+            workflow = item.get("workflow")
+            if isinstance(workflow, dict):
+                for field, value in workflow.items():
+                    if isinstance(value, str):
+                        workflow[field] = normalize(value)
 
 
 def _format_conditions(condition_codes: list[dict]) -> str:
@@ -139,11 +408,14 @@ def plan_composer(state: CarePlanComposerState) -> dict:
     feedback = state.get("brief_review_feedback", "")
     output_dir = state.get("output_dir", "")
 
-    # Revision mode (F17a): a prior brief in state means this is a request-changes
-    # loop. The monolith never sets this key (it is one-shot from an IPS bundle),
-    # so it always authors.
+    # Revision mode (F17a): a prior brief means request-changes, except that a
+    # parse/normalization retry must re-author from its feedback. The monolith
+    # never sets this key, so it always authors.
     prior_brief = state.get("prior_planning_brief") or {}
-    is_revision = bool(prior_brief.get("goals") or prior_brief.get("activities"))
+    is_revision = bool(
+        (prior_brief.get("goals") or prior_brief.get("activities"))
+        and not state.get("brief_parse_failed")
+    )
 
     # Evolving base (F18b): iteration 1 revises the clinician-reviewed prior
     # brief; once the loop has produced a draft (state["planning_brief"]), later
@@ -224,16 +496,35 @@ def plan_composer(state: CarePlanComposerState) -> dict:
     logger.info("Calling LLM...")
     t0 = time.time()
 
-    response = llm.invoke([
+    messages = [
         {"role": "system", "content": compose_system_prompt(is_revision)},
         {"role": "user", "content": user_prompt},
-    ])
+    ]
+    patient_values = _patient_values(demographics, patient_ref)
+    _record_composer_round(
+        output_dir,
+        state.get("run_id"),
+        review_round + 1,
+        {"messages": messages},
+        None,
+        patient_values,
+    )
+    response = llm.invoke(messages)
 
     elapsed = time.time() - t0
     logger.info("LLM responded in %.1fs", elapsed)
 
     try:
-        brief_data = _parse_brief_from_response(content_to_text(response.content))
+        raw_response = content_to_text(response.content)
+        _record_composer_round(
+            output_dir,
+            state.get("run_id"),
+            review_round + 1,
+            {"messages": messages},
+            {"content": raw_response},
+            patient_values,
+        )
+        brief_data = _parse_brief_from_response(raw_response)
         # The DMN audit trail is authoritative data the executor already built —
         # inject it directly rather than asking the LLM to echo it back through
         # the prompt (F10). This removes a large, error-prone round-trip and
@@ -246,7 +537,12 @@ def plan_composer(state: CarePlanComposerState) -> dict:
         if review_history:
             brief_data["revision_history"] = normalize_review_history(review_history)
         _sanitize_provenance(brief_data, cpg_ids[0] if cpg_ids else "unspecified")
+        _neutralize_unprovided_pronouns(brief_data, demographics)
+        _resolve_missing_medication_codes(brief_data)
+        merged_medication_groups = _merge_same_cpg_medication_regimens(brief_data)
+        _merge_goals_for_merged_regimens(brief_data, merged_medication_groups)
         brief = PlanningBrief.model_validate(brief_data)
+        brief = stamp_activity_ids(brief, base_brief)
         brief_dict = brief.model_dump(mode="json")
 
         if output_dir:
@@ -262,12 +558,24 @@ def plan_composer(state: CarePlanComposerState) -> dict:
         return {
             "planning_brief": brief_dict,
             "brief_review_feedback": "",
+            "brief_parse_failed": False,
             "plan_composer_prompt": user_prompt,
         }
 
-    except (json.JSONDecodeError, Exception) as e:
-        logger.error("Failed to parse Planning Brief from LLM response: %s", e)
-        logger.debug("Raw response: %s", content_to_text(response.content)[:500])
+    except Exception as e:
+        raw_response = content_to_text(response.content)
+        try:
+            parsed_fragment_source = _parse_brief_from_response(raw_response)
+        except Exception:
+            parsed_fragment_source = None
+        fragment = _offending_fragment(parsed_fragment_source, raw_response)
+        safe_error = _sanitize_artifact_value(str(e), patient_values)
+        safe_fragment = _sanitize_artifact_value(fragment, patient_values)
+        feedback = (
+            f"Planning Brief parse/normalization error: {safe_error}\n"
+            f"Offending fragment (first 500 characters): {str(safe_fragment)[:500]}"
+        )
+        logger.exception("Failed to parse or normalize Planning Brief from LLM response")
         return {
             "planning_brief": {
                 "patient_reference": patient_ref,
@@ -275,8 +583,10 @@ def plan_composer(state: CarePlanComposerState) -> dict:
                 "goals": [],
                 "activities": [],
                 "review_status": "flagged",
-                "review_feedback": f"LLM response parse error: {e}",
+                "review_feedback": feedback,
             },
-            "brief_review_feedback": "",
+            "brief_review_feedback": feedback,
+            "brief_parse_failed": True,
+            "brief_review_count": review_round + 1,
             "plan_composer_prompt": user_prompt,
         }

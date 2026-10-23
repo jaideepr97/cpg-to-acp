@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,6 +11,10 @@ from acp_writer.nodes.plan_composer import (
     _format_conditions,
     _format_demographics,
     _format_recommendations,
+    _merge_goals_for_merged_regimens,
+    _merge_same_cpg_medication_regimens,
+    _resolve_missing_medication_codes,
+    _neutralize_unprovided_pronouns,
     _parse_brief_from_response,
     _sanitize_provenance,
     plan_composer,
@@ -136,6 +141,67 @@ class TestSanitizeProvenance:
         assert data["goals"][0]["source_cpg"] == "SYN-HTN-2026-001"
 
 
+class TestDeterministicClinicalNormalization:
+    def _duplicate_regimen_brief(self):
+        return {
+            "goals": [
+                {"description": "Initiate lisinopril for confirmed high BP.", "source_recommendation_id": "rec-a", "source_cpg": "SYN-HTN-2026-002"},
+                {"description": "Initiate lisinopril for high BP with diabetes.", "source_recommendation_id": "rec-b", "source_cpg": "SYN-HTN-2026-002"},
+            ],
+            "activities": [
+                {"type": "medication", "description": "Start lisinopril 10 mg after confirmed BP.", "dose": "10 mg", "route": "oral", "frequency": "daily", "source_recommendation_id": "rec-a", "source_cpg": "SYN-HTN-2026-002"},
+                {"type": "medication", "description": "Start lisinopril 10 mg when BP and diabetes criteria are met.", "dose": "10 mg", "route": "oral", "frequency": "daily", "source_recommendation_id": "rec-b", "source_cpg": "SYN-HTN-2026-002"},
+                {"type": "lifestyle", "description": "DASH diet", "source_recommendation_id": "rec-c", "source_cpg": "SYN-HTN-2026-002"},
+            ],
+        }
+
+    @patch("acp_writer.nodes.plan_composer.resolve")
+    def test_same_cpg_rows_use_resolver_and_preserve_sources(self, resolver):
+        resolver.return_value = SimpleNamespace(
+            action="extract_medication", system="resolver-system", code="resolver-code"
+        )
+        brief = self._duplicate_regimen_brief()
+        _resolve_missing_medication_codes(brief)
+        assert resolver.call_count == 2
+        groups = _merge_same_cpg_medication_regimens(brief)
+        _merge_goals_for_merged_regimens(brief, groups)
+
+        meds = [a for a in brief["activities"] if a["type"] == "medication"]
+        assert len(meds) == 1
+        assert meds[0]["code"] == {"system": "resolver-system", "code": "resolver-code"}
+        assert meds[0]["source_recommendation_ids"] == ["rec-a", "rec-b"]
+        assert "either applicable same-CPG decision condition" in meds[0]["description"]
+        assert len(brief["goals"]) == 1
+        assert brief["goals"][0]["source_recommendation_ids"] == ["rec-a", "rec-b"]
+
+    @patch("acp_writer.nodes.plan_composer.resolve", return_value=None)
+    def test_unresolved_medication_code_is_left_absent(self, resolver):
+        brief = {"activities": [{"type": "medication", "description": "Unrecognized medicine"}]}
+        _resolve_missing_medication_codes(brief)
+        resolver.assert_called_once_with("Unrecognized medicine")
+        assert "code" not in brief["activities"][0]
+
+    def test_unknown_patient_pronouns_are_neutralized(self):
+        brief = {
+            "goals": [],
+            "activities": [{
+                "description": "Inform the patient and involve him in shared decisions.",
+                "clinical_rationale": "His preferences should guide the discussion.",
+                "workflow": {"escalation": "Ask him to contact the clinic."},
+            }],
+        }
+        _neutralize_unprovided_pronouns(brief, {})
+        activity = brief["activities"][0]
+        assert "involve the patient" in activity["description"]
+        assert "the patient's preferences" in activity["clinical_rationale"]
+        assert "Ask the patient" in activity["workflow"]["escalation"]
+
+    def test_explicit_patient_pronouns_are_preserved(self):
+        brief = {"goals": [], "activities": [{"description": "Involve him in decisions."}]}
+        _neutralize_unprovided_pronouns(brief, {"pronouns": "he/him"})
+        assert brief["activities"][0]["description"] == "Involve him in decisions."
+
+
 class TestPlanComposer:
     def _make_state(self) -> dict:
         return {
@@ -226,7 +292,58 @@ class TestPlanComposer:
 
         result = plan_composer(self._make_state())
         assert result["planning_brief"]["review_status"] == "flagged"
-        assert "parse error" in result["planning_brief"]["review_feedback"].lower()
+        assert "parse/normalization error" in result["planning_brief"]["review_feedback"].lower()
+
+    @patch("acp_writer.nodes.plan_composer.get_llm")
+    def test_malformed_activity_is_fed_back_to_composer_and_saved(self, mock_get_llm, tmp_path, caplog):
+        malformed = json.loads(SAMPLE_BRIEF_JSON)
+        malformed["activities"][0] = "this activity must be an object"
+        first = MagicMock(content=json.dumps(malformed))
+        second = MagicMock(content=SAMPLE_BRIEF_JSON)
+        mock_llm = MagicMock()
+        mock_llm.invoke.side_effect = [first, second]
+        mock_get_llm.return_value = mock_llm
+
+        state = self._make_state()
+        state.update({"output_dir": str(tmp_path), "run_id": "run-test"})
+        with caplog.at_level("ERROR"):
+            failed = plan_composer(state)
+        assert "str' object has no attribute 'get'" in failed["brief_review_feedback"]
+        assert "this activity must be an object" in failed["brief_review_feedback"]
+        assert failed["brief_parse_failed"] is True
+        assert failed["brief_review_count"] == 1
+        assert "Traceback" in caplog.text
+
+        state.update(failed)
+        repaired = plan_composer(state)
+        assert repaired["brief_parse_failed"] is False
+        assert "str' object has no attribute 'get'" in mock_llm.invoke.call_args_list[1].args[0][1]["content"]
+        retry_messages = mock_llm.invoke.call_args_list[1].args[0]
+        assert "Preserving conflicts between guidelines" in retry_messages[0]["content"]
+        assert "Revising an existing care plan" not in retry_messages[0]["content"]
+        assert "Care Plan Base" not in retry_messages[1]["content"]
+
+        artifact_dir = tmp_path / "acp-writer" / "run-test" / "plan-composer"
+        for round_number in (1, 2):
+            assert (artifact_dir / f"round-{round_number}.request.json").is_file()
+            assert (artifact_dir / f"round-{round_number}.response.json").is_file()
+
+    @patch("acp_writer.nodes.plan_composer.get_llm")
+    def test_saved_composer_response_redacts_credential_patterns(self, mock_get_llm, tmp_path):
+        malformed = json.loads(SAMPLE_BRIEF_JSON)
+        malformed["activities"][0] = "sk-test-sentinel-123456789012345"
+        mock_response = MagicMock(content=json.dumps(malformed))
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = mock_response
+        mock_get_llm.return_value = mock_llm
+
+        state = self._make_state()
+        state.update({"output_dir": str(tmp_path), "run_id": "run-redaction"})
+        plan_composer(state)
+
+        artifacts = tmp_path / "acp-writer" / "run-redaction" / "plan-composer"
+        for path in artifacts.glob("*.json"):
+            assert "sk-test-sentinel-123456789012345" not in path.read_text()
 
     @patch("acp_writer.nodes.plan_composer.get_llm")
     def test_includes_feedback_in_prompt(self, mock_get_llm):

@@ -10,9 +10,18 @@
 # Only exclude things no root-context build needs.
 **/node_modules
 **/dist
+**/.venv
+**/venv
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+working/
 .git
 .claude
 **/*.log
+**/mlflow.db
 **/.DS_Store
 dev_docs/
 docs/
+acp-writer/ui/public/smart-config.json

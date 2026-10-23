@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 import uuid
 from pathlib import Path
 
@@ -18,6 +19,13 @@ except Exception:
     pass
 
 
+def _configure_mlflow_experiment() -> None:
+    """Select the run-scoped experiment when the caller provides one."""
+    experiment_name = os.environ.get("MLFLOW_EXPERIMENT_NAME")
+    if experiment_name:
+        mlflow.set_experiment(experiment_name)
+
+
 @click.command()
 @click.argument("input_pdf", type=click.Path(exists=True, path_type=Path))
 @click.option("--output-dir", "-o", type=click.Path(path_type=Path), default=None)
@@ -31,6 +39,10 @@ def main(
 ):
     """Run the cpg-ingester pipeline on a CPG PDF."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+    # Slice runs use a fresh experiment so its traces are stored through the
+    # MLflow artifact proxy rather than the legacy local-path Default experiment.
+    _configure_mlflow_experiment()
 
     run_id = str(uuid.uuid4())[:8]
     if output_dir is None:
@@ -57,6 +69,19 @@ def main(
     click.echo(f"  LLM: {litellm_url} (model: {model})")
 
     result = compiled.invoke(initial_state, config=config)
+
+    write_artifact(str(output_dir), "analysis-result.json", {
+        "cpg_metadata": result.get("cpg_metadata", {}),
+        "section_map": result.get("section_map", []),
+        "item_manifest": result.get("item_manifest", []),
+    })
+    write_artifact(str(output_dir), "generation-result.json", {
+        "dmn_results": result.get("dmn_results", []),
+        "recommendation_results": result.get("recommendation_results", []),
+        "bpmn_results": result.get("bpmn_results", []),
+        "recommendation_escalations": result.get("recommendation_escalations", []),
+        "escalated_items": result.get("escalated_items", []),
+    })
 
     write_artifact(str(output_dir), "run-summary.json", {
         "run_id": run_id,

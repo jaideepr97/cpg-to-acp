@@ -196,9 +196,12 @@ mlruns/
 .DS_Store
 .medplum/
 .vite/
+# ONNX Runtime telemetry fallback artifact in restricted macOS environments
+:memory:.ses
 mock-EHR/deploy/.env
 
 # Deploy framework — secrets and rendered manifests
 deploy/config/*.env
 !deploy/config/*.env.template
 deploy/.rendered/
+/acp-writer/ui/public/smart-config.json

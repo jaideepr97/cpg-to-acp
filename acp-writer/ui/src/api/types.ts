@@ -245,6 +245,40 @@ export interface components {
             sourceCpg?: string;
             /** @description Why the activity was selected. */
             clinicalRationale?: string;
+            /** @description Pinned per-activity automation definitions and their plan-specific bindings. */
+            automations?: components["schemas"]["ActivityAutomationView"][];
+        };
+        ActivityAutomationView: {
+            /** Format: uuid */
+            id: string;
+            templateRefs: {
+                templateId: string;
+                version: string;
+                sourceCpg?: string;
+            }[];
+            /** @description Activities served by a shared/composed automation. */
+            activityIds?: string[];
+            enabled: boolean;
+            revision: string;
+            /** @description Compiled patient-free BPMN definition. */
+            bpmnXml: string;
+            capabilitiesUsed?: string[];
+            bindings: {
+                name: string;
+                value: unknown;
+                /** @enum {string} */
+                source: "cpg-default" | "clinician" | "plan-derived" | "reviewer" | "authored" | "policy";
+                unit?: string;
+                note?: string;
+            }[];
+            validation: {
+                /** @enum {string} */
+                status: "valid" | "incomplete" | "escalated";
+                rungsPassed: string[];
+                warnings?: string[];
+                errors?: string[];
+            };
+            reviewNotes?: string[];
         };
         /** @description A plan-level conflict flagged by the conflict_analyst node. Persisted plans reconstruct these from the conflict Provenance resources' extensions (never from note text); the live review view carries them on the brief. */
         PlanConflict: {
@@ -311,6 +345,12 @@ export interface components {
         CarePlanDetail: components["schemas"]["CarePlanSummary"] & {
             patient?: components["schemas"]["PatientSummary"];
             view?: components["schemas"]["CarePlanView"];
+            automationPublication?: components["schemas"]["AutomationPublicationView"];
+        };
+        /** @description Status-only automation publication view; contains no bundle or configuration values. */
+        AutomationPublicationView: {
+            /** @enum {string} */
+            status: "approving" | "pending" | "published" | "failed" | "withdrawn" | "unconfigured" | "not-applicable";
         };
         ReviewAction: {
             decision: components["schemas"]["ReviewDecision"];

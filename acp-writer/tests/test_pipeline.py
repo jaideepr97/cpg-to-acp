@@ -5,7 +5,9 @@ from unittest.mock import patch, MagicMock
 
 from langgraph.checkpoint.memory import MemorySaver
 
-from acp_writer.pipeline import build_pipeline
+from acp_writer.pipeline import _route_after_plan_composer
+
+from .pipeline_helpers import build_pipeline
 
 
 def _mock_llm_invoke(messages):
@@ -71,6 +73,7 @@ class TestPipelineStructure:
             "recommendation_retriever",
             "plan_composer",
             "brief_reviewer",
+            "automation_synthesizer",
             "conflict_analyst",
             "fhir_bundle_generator",
             "terminology_validator",
@@ -80,18 +83,30 @@ class TestPipelineStructure:
         }
         assert expected == node_names
 
-    def test_twelve_nodes(self):
+    def test_thirteen_nodes(self):
         graph = build_pipeline()
-        assert len(graph.nodes) == 12
+        assert len(graph.nodes) == 13
 
     def test_conflict_analyst_wiring(self):
-        """brief_reviewer → conflict_analyst → fhir_bundle_generator; the FHIR
+        """brief_reviewer → automation_synthesizer → conflict_analyst → fhir_bundle_generator; the FHIR
         loop must not pass back through the analyst."""
         graph = build_pipeline()
         edges = set(graph.edges)
+        assert ("automation_synthesizer", "conflict_analyst") in edges
         assert ("conflict_analyst", "fhir_bundle_generator") in edges
         # The FHIR review loop returns to the generator, never the analyst.
         assert ("fhir_semantic_reviewer", "conflict_analyst") not in edges
+
+    def test_malformed_brief_routes_to_composer_without_reviewer(self):
+        assert _route_after_plan_composer({
+            "brief_parse_failed": True,
+            "brief_review_count": 1,
+        }) == "plan_composer"
+        assert _route_after_plan_composer({
+            "brief_parse_failed": True,
+            "brief_review_count": 4,
+        }) == "__end__"
+        assert _route_after_plan_composer({"brief_parse_failed": False}) == "brief_reviewer"
 
 
 class TestPipelineExecution:
@@ -113,6 +128,7 @@ class TestPipelineExecution:
             "recommendation_retriever",
             "plan_composer",
             "brief_reviewer",
+            "automation_synthesizer",
             "fhir_bundle_generator",
             "terminology_validator",
             "fhir_syntax_validator",

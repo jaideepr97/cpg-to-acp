@@ -22,7 +22,19 @@ Before deploying, ensure:
 
 ## MaaS Setup
 
-MaaS (Model as a Service) provides governed LLM inference on OpenShift AI. The steps below are **platform-level setup outside the scope of this project** — they must be completed before deploying cpg-to-acp. Work with your cluster administrator or platform team as needed.
+MaaS (Model as a Service) provides governed LLM inference on OpenShift AI. The steps below describe the in-cluster MaaS option; use the EnMaaS alternative below when that gateway is unavailable. MaaS setup is **platform-level work outside the scope of this project** — work with your cluster administrator or platform team as needed.
+
+### EnMaaS alternative
+
+If the in-cluster MaaS controller or gateway is unavailable, deployments can use the OpenAI-compatible EnMaaS gateway instead. Skip the MaaS namespace-whitelist and `ExternalModel` setup below, and set the gateway origin, route segment, and model in `deploy/config/cluster.env`:
+
+```bash
+MAAS_GATEWAY_URL=https://api.enmaas.devshift.net
+MAAS_ROUTE_SEGMENT=
+LLM_MODEL_DEFAULT=<model-id-enabled-for-your-account>
+```
+
+Use the bare gateway origin without `/v1`; the LLM client adds `/v1` to its base URL. Put the EnMaaS API key in the existing `OPENAI_API_KEY` entry in `deploy/config/secrets.env`, then run `setup-secrets.sh` to update the `llm-credentials` Secret. The OpenShell policies allow the configured gateway hostname on HTTPS port 443. Confirm the gateway and selected model are reachable from a pod in the deployment namespace before deploying. Keep the key in the Secret; do not put it in `cluster.env`, a command line, or the evidence log.
 
 ### 1. Whitelist your namespace for MaaS inference
 
@@ -173,8 +185,8 @@ Non-secret configuration. Template checked in; actual file gitignored.
 |---|---|---|
 | `NAMESPACE` | OpenShift project (max 35 chars) | `sschifma-cpg-to-acp` |
 | `CLUSTER_DOMAIN` | Cluster domain for Route hostnames | `apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com` |
-| `MAAS_GATEWAY_URL` | MaaS gateway base URL (bare origin, no `/v1`) | `http://maas-default-gateway-...:80` |
-| `MAAS_ROUTE_SEGMENT` | Model path segment on the gateway | `gpt-5-6` |
+| `MAAS_GATEWAY_URL` | LLM gateway base URL (bare origin, no `/v1`) | `http://maas-default-gateway-...:80` or `https://api.enmaas.devshift.net` |
+| `MAAS_ROUTE_SEGMENT` | Optional model path segment (leave empty for EnMaaS) | `gpt-5-6` |
 | `LLM_MODEL_DEFAULT` | Model parameter in API payloads | `gpt-5.6-terra` |
 | `ACP_WRITER_LLM_MODEL` | Override model for acp-writer (optional) | |
 | `CPG_INGESTER_LLM_MODEL` | Override model for cpg-ingester (optional) | |
@@ -436,6 +448,10 @@ This loads the guideline metadata, recommendations (into the vector store), and 
 The supplied CPG id is sent as the DMN models' `source_cpg`. If a model id is already owned by a different CPG, the decision engine rejects the upload with HTTP 409 unless `--replace` is supplied. The loader stops on any non-2xx response and reports the number of DMN models that were successfully loaded.
 
 Run the cluster-free loader tests with `bash deploy/tests/test-load-published-artifacts.sh`.
+
+### Automation templates
+
+Loader step 4 registers published automation templates with the acp-writer decision engine. Template rejections are warnings and are counted in the loader summary; they do not turn optional template registration into a deployment failure. The automation service is not deployed on the cluster in this release, so cluster care-plan automation publications are `unconfigured` and remain stored with the CarePlan rather than being sent to a runtime.
 
 ## SonataFlow Workflow Configuration
 

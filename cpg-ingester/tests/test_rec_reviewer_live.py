@@ -12,6 +12,7 @@ Requires: LiteLLM running in podman on port 4000.
 """
 
 import json
+import os
 import re
 import tempfile
 from pathlib import Path
@@ -25,7 +26,7 @@ PARSED_MD = ARTIFACTS_DIR / "parsed.md"
 
 LITELLM_URL = "http://localhost:4000"
 LLM_MODEL = "default"
-LLM_API_KEY = "sk-change-me"
+LLM_API_KEY = os.environ.get("LITELLM_API_KEY", "sk-change-me")
 
 SECTIONS_WITH_RECS = ["3.1", "3.2", "3.4", "5.1", "5.2", "5.3"]
 

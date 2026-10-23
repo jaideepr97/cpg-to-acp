@@ -8,9 +8,12 @@ import hashlib
 from datetime import datetime
 from enum import Enum
 from typing import Any
+from uuid import uuid4
 
 import mlflow
 from pydantic import BaseModel, Field, model_validator
+
+from cpg_contracts.automation.instances import ActivityAutomation
 
 
 class FHIRCode(BaseModel):
@@ -78,6 +81,7 @@ class PlanGoal(BaseModel):
     target_measure_code: FHIRCode | None = None
     target_value: TargetValue | None = None
     source_recommendation_id: str | None = None
+    source_recommendation_ids: list[str] = Field(default_factory=list)
     source_cpg: str
 
 
@@ -86,6 +90,8 @@ class PlanActivity(BaseModel):
 
     type: ActivityType
     description: str
+    id: str = Field(default_factory=lambda: uuid4().hex)
+    automations: list[ActivityAutomation] = Field(default_factory=list)
 
     code: FHIRCode | None = None
     dose: str | None = None
@@ -94,6 +100,7 @@ class PlanActivity(BaseModel):
     specialty: str | None = None
 
     source_recommendation_id: str | None = None
+    source_recommendation_ids: list[str] = Field(default_factory=list)
     source_cpg: str
     source_dmn_call: int | None = Field(
         default=None,
@@ -520,3 +527,43 @@ class PlanningBrief(BaseModel):
             data = dict(data)
             data["conflicts"] = coerce_conflicts(data["conflicts"])
         return data
+
+
+@mlflow.trace(name="stamp_activity_ids")
+def stamp_activity_ids(
+    brief: PlanningBrief,
+    prior_brief: PlanningBrief | dict | None = None,
+) -> PlanningBrief:
+    """Keep activity ids stable across revisions, assigning ids to new items."""
+    if prior_brief is None:
+        return brief
+    previous = (
+        prior_brief.activities
+        if isinstance(prior_brief, PlanningBrief)
+        else prior_brief.get("activities", [])
+    )
+    prior_ids: dict[tuple[str, str | None, str], list[str]] = {}
+    for item in previous:
+        if isinstance(item, PlanActivity):
+            activity_type = item.type.value
+            recommendation_id = item.source_recommendation_id
+            description = item.description
+            activity_id = item.id
+        elif isinstance(item, dict):
+            activity_type = item.get("type", "")
+            activity_type = activity_type.value if isinstance(activity_type, Enum) else activity_type
+            recommendation_id = item.get("source_recommendation_id")
+            description = item.get("description", "")
+            activity_id = item.get("id")
+        else:
+            continue
+        if activity_id:
+            key = (str(activity_type), recommendation_id, description)
+            prior_ids.setdefault(key, []).append(activity_id)
+
+    for activity in brief.activities:
+        key = (activity.type.value, activity.source_recommendation_id, activity.description)
+        matches = prior_ids.get(key)
+        if matches:
+            activity.id = matches.pop(0)
+    return brief

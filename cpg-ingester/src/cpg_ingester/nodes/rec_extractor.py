@@ -8,6 +8,7 @@ import mlflow
 from cpg_contracts import content_to_text, get_llm
 from cpg_ingester.nodes.structure_analyzer import _parse_llm_json
 from cpg_ingester.output import write_artifact
+from cpg_ingester.review_feedback import render_reviewer_feedback
 from cpg_ingester.prompts.rec_extractor import (
     REC_EXTRACTOR_SYSTEM,
     REC_EXTRACTOR_USER,
@@ -34,11 +35,25 @@ def rec_extractor(state: dict) -> dict:
     item_specs = json.dumps(items, indent=2, default=str)
     abbr_str = "\n".join(f"- {k}: {v}" for k, v in abbreviations.items()) if abbreviations else "(none)"
 
-    feedback = ""
+    feedback_sections = []
     if schema_errors:
-        feedback = "PREVIOUS ATTEMPT HAD SCHEMA ERRORS — fix these:\n" + "\n".join(f"- {e}" for e in schema_errors)
-    elif semantic_discrepancies:
-        feedback = "PREVIOUS ATTEMPT HAD SEMANTIC ISSUES — fix these:\n" + "\n".join(f"- {d}" for d in semantic_discrepancies)
+        feedback_sections.append(
+            "PREVIOUS ATTEMPT HAD SCHEMA ERRORS — fix these:\n"
+            + "\n".join(f"- {e}" for e in schema_errors)
+        )
+    if semantic_discrepancies:
+        feedback_sections.append(
+            "PREVIOUS ATTEMPT HAD SEMANTIC ISSUES — fix these:\n"
+            + "\n".join(f"- {d}" for d in semantic_discrepancies)
+        )
+    human_feedback = state.get("human_feedback", "") or render_reviewer_feedback(
+        state.get("review_feedback"),
+        state.get("review_comment", ""),
+        state.get("review_iteration", 0),
+    )
+    if human_feedback:
+        feedback_sections.append(human_feedback)
+    feedback = "\n\n".join(feedback_sections)
 
     llm = get_llm(state)
 

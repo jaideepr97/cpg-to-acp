@@ -8,12 +8,15 @@ mock data when available.
 
 import logging
 import os
+import math
+import re
 from uuid import uuid4
 
 from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
+from cpg_contracts.artifact_paths import validated_run_artifact_key
 from cpg_contracts.artifact_store import ArtifactStore
 
 from cpg_ingester.services.artifact_resolver import enrich_run_detail
@@ -57,8 +60,18 @@ def notify_review(payload: dict | None = None):
 
     No-op acknowledgment — the UI discovers review state by polling.
     """
-    logger.info("Review notification: %s", payload)
-    return {"status": "acknowledged"}
+    notification = payload if isinstance(payload, dict) else {}
+    counts = notification.get("automation_counts")
+    if not isinstance(counts, dict):
+        counts = None
+    logger.info(
+        "Review notification: type=%s automation_counts=%s",
+        notification.get("review_type"), counts,
+    )
+    result = {"status": "acknowledged"}
+    if counts is not None:
+        result["automation_counts"] = counts
+    return result
 
 
 @app.get("/health")
@@ -71,9 +84,116 @@ def health():
     }
 
 
+_L7_ESCALATION_REASONS = {
+    "semantic-budget-exhausted",
+    "no-source-text",
+    "reviewer-unparseable",
+}
+
+
+def _validate_parameter_value(parameter: dict, value) -> str | None:
+    """Validate a pre-delivery default against its declared parameter contract."""
+    name = str(parameter.get("name", "parameter"))
+    value_type = parameter.get("type")
+    if value is None or value == "":
+        if parameter.get("required"):
+            return f"Parameter {name!r} requires a value."
+        return None
+    if value_type == "boolean" and not isinstance(value, bool):
+        return f"Parameter {name!r} requires a boolean value."
+    if value_type == "integer" and (
+        isinstance(value, bool) or not isinstance(value, int)
+    ):
+        return f"Parameter {name!r} requires an integer value."
+    if value_type in {"decimal", "quantity"} and (
+        isinstance(value, bool) or not isinstance(value, (int, float))
+        or not math.isfinite(value)
+    ):
+        return f"Parameter {name!r} requires a finite numeric value."
+    if value_type in {"string", "duration"} and not isinstance(value, str):
+        return f"Parameter {name!r} requires a string value."
+    if value_type == "duration" and not re.fullmatch(r"P(?=.*\d)[0-9YMWDTHS.]+", value):
+        return f"Parameter {name!r} requires an ISO 8601 duration."
+
+    constraints = parameter.get("constraints") or {}
+    allowed = constraints.get("enum")
+    if allowed and value not in allowed:
+        return f"Parameter {name!r} must be one of the declared enum values."
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        minimum = constraints.get("min")
+        maximum = constraints.get("max")
+        if minimum is not None and value < minimum:
+            return f"Parameter {name!r} is below its minimum constraint."
+        if maximum is not None and value > maximum:
+            return f"Parameter {name!r} exceeds its maximum constraint."
+    pattern = constraints.get("pattern")
+    if pattern and isinstance(value, str):
+        try:
+            if not re.fullmatch(pattern, value):
+                return f"Parameter {name!r} does not match its declared format."
+        except re.error:
+            return f"Parameter {name!r} has an invalid format constraint."
+    return None
+
+
+def validate_review_payload(run_detail: dict, gate: str, review: dict) -> str | None:
+    """Return a client-safe validation message for structured review edits."""
+    edits = review.get("parameterEdits") or []
+    acknowledgements = review.get("acknowledgements") or []
+    if (edits or acknowledgements) and gate != "pre-delivery":
+        return "Parameter edits and acknowledgements are only accepted at pre-delivery review."
+    automations = run_detail.get("automations") or []
+    # Key automations by the summary id and by the manifest item's template id:
+    # an escalated template may carry no summary, but its item always has one.
+    by_template_id: dict[str, dict] = {}
+    for automation in automations:
+        if not isinstance(automation, dict):
+            continue
+        for key in (
+            (automation.get("template_summary") or {}).get("id"),
+            (automation.get("item") or {}).get("template_id"),
+        ):
+            if key:
+                by_template_id.setdefault(str(key), automation)
+
+    for edit in edits:
+        if not isinstance(edit, dict):
+            return "Each parameter edit must be an object."
+        template_id = str(edit.get("templateId", ""))
+        automation = by_template_id.get(template_id)
+        if automation is None:
+            return f"Unknown automation template {template_id!r}."
+        process = (automation.get("process_ir") or {}).get("process") or {}
+        parameters = (process.get("acp") or {}).get("parameters") or (
+            automation.get("template_summary") or {}
+        ).get("parameters") or []
+        parameter_name = str(edit.get("parameter", ""))
+        parameter = next((item for item in parameters if item.get("name") == parameter_name), None)
+        if parameter is None:
+            return f"Unknown parameter {parameter_name!r} on template {template_id!r}."
+        error = _validate_parameter_value(parameter, edit.get("value"))
+        if error:
+            return error
+        if "unit" in edit and edit.get("unit") != parameter.get("unit"):
+            return f"Parameter {parameter_name!r} uses its declared unit and cannot be changed."
+
+    for acknowledgement in acknowledgements:
+        if not isinstance(acknowledgement, dict):
+            return "Each acknowledgement must be an object."
+        template_id = str(acknowledgement.get("templateId", ""))
+        automation = by_template_id.get(template_id)
+        if automation is None:
+            return f"Unknown automation template {template_id!r}."
+        if automation.get("escalation_reason") not in _L7_ESCALATION_REASONS:
+            return f"Template {template_id!r} is not escalated at the semantic review rung."
+        if not str(acknowledgement.get("note", "")).strip():
+            return f"Acknowledgement for template {template_id!r} requires a note."
+    return None
+
+
 # ---------------------------------------------------------------------------
-# MinIO-backed endpoints (upload, artifacts) — registered first so they
-# take priority over mock router paths when MinIO is configured
+# MinIO-backed endpoints are registered first so they take priority over
+# mock router paths when configured.
 # ---------------------------------------------------------------------------
 
 if _artifact_store:
@@ -97,14 +217,21 @@ if _artifact_store:
 
         return {"runId": run_id}
 
-    @app.get("/api/v1/runs/{run_id}/artifacts/{path:path}")
-    def get_artifact(run_id: str, path: str):
-        key = f"{run_id}/{path}"
-        try:
-            data = _artifact_store.get_raw(key)
-        except Exception:
-            return JSONResponse(status_code=404, content={"error": f"Artifact not found: {key}"})
-        return Response(content=data, media_type="application/octet-stream")
+
+@app.get("/api/v1/runs/{run_id}/artifacts/{path:path}")
+def get_artifact(run_id: str, path: str):
+    try:
+        key = validated_run_artifact_key(run_id, path)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"error": "Invalid artifact path"})
+    store = _artifact_store
+    if not store:
+        return JSONResponse(status_code=503, content={"error": "No artifact store configured"})
+    try:
+        data = store.get_raw_in_bucket("cpg-uploads", key)
+    except Exception:
+        return JSONResponse(status_code=404, content={"error": f"Artifact not found: {key}"})
+    return Response(content=data, media_type="application/octet-stream")
 
 
 # ---------------------------------------------------------------------------
@@ -147,6 +274,16 @@ if not _mock_mode:
         if gate not in ("manifest", "pre-delivery"):
             return JSONResponse(status_code=400, content={"error": f"Unknown gate: {gate}"})
         review = await request.json()
+        review = review if isinstance(review, dict) else {}
+        if review.get("parameterEdits") or review.get("acknowledgements"):
+            try:
+                instance = _sonataflow.get_instance(run_id)
+            except Exception:
+                return JSONResponse(status_code=404, content={"error": f"Run {run_id} not found"})
+            detail = enrich_run_detail(map_to_run_detail(instance), _artifact_store)
+            error = validate_review_payload(detail, gate, review)
+            if error:
+                return JSONResponse(status_code=400, content={"error": error})
         _sonataflow.send_review(run_id, gate, review or {})
         return {"status": "accepted"}
 

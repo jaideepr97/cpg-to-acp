@@ -21,6 +21,17 @@ from cpg_contracts import (
     RecommendationBundle,
     RecommendationSearchRequest,
 )
+from cpg_contracts.decisions import normalize_decision_model_summary
+from cpg_contracts.automation.catalog import load_catalog
+from cpg_contracts.automation.ir import ProcessIR
+from cpg_contracts.automation.instances import Evidence, ParameterBinding
+from cpg_contracts.automation.validators.grounding import InstanceContext
+from cpg_contracts.automation.validators.ladder import run_static_ladder
+from cpg_contracts.automation.compiler import (
+    ParseError,
+    compile as compile_bpmn,
+    parse as parse_bpmn,
+)
 
 from acp_writer.store.embedding import (
     EmbeddingProvider,
@@ -29,6 +40,7 @@ from acp_writer.store.embedding import (
 from acp_writer.store.guidelines_store import GuidelinesStore
 from acp_writer.store.vector_store import InMemoryVectorStore, VectorStore
 from acp_writer.tools.dmn_evaluation import DmnEngineError
+from acp_writer.services.automation_registry import AutomationRegistry, router as automation_registry_router
 
 try:
     mlflow.fastapi.autolog()
@@ -43,6 +55,7 @@ KOGITO_URL = os.environ.get("KOGITO_URL", "http://localhost:8081")
 # across DMN language versions (1.3, 1.4, …) without pinning a MODEL namespace.
 
 _dynamic_models: dict[str, dict] = {}
+_automation_registry = AutomationRegistry()
 
 # --- Store initialization ---
 # The provider is chosen by the EMBEDDING_PROVIDER env switch
@@ -80,6 +93,9 @@ async def startup():
         datefmt="%H:%M:%S",
         force=True,
     )
+    from acp_writer.services.automation_publisher import get_publisher
+
+    get_publisher().reconcile_on_start()
 
 
 def _check_kogito() -> bool:
@@ -207,6 +223,7 @@ def _parse_dmn_metadata(dmn_xml: str) -> DecisionModelSummary:
         name=model_name,
         inputs=inputs,
         outputs=outputs,
+        namespace=root.get("namespace"),
         deployed_at=datetime.now(timezone.utc),
     )
 
@@ -271,6 +288,183 @@ def _validate_dmn_with_engine(dmn_xml: str) -> dict | None:
     return result
 
 
+@mlflow.trace(span_type="TOOL", name="validate_bpmn_with_engine")
+def validate_bpmn(bpmn_xml: str) -> dict | None:
+    """Validate BPMN with Kogito, returning None when the engine is unavailable."""
+    bpmn_b64 = base64.b64encode(bpmn_xml.encode()).decode()
+    try:
+        response = requests.post(
+            f"{KOGITO_URL}/jit/bpmn/validate",
+            json={"bpmn_xml_base64": bpmn_b64},
+            timeout=30,
+        )
+    except (requests.ConnectionError, requests.Timeout) as exc:
+        logger.warning("BPMN engine validation unavailable: %s", exc)
+        return None
+    except requests.RequestException as exc:
+        logger.error("BPMN engine validation request failed: %s", exc)
+        return {"valid": False, "messages": [{
+            "severity": "ERROR",
+            "text": f"decision engine validation request failed: {exc}",
+        }]}
+    if response.status_code >= 400:
+        body = getattr(response, "text", "")[:500]
+        return {"valid": False, "messages": [{
+            "severity": "ERROR",
+            "text": f"decision engine validation returned HTTP {response.status_code}: {body}",
+        }]}
+    try:
+        result = response.json()
+    except ValueError:
+        result = None
+    if not isinstance(result, dict) or "valid" not in result:
+        body = getattr(response, "text", "")[:500]
+        return {"valid": False, "messages": [{
+            "severity": "ERROR",
+            "text": f"decision engine returned invalid validation JSON: {body}",
+        }]}
+    return result
+
+
+def _automation_dmn_namespaces() -> dict[str, str]:
+    namespaces: dict[str, str] = {}
+    for model_id, model in _dynamic_models.items():
+        summary = normalize_decision_model_summary(model["summary"])
+        if summary.namespace is not None:
+            namespaces[model_id] = summary.namespace
+    return namespaces
+
+
+def _automation_dmn_summaries() -> dict[str, DecisionModelSummary]:
+    return {
+        model_id: normalize_decision_model_summary(model["summary"])
+        for model_id, model in _dynamic_models.items()
+    }
+
+
+@mlflow.trace(name="automation.validate")
+def _automation_validation_result(payload: dict) -> dict:
+    """Run local ladder checks and Kogito for an IR or BPMN request."""
+    if ("ir" in payload) == ("bpmn_xml" in payload):
+        raise HTTPException(status_code=400, detail="provide exactly one of 'ir' or 'bpmn_xml'")
+    try:
+        if "bpmn_xml" in payload:
+            xml = payload["bpmn_xml"]
+            if not isinstance(xml, str):
+                raise ValueError("bpmn_xml must be a string")
+            process_ir = parse_bpmn(xml)
+        else:
+            process_ir = ProcessIR.model_validate(payload["ir"])
+            xml = None
+    except (ParseError, ValueError, TypeError) as exc:
+        return {"valid": False, "rungs_passed": [], "findings": [], "errors": [str(exc)]}
+
+    supplied_namespaces = payload.get("dmn_namespaces", {})
+    if not isinstance(supplied_namespaces, dict) or any(
+        not isinstance(model_id, str) or not isinstance(namespace, str)
+        for model_id, namespace in supplied_namespaces.items()
+    ):
+        return {"valid": False, "rungs_passed": [], "findings": [], "errors": [
+            "dmn_namespaces must map model ids to namespace strings"
+        ]}
+    dmn_namespaces = _automation_dmn_namespaces()
+    dmn_namespaces.update(supplied_namespaces)
+
+    supplied_summaries = payload.get("dmn_summaries", {})
+    if not isinstance(supplied_summaries, dict) or any(
+        not isinstance(model_id, str) for model_id in supplied_summaries
+    ):
+        return {"valid": False, "rungs_passed": [], "findings": [], "errors": [
+            "dmn_summaries must map model ids to decision model summaries"
+        ]}
+    try:
+        normalized_supplied_summaries = {
+            model_id: normalize_decision_model_summary(summary)
+            for model_id, summary in supplied_summaries.items()
+        }
+    except (TypeError, ValueError) as exc:
+        return {"valid": False, "rungs_passed": [], "findings": [], "errors": [
+            f"invalid dmn_summaries: {exc}"
+        ]}
+    if any(
+        model_id != summary.id
+        for model_id, summary in normalized_supplied_summaries.items()
+    ):
+        return {"valid": False, "rungs_passed": [], "findings": [], "errors": [
+            "dmn_summaries keys must match each summary's model id"
+        ]}
+    dmn_summaries = _automation_dmn_summaries()
+    dmn_summaries.update(normalized_supplied_summaries)
+    for model_id, summary in normalized_supplied_summaries.items():
+        if summary.namespace is not None:
+            dmn_namespaces[model_id] = summary.namespace
+
+    validation_xml = xml
+    if validation_xml is None:
+        try:
+            validation_xml = compile_bpmn(process_ir, dmn_namespaces=dmn_namespaces)
+        except (KeyError, TypeError, ValueError) as exc:
+            return {
+                "valid": False,
+                "rungs_passed": [],
+                "findings": [],
+                "errors": [str(exc)],
+            }
+
+    stage = "template" if process_ir.process.kind == "template" else "instance"
+    templates = [ProcessIR.model_validate(item) for item in payload.get("templates", [])]
+    context_data = payload.get("context", {})
+    context = None
+    if stage == "instance":
+        context = InstanceContext(
+            bindings=[
+                ParameterBinding.model_validate(item)
+                for item in context_data.get("bindings", [])
+            ],
+            evidence={
+                key: Evidence.model_validate(item)
+                for key, item in context_data.get("evidence", {}).items()
+            },
+            dmn_audit_trail=context_data.get("dmn_audit_trail", []),
+            careplan_feedback=context_data.get("careplan_feedback", ""),
+        )
+    result = run_static_ladder(
+        xml if xml is not None else process_ir,
+        catalog=load_catalog(),
+        stage=stage,
+        templates=templates if stage == "instance" else None,
+        context=context,
+        dmn_summaries=dmn_summaries,
+        dmn_namespaces=dmn_namespaces,
+        phi_known_values=payload.get("phi_known_values", ()),
+    )
+    if not result.ok:
+        return {
+            "valid": False,
+            "bpmn_xml": validation_xml,
+            "rungs_passed": result.rungs_passed,
+            "findings": [finding.__dict__ for finding in result.findings],
+            "deferred": result.deferred,
+        }
+    engine = validate_bpmn(validation_xml)
+    if engine is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "message": "Decision engine BPMN validation unavailable",
+                "bpmn_xml": validation_xml,
+            },
+        )
+    return {
+        "valid": bool(engine.get("valid")),
+        "bpmn_xml": validation_xml,
+        "rungs_passed": [*result.rungs_passed, "L6"] if engine.get("valid") else result.rungs_passed,
+        "findings": [finding.__dict__ for finding in result.findings],
+        "messages": engine.get("messages", []),
+        "deferred": result.deferred,
+    }
+
+
 def _validation_failure_response(validation: dict) -> JSONResponse:
     messages = validation.get("messages", [])
     return JSONResponse(
@@ -328,13 +522,25 @@ async def generate_careplan(request: Request):
     import uuid
 
     from acp_writer.checkpointer import get_checkpointer
-    from acp_writer.pipeline import build_pipeline
+    from acp_writer.pipeline import MAX_BRIEF_REVIEWS, build_pipeline
 
     litellm_url = os.environ.get("LITELLM_URL", "http://localhost:4000")
     llm_model = os.environ.get("LLM_MODEL", "default")
 
     run_id = str(uuid.uuid4())
-    graph = build_pipeline()
+    careplan_id = uuid.uuid4().hex
+    output_root = os.environ.get("ACP_RUN_ARTIFACT_DIR", "")
+    output_dir = os.path.join(output_root, careplan_id) if output_root else ""
+    graph = build_pipeline(
+        automation_registry=_automation_registry,
+        automation_validator=_automation_validation_result,
+        guidelines_store=_guidelines_store,
+        vector_store=_vector_store,
+        decision_models_provider=lambda: [
+            entry["summary"].model_dump(mode="json")
+            for entry in _dynamic_models.values()
+        ],
+    )
     checkpointer = get_checkpointer()
     compiled = graph.compile(checkpointer=checkpointer)
 
@@ -343,6 +549,9 @@ async def generate_careplan(request: Request):
             {
                 "ips_bundle": bundle,
                 "run_id": run_id,
+                "careplan_id": careplan_id,
+                "output_dir": output_dir,
+                "approved": False,
                 "litellm_url": litellm_url,
                 "llm_model": llm_model,
             },
@@ -350,6 +559,18 @@ async def generate_careplan(request: Request):
         )
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Care plan generation failed: {e}")
+
+    brief = result.get("planning_brief") or {}
+    if (
+        result.get("brief_review_count", 0) >= MAX_BRIEF_REVIEWS
+        and not brief.get("goals")
+        and not brief.get("activities")
+    ):
+        feedback = result.get("brief_review_feedback") or brief.get("review_feedback")
+        raise HTTPException(
+            status_code=422,
+            detail=feedback or "Care plan generation exhausted its brief review budget without a usable brief.",
+        )
 
     fhir_bundle = result.get("fhir_bundle", {})
     return Response(
@@ -396,6 +617,29 @@ async def update_careplan_status(careplan_id: str, request: Request):
         raise HTTPException(status_code=400, detail=f"Invalid status: {new_status}. Use 'active' or 'entered-in-error'.")
 
 
+@app.post("/api/v1/careplans/{careplan_id}/automations/publish")
+def retry_automation_publication(careplan_id: str):
+    from acp_writer.services.automation_publisher import (
+        get_publisher,
+        publication_status_view,
+    )
+    result = get_publisher().retry(careplan_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="No publication job found")
+    return publication_status_view(result)
+
+
+# --- Decision Models ---
+
+
+app.state.automation_registry = _automation_registry
+app.state.bpmn_validator = validate_bpmn
+app.state.dmn_namespaces = _automation_dmn_namespaces
+app.state.dmn_summaries = _automation_dmn_summaries
+app.state.automation_validation_result = _automation_validation_result
+app.include_router(automation_registry_router)
+
+
 # --- Decision Models ---
 
 
@@ -411,7 +655,7 @@ async def deploy_decision_model(
     dmn_xml = body.decode("utf-8")
 
     try:
-        summary = _parse_dmn_metadata(dmn_xml)
+        summary = normalize_decision_model_summary(_parse_dmn_metadata(dmn_xml))
     except ET.ParseError as e:
         raise HTTPException(status_code=400, detail=f"Invalid DMN XML: {e}")
 

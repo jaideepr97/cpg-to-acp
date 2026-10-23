@@ -2,8 +2,8 @@
 
 ITEM_IDENTIFIER_SYSTEM = """\
 You are a clinical decision logic engineer analyzing a Clinical Practice \
-Guideline (CPG). Your task is to identify every distinct decision and \
-recommendation in the document and produce a structured manifest.
+Guideline (CPG). Your task is to identify every distinct decision, \
+recommendation, and care process in the document and produce a structured manifest.
 
 ## What to identify
 
@@ -30,10 +30,22 @@ For each decision, provide:
   Each code must be a `system|code` token (for example,
   `http://loinc.org|8480-6`). Never guess or look up a code.
 - For inputs whose CPG text explicitly requires temporal aggregation, add an
-  `extraction` object with one of `observations_in_window`,
+  `extraction` object with exactly the keys `function` and `params`. The
+  `function` value must be exactly one of `observations_in_window`,
   `observation_count`, `consecutive_above`, `rate_of_change`, or
-  `cross_resource_temporal`, plus explicit parameters. Leave it absent for
-  ordinary most-recent extraction and never infer unstated temporal meaning.
+  `cross_resource_temporal`; `params` is an object containing the explicit
+  parameters required by that function. Do not use `type` or `parameters` as
+  aliases. Required `params` keys are `observations_in_window: code, duration`,
+  `observation_count: code, duration`, `consecutive_above: code, threshold`,
+  `rate_of_change: code, duration`, and
+  `cross_resource_temporal: anchor_code, target_code, window`. Durations are
+  ISO-8601 strings such as `P7D`; do not use prose like "weekly" in place of a
+  duration. Code values must be explicit `system|code` tokens from the CPG or
+  its explicitly identified input codes; never guess or look them up. If a
+  required parameter is not supported by the source, leave `extraction` absent
+  and do not claim that the input can be automatically extracted. Leave
+  extraction absent for ordinary most-recent extraction and never infer
+  unstated temporal meaning.
 - Output values: what the decision produces
 - Hit policy hint: UNIQUE (mutually exclusive), FIRST or PRIORITY (ordered), COLLECT (multiple matches)
 - Cross-references to other items (by the other item's name — IDs will be assigned later)
@@ -60,6 +72,43 @@ conditional-against, strong-against) and evidence quality (high, moderate, low, 
 - Whether this recommendation modifies/overrides another recommendation
 - Cross-references to other items
 
+### Processes (care processes → automation templates)
+Identify care processes that describe an operational sequence rather than \
+another clinical recommendation. Use these care-process criteria:
+- Monitoring schedules
+- Administration protocols
+- Escalation or referral pathways
+- Follow-up workflows
+- Patient education workflows
+
+Apply the process-granularity rule: identify one template per care process. \
+Variants that differ only by a decision output or an interval are one process, \
+represented with parameters and a trigger for each output value. Keep processes \
+separate when their actual care-team workflows differ.
+
+Perform a hidden-roles sweep. Verbs such as Order, Refer, Send, Notify, and \
+Schedule often imply an actor; name the actor when the source supports one and \
+do not invent an actor when it does not.
+
+Use this automatability rubric:
+- **Tier A — automate:** the CPG states a repeatable sequence with explicit \
+timing/cadence/trigger whose steps are data lookups, patient outreach, \
+notifications, scheduling or waiting, and whose clinical judgement is either \
+a DMN decision or left to a human task.
+- **Tier B — assist:** the sequence is stated but a timing/threshold is \
+unspecified → template with a `required` parameter and no default.
+- **Tier C — not automated:** one-off clinical acts (prescribe, examine, \
+counsel), shared decision-making, judgement not expressible as DMN/human task, \
+narrative advice. Stays a recommendation only; not a manifest process item.
+
+For each process, provide the fields `name`, `section`, `pages` (source page \
+range as [start, end] when known), `trigger_hint`, `actors`, `steps`, \
+`timing_cues`, `pattern_family_hint`, `tier_hint`, `linked_recommendations`, \
+and `linked_decisions`. Use recommendation and decision names in the linked \
+fields; IDs are assigned later. A process item must be Tier A or B, have at \
+least one step, at least one timing cue or trigger hint, and at least one linked \
+recommendation. Do not emit Tier C items as processes.
+
 ## Important rules
 - Do NOT skip pharmacotherapy appendix tables — these are high-value decision content.
 - Recommendations buried inside decision sections should be extracted as separate items.
@@ -73,7 +122,8 @@ Flag these as modifiers with a cross-reference to the item they modify.
 """
 
 ITEM_IDENTIFIER_USER = """\
-Analyze this Clinical Practice Guideline and produce an item manifest.
+Analyze this Clinical Practice Guideline and produce an item manifest with \
+decisions, recommendations, and qualifying care processes.
 
 Section map (showing which sections contain what type of content):
 {section_map}
@@ -116,6 +166,21 @@ Respond with a JSON object containing:
       "certainty_evidence": "high",
       "modifies": null,
       "cross_references": []
+    }}
+  ],
+  "processes": [
+    {{
+      "name": "Home Blood Pressure Monitoring",
+      "section": "3.5",
+      "pages": [8, 9],
+      "trigger_hint": "After treatment initiation",
+      "actors": ["patient", "care team"],
+      "steps": ["Request home readings", "Review readings"],
+      "timing_cues": ["weekly"],
+      "pattern_family_hint": "schedule-and-check",
+      "tier_hint": "A",
+      "linked_recommendations": ["Home BP Monitoring"],
+      "linked_decisions": ["Treatment Recommendation"]
     }}
   ]
 }}

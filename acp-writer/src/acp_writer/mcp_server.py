@@ -12,8 +12,11 @@ from cpg_contracts import (
     RecommendationBundle,
     RecommendationSearchRequest,
 )
+from cpg_contracts.decisions import normalize_decision_model_summary
 
 from acp_writer.api import (
+    _automation_registry,
+    _automation_validation_result,
     _dynamic_models,
     _evaluate_jit,
     _guidelines_store,
@@ -30,7 +33,7 @@ KOGITO_URL = os.environ.get("KOGITO_URL", "http://localhost:8081")
 @mlflow.trace(name="mcp_deploy_decision_model")
 def deploy_decision_model(dmn_xml: str) -> str:
     """Deploy a DMN decision model to the care plan writer's internal decision engine."""
-    summary = _parse_dmn_metadata(dmn_xml)
+    summary = normalize_decision_model_summary(_parse_dmn_metadata(dmn_xml))
     _dynamic_models[summary.id] = {"summary": summary, "dmn_xml": dmn_xml}
     return json.dumps(summary.model_dump(mode="json"))
 
@@ -63,7 +66,18 @@ def generate_careplan(ips_bundle: dict) -> str:
     """
     from acp_writer.pipeline import build_pipeline
 
-    graph = build_pipeline()
+    from acp_writer import api
+
+    graph = build_pipeline(
+        automation_registry=_automation_registry,
+        automation_validator=_automation_validation_result,
+        guidelines_store=_guidelines_store,
+        vector_store=_vector_store,
+        decision_models_provider=lambda: [
+            entry["summary"].model_dump(mode="json")
+            for entry in api._dynamic_models.values()
+        ],
+    )
     compiled = graph.compile()
 
     result = compiled.invoke({

@@ -2,7 +2,7 @@
 
 Two async endpoints:
   /api/v1/analyze-async  — classify sections, build manifest, extract metadata
-  /api/v1/generate-async — generate DMN decision tables and recommendations
+  /api/v1/generate-async — generate DMN, recommendations, and BPMN templates
 
 Split so human review gates can approve the manifest before spending LLM
 tokens on generation.
@@ -85,6 +85,9 @@ def _do_analyze(data: dict) -> dict:
     review_feedback = data.get("review_feedback")
     review_comment = data.get("review_comment")
     review_iteration = data.get("review_iteration", 0)
+    prior_analysis = None
+    if review_iteration and data.get("prior_analysis_result_ref"):
+        prior_analysis = resolve_ref(data, "prior_analysis_result", _store)
 
     with tempfile.TemporaryDirectory() as output_dir:
         state = {
@@ -99,6 +102,10 @@ def _do_analyze(data: dict) -> dict:
         if review_feedback and review_iteration:
             state["review_feedback"] = review_feedback
             state["review_comment"] = review_comment
+            state["review_iteration"] = review_iteration
+        if isinstance(prior_analysis, dict):
+            state["prior_item_manifest"] = prior_analysis.get("item_manifest", [])
+            state["prior_section_map"] = prior_analysis.get("section_map", [])
 
         # Interpret figures first so the enriched markdown (Mermaid + figure
         # descriptions inlined at each figure's location) flows into structure
@@ -162,6 +169,7 @@ def _do_analyze(data: dict) -> dict:
 
         result = {
             "markdown": markdown,
+            "figures": state.get("figures", []),
             "section_map": state.get("section_map", []),
             "abbreviations": state.get("abbreviations", {}),
             "grading_definitions": state.get("grading_definitions", ""),
@@ -179,7 +187,7 @@ def _do_analyze(data: dict) -> dict:
 
 
 def _do_generate(data: dict) -> dict:
-    """Generate DMN decision tables and recommendations from an approved manifest."""
+    """Generate DMN, recommendations, and BPMN templates from an approved manifest."""
     from cpg_ingester.generation import generate_all
 
     analysis = resolve_ref(data, "analysis_result", _store)
@@ -189,10 +197,14 @@ def _do_generate(data: dict) -> dict:
     review_feedback = data.get("review_feedback")
     review_comment = data.get("review_comment")
     review_iteration = data.get("review_iteration", 0)
+    prior_generate_result = None
+    if review_iteration and data.get("prior_generate_result_ref"):
+        prior_generate_result = resolve_ref(data, "prior_generate_result", _store)
 
     with tempfile.TemporaryDirectory() as output_dir:
         state = {
             "markdown": analysis.get("markdown", ""),
+            "figures": analysis.get("figures", []),
             "section_map": analysis.get("section_map", []),
             "abbreviations": analysis.get("abbreviations", {}),
             "grading_definitions": analysis.get("grading_definitions", ""),
@@ -207,21 +219,35 @@ def _do_generate(data: dict) -> dict:
         if review_feedback and review_iteration:
             state["review_feedback"] = review_feedback
             state["review_comment"] = review_comment
+            state["review_iteration"] = review_iteration
+        if isinstance(prior_generate_result, dict):
+            state["prior_generate_result"] = prior_generate_result
 
         updates = generate_all(state)
         state.update(updates)
 
+        bpmn_results = state.get("bpmn_results", []) or []
+        automation_counts = {
+            "total": len(bpmn_results),
+            "ready": sum(not item.get("escalated") for item in bpmn_results),
+            "escalated": sum(bool(item.get("escalated")) for item in bpmn_results),
+        }
         result = {
             "cpg_metadata": state.get("cpg_metadata", {}),
             "item_manifest": state.get("item_manifest", []),
             "dmn_results": state.get("dmn_results", []),
             "recommendation_results": state.get("recommendation_results", []),
             "recommendation_escalations": state.get("recommendation_escalations", []),
+            "bpmn_results": bpmn_results,
+            "automation_counts": automation_counts,
         }
 
         _, ref = store_artifact(_store, f"{uuid4()}/generate_result.json", result)
         if ref:
-            return {"generate_result_ref": ref}
+            return {
+                "generate_result_ref": ref,
+                "automation_counts": automation_counts,
+            }
         if _store:
             raise RuntimeError("Artifact store available but failed to store generate result")
         return result
@@ -248,6 +274,7 @@ async def analyze_async(request: Request, background_tasks: BackgroundTasks):
 
 def _run_analyze_background(data: dict, callback_url: str, process_instance_id: str):
     iteration = data.pop("review_iteration", 0) or 0
+    data["review_iteration"] = iteration
     try:
         result = _do_analyze(data)
     except Exception as e:
@@ -279,6 +306,7 @@ async def generate_async(request: Request, background_tasks: BackgroundTasks):
 
 def _run_generate_background(data: dict, callback_url: str, process_instance_id: str):
     iteration = data.pop("review_iteration", 0) or 0
+    data["review_iteration"] = iteration
     try:
         result = _do_generate(data)
     except Exception as e:

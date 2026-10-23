@@ -11,6 +11,7 @@ from cpg_ingester.generation import (
     MAX_DMN_SEMANTIC_RETRIES,
     MAX_DMN_SYNTAX_RETRIES,
     _dmn_escalate,
+    _decision_summary,
     _rec_escalate,
     _route_after_dmn_engine,
     _route_after_dmn_semantic,
@@ -98,6 +99,21 @@ class TestRepairFeedback:
         assert "acp:extraction" in result
         assert "observation_count" in result
 
+    def test_creator_replaces_malformed_extraction_with_manifest_annotation(self):
+        xml = (
+            '<definitions xmlns:acp="https://redhat.com/cpg-to-acp/dmn">'
+            '<inputData><variable name="Systolic BP"/><extensionElements>'
+            '<acp:extraction><![CDATA[{"function":"not_a_manifest_value"}]]>'
+            '</acp:extraction></extensionElements></inputData></definitions>'
+        )
+        result = _ensure_extraction_annotations(xml, [{
+            "name": "Systolic BP",
+            "extraction": {"function": "observation_count", "params": {"duration": "P3M"}},
+        }])
+        assert result.count("<acp:extraction>") == 1
+        assert '{"function":"observation_count","params":{"duration":"P3M"}}' in result
+        assert "not_a_manifest_value" not in result
+
     def test_renders_both_sections_and_previous_xml(self):
         fb = _build_feedback(["missing hitPolicy"], ["threshold wrong"], "<definitions/>")
         assert "Syntax errors to fix" in fb
@@ -120,6 +136,11 @@ class TestRepairFeedback:
 
 
 class TestErrorPatternKB:
+    def test_extraction_annotation_hint_tells_creator_to_remove_annotation(self):
+        hint = _build_feedback(["Extraction annotation: function: Field required"], [], "")
+        assert "do not emit acp:extraction" in hint.lower()
+        assert "remove it" in hint.lower()
+
     def test_matches_missing_hit_policy(self):
         hits = match_error_patterns(["DecisionTable 'x': missing hitPolicy attribute"])
         assert hits
@@ -142,6 +163,16 @@ class TestGenerateAllNoSilentDrop:
     both become flagged entries."""
 
     _MANIFEST = [{"type": "decision", "name": "D1", "section": "S1"}]
+
+    def test_decision_summary_includes_dmn_namespace(self):
+        summary = _decision_summary(
+            {"name": "Treatment", "inputs": [], "outputs": []},
+            {},
+            [],
+            '<definitions namespace="https://example.org/dmn">'
+            '<decision><decisionTable/></decision></definitions>',
+        )
+        assert summary["namespace"] == "https://example.org/dmn"
 
     def _run_with_graph(self, fake_graph):
         state = {"item_manifest": self._MANIFEST, "markdown": "", "section_map": []}

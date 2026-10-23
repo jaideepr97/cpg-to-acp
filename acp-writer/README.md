@@ -46,12 +46,26 @@ flowchart TD
 
 Both the decision engine and vector store are internal implementation details, hidden behind the API.
 
+The decision engine also validates and stores immutable BPMN automation template versions; the BFF reloads published templates from MinIO at startup.
+
+### Automation service access
+
+The writer uses `AUTOMATION_SERVICE_URL` and `AUTOMATION_SERVICE_TOKEN` for automation publication and withdrawal, sending the token in `X-Automation-Token` without following redirects. The Compose default `carewright-local-automation-dev-only` is for local development only and must not be used as a cluster credential. The automation service's health and read-only list/get routes are unauthenticated, so this Compose-only service is intended for a trusted local network, not an untrusted shared network. The base Compose file does not publish its port; the local slice binds it to `127.0.0.1:8096`.
+
 ## Getting Started
 
 ```bash
 cd acp-writer
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e "../shared" -e ".[test]"
+```
+
+The local Sentence Transformers embedding provider is optional because it adds
+PyTorch and a local model runtime. Install it only when
+`EMBEDDING_PROVIDER=sentence-transformers` is selected:
+
+```bash
+pip install -e ".[local-embeddings]"
 ```
 
 ### Run the pipeline via CLI

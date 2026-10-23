@@ -1,0 +1,331 @@
+"""Parser and static type checker tests for automation expressions."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from cpg_contracts.automation.expressions import (
+    BinaryNode,
+    ExpressionError,
+    ExpressionLimitError,
+    IdentifierNode,
+    LiteralNode,
+    MAX_AST_DEPTH,
+    MAX_CONSECUTIVE_UNARY_OPERATORS,
+    MAX_NON_EOF_TOKENS,
+    MAX_PARENTHESIS_DEPTH,
+    MAX_SOURCE_LENGTH,
+    TypeInfo,
+    UnaryNode,
+    _tokenize,
+    expression_environment,
+    identifiers,
+    literals,
+    parse,
+    typecheck,
+)
+from cpg_contracts.automation.ir import Parameter, ProcessIR, SequenceFlow
+
+
+FIXTURE = Path(__file__).parents[1] / "fixtures/automation/home-bp-monitoring.ir.json"
+
+
+def fixture_ir() -> ProcessIR:
+    return ProcessIR.model_validate_json(FIXTURE.read_text())
+
+
+def fixture_env() -> dict[str, TypeInfo]:
+    return expression_environment(fixture_ir().process)
+
+
+def test_source_length_limit_accepts_boundary_and_rejects_one_over() -> None:
+    at_limit = "true" + " " * (MAX_SOURCE_LENGTH - len("true"))
+    assert type(parse(at_limit)) is LiteralNode
+
+    with pytest.raises(ExpressionLimitError) as raised:
+        parse(at_limit + " ")
+
+    assert str(raised.value) == "expression exceeds the source length limit"
+
+
+def test_token_limit_accepts_boundary_and_rejects_one_over() -> None:
+    at_limit = " ".join(["true"] * MAX_NON_EOF_TOKENS)
+    assert len(_tokenize(at_limit)) - 1 == MAX_NON_EOF_TOKENS
+
+    with pytest.raises(ExpressionLimitError) as raised:
+        _tokenize(" ".join(["true"] * (MAX_NON_EOF_TOKENS + 1)))
+
+    assert str(raised.value) == "expression exceeds the token count limit"
+
+
+def test_parenthesis_limit_counts_tokens_not_quoted_characters() -> None:
+    at_limit = "(" * MAX_PARENTHESIS_DEPTH + "true" + ")" * MAX_PARENTHESIS_DEPTH
+    assert isinstance(parse(at_limit), LiteralNode)
+    assert isinstance(parse("'('"), LiteralNode)
+
+    with pytest.raises(ExpressionLimitError) as raised:
+        parse("(" * (MAX_PARENTHESIS_DEPTH + 1) + "true" + ")" * (MAX_PARENTHESIS_DEPTH + 1))
+
+    assert str(raised.value) == "expression exceeds the parenthesis nesting limit"
+
+
+def test_five_thousand_nested_parentheses_fail_at_source_limit() -> None:
+    source = "(" * 5000 + "true" + ")" * 5000
+
+    with pytest.raises(ExpressionLimitError) as raised:
+        parse(source)
+
+    assert str(raised.value) == "expression exceeds the source length limit"
+
+
+def test_consecutive_unary_limit_accepts_boundary_and_rejects_one_over() -> None:
+    at_limit = "not " * MAX_CONSECUTIVE_UNARY_OPERATORS + "true"
+    assert type(parse(at_limit)) is UnaryNode
+
+    with pytest.raises(ExpressionLimitError) as raised:
+        parse("not " * (MAX_CONSECUTIVE_UNARY_OPERATORS + 1) + "true")
+
+    assert str(raised.value) == "expression exceeds the unary operator limit"
+
+
+def test_ast_depth_limit_accepts_boundary_and_rejects_one_over() -> None:
+    at_limit = " or ".join(["true"] * MAX_AST_DEPTH)
+    assert type(parse(at_limit)) is BinaryNode
+
+    with pytest.raises(ExpressionLimitError) as raised:
+        parse(" or ".join(["true"] * (MAX_AST_DEPTH + 1)))
+
+    assert str(raised.value) == "expression exceeds the AST depth limit"
+
+
+def test_parser_recursion_error_becomes_expression_limit(monkeypatch) -> None:
+    def recurse(_parser):
+        raise RecursionError
+
+    monkeypatch.setattr("cpg_contracts.automation.expressions._Parser.parse", recurse)
+
+    with pytest.raises(ExpressionLimitError) as raised:
+        parse("true")
+
+    assert str(raised.value) == "expression exceeds the parser recursion limit"
+
+
+def test_typecheck_rejects_overdeep_expression_node_before_recursing() -> None:
+    expression = LiteralNode(True, "boolean")
+    for _ in range(MAX_AST_DEPTH):
+        expression = UnaryNode("not", expression)
+
+    with pytest.raises(ExpressionLimitError, match="AST depth limit"):
+        typecheck(expression, {})
+
+
+def test_fixture_conditions_and_invariant_parse_and_typecheck() -> None:
+    ir = fixture_ir()
+    env = fixture_env()
+    by_id = {
+        element.id: element
+        for element in ir.process.flowElements
+        if isinstance(element, SequenceFlow)
+    }
+    condition_ids = ("f_some", "f_escalate", "f_high")
+    for element_id in condition_ids:
+        condition = by_id[element_id].conditionExpression
+        assert condition is not None
+        assert typecheck(parse(condition), env) == "boolean"
+
+    invariant = ir.process.acp.invariants[0]
+    assert typecheck(parse(invariant), env) == "boolean"
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("reading_count == 2", "boolean"),
+        ("reading_count != 2", "boolean"),
+        ("reading_count < 2", "boolean"),
+        ("reading_count <= 2", "boolean"),
+        ("reading_count > 2", "boolean"),
+        ("reading_count >= 2", "boolean"),
+        ("true and false", "boolean"),
+        ("true or false", "boolean"),
+        ("not false", "boolean"),
+        ("defined(reading_count)", "boolean"),
+        ("reading_count + 1", "integer"),
+        ("reporting_interval * 2", "duration"),
+        ("2 * reporting_interval", "duration"),
+        ("reporting_interval + reporting_interval", "duration"),
+        ("avg_systolic >= notify_systolic_threshold", "boolean"),
+        ("kind == 'reminder'", "boolean"),
+    ],
+)
+def test_operator_and_type_table(source: str, expected: str) -> None:
+    env = fixture_env()
+    env["kind"] = TypeInfo("enum")
+    assert typecheck(parse(source), env) == expected
+
+
+@pytest.mark.parametrize("source", ["P1W", "P7D", "PT12H", "P1DT2H3M4S", "P1M"])
+def test_iso_duration_literals(source: str) -> None:
+    expression = parse(source)
+    assert literals(expression) == [(source, "duration")]
+    assert typecheck(expression, fixture_env()) == "duration"
+
+
+def test_duration_literal_compares_with_duration_parameter() -> None:
+    assert typecheck(parse("P1W <= reporting_interval"), fixture_env()) == "boolean"
+
+
+def test_enum_string_literal_is_allowed_only_for_equality() -> None:
+    env = fixture_env()
+    env["kind"] = TypeInfo("enum")
+    assert typecheck(parse('kind == "reminder"'), env) == "boolean"
+    assert typecheck(parse("'reminder' != kind"), env) == "boolean"
+    with pytest.raises(ExpressionError, match="operator '<'.*enum.*string"):
+        typecheck(parse("kind < 'reminder'"), env)
+    with pytest.raises(ExpressionError, match="enum-typed"):
+        typecheck(parse("instructions_text == 'message'"), env)
+
+
+def test_string_parameter_error_explains_enum_remedy() -> None:
+    ir = fixture_ir()
+    ir.process.acp.parameters.append(
+        Parameter(name="review_pathway", type="string", required=True)
+    )
+
+    with pytest.raises(ExpressionError) as exc_info:
+        typecheck(
+            parse('review_pathway == "lifestyle modification alone"'),
+            expression_environment(ir.process),
+        )
+
+    assert str(exc_info.value) == (
+        "quoted strings require == or != against an enum-typed operand; "
+        "parameter 'review_pathway' is typed 'string' — declare constraints.enum "
+        "on it with the categorical values (for a DMN output, that output's value set)"
+    )
+
+
+def test_quantity_comparisons_require_matching_units() -> None:
+    env = fixture_env()
+    env["glucose"] = TypeInfo("quantity", "mmol/L")
+    with pytest.raises(ExpressionError, match=r"quantity.*mm\[Hg\].*mmol/L"):
+        typecheck(parse("avg_systolic >= glucose"), env)
+
+
+def test_integer_literal_promotes_to_decimal_or_quantity_in_comparisons() -> None:
+    env = fixture_env()
+    env["lab_timing_weeks"] = TypeInfo("decimal")
+    env["systolic_bp"] = TypeInfo("decimal")
+    env["qty"] = TypeInfo("quantity", "mm[Hg]")
+
+    for source in (
+        "lab_timing_weeks == 2",
+        "systolic_bp >= 140",
+        "qty >= 140",
+    ):
+        assert typecheck(parse(source), env) == "boolean"
+
+
+def test_decimal_property_does_not_promote_an_integer_property() -> None:
+    env = fixture_env()
+    env["int_prop"] = TypeInfo("integer")
+    env["dec_prop"] = TypeInfo("decimal")
+
+    with pytest.raises(
+        ExpressionError,
+        match=r"operator '==' does not support operand types 'integer' and 'decimal'",
+    ):
+        typecheck(parse("int_prop == dec_prop"), env)
+
+
+@pytest.mark.parametrize(
+    ("source", "fragments"),
+    [
+        ("reading_count + reporting_interval", ("+", "integer", "duration")),
+        ("reading_count * reading_count", ("*", "integer", "integer")),
+        ("reporting_interval * reporting_interval", ("*", "duration", "duration")),
+        ("reading_count and true", ("and", "integer", "boolean")),
+        ("not reading_count", ("not", "integer")),
+        ("reading_count < true", ("<", "integer", "boolean")),
+    ],
+)
+def test_invalid_operator_combinations_report_operator_and_types(
+    source: str, fragments: tuple[str, ...]
+) -> None:
+    with pytest.raises(ExpressionError) as exc_info:
+        typecheck(parse(source), fixture_env())
+    for fragment in fragments:
+        assert fragment in str(exc_info.value)
+
+
+def test_unknown_identifiers_are_rejected_even_inside_defined() -> None:
+    with pytest.raises(ExpressionError, match="unknown identifier 'missing_value'"):
+        typecheck(parse("defined(missing_value)"), fixture_env())
+
+
+def test_precedence_and_parentheses_build_expected_tree() -> None:
+    expression = parse("not reading_count > 0 and true or false")
+    assert isinstance(expression, BinaryNode)
+    assert expression.operator == "or"
+    assert isinstance(expression.left, BinaryNode)
+    assert expression.left.operator == "and"
+    assert isinstance(expression.left.left, UnaryNode)
+    assert expression.left.left.operator == "not"
+    assert isinstance(expression.left.left.operand, BinaryNode)
+    assert expression.left.left.operand.operator == ">"
+
+    grouped = parse("(true or false) and true")
+    assert isinstance(grouped, BinaryNode)
+    assert grouped.operator == "and"
+    assert isinstance(grouped.left, BinaryNode)
+    assert grouped.left.operator == "or"
+
+
+def test_ast_children_identifiers_and_literals() -> None:
+    expression = parse("defined(reading_count) and reporting_interval >= P1W")
+    assert {node for node in identifiers(expression)} == {
+        "reading_count",
+        "reporting_interval",
+    }
+    assert literals(expression) == [("P1W", "duration")]
+    assert len(expression.children()) == 2
+
+    leaf = parse("7")
+    assert isinstance(leaf, LiteralNode)
+    assert leaf.children() == ()
+    variable = parse("reading_count")
+    assert isinstance(variable, IdentifierNode)
+    assert variable.children() == ()
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "reading_count.value > 0",
+        "Reading_count > 0",
+        "_reading_count > 0",
+        "reading_count >",
+        "reading_count > 0 > 1",
+        "@reading_count",
+        "defined(reading_count, avg_systolic)",
+        "defined(1)",
+    ],
+)
+def test_invalid_syntax_is_rejected(source: str) -> None:
+    with pytest.raises(ExpressionError):
+        parse(source)
+
+
+def test_prefixed_identifier_is_parsed_verbatim() -> None:
+    expression = parse("confirm__reading_count >= 2")
+    assert identifiers(expression) == {"confirm__reading_count"}
+    assert typecheck(
+        expression,
+        {"confirm__reading_count": TypeInfo("integer")},
+    ) == "boolean"
+
+
+def test_type_info_requires_no_pydantic_conversion() -> None:
+    assert TypeInfo(type="quantity", unit="mm[Hg]") == TypeInfo("quantity", "mm[Hg]")

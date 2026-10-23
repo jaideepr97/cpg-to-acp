@@ -213,6 +213,116 @@ paths:
         "404":
           description: Model not found
 
+  /api/v1/automation/templates:
+    post:
+      operationId: registerAutomationTemplate
+      summary: Validate and register an immutable automation template
+      parameters:
+        - name: source_cpg
+          in: query
+          required: true
+          schema: { type: string }
+        - name: validate_only
+          in: query
+          schema: { type: boolean, default: false }
+        - name: replace
+          in: query
+          description: Allow a new source CPG to take ownership of a colliding template id.
+          schema: { type: boolean, default: false }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AutomationTemplate" }
+      responses:
+        "201": { description: Template version registered }
+        "200": { description: Validation-only result or idempotent replay }
+        "400": { description: Invalid template JSON }
+        "409": { description: Cross-CPG id collision or immutable version conflict }
+        "422": { description: IR, static ladder, source grounding, or Kogito validation failed }
+        "503": { description: Kogito validation unavailable }
+    get:
+      operationId: listAutomationTemplates
+      summary: List current automation template versions
+      parameters:
+        - name: recommendation_id
+          in: query
+          schema: { type: string }
+        - name: dmn_model_id
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Matching current template versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AutomationTemplate" }
+
+  /api/v1/automation/templates/{templateId}:
+    get:
+      operationId: getAutomationTemplate
+      summary: Get a template version, latest by default
+      parameters:
+        - name: templateId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: version
+          in: query
+          schema: { type: string, pattern: "^[0-9a-f]{12}$" }
+      responses:
+        "200":
+          description: Template definition and BPMN
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AutomationTemplate" }
+        "404": { description: Template version not found }
+
+  /api/v1/automation/validate:
+    post:
+      operationId: validateAutomation
+      summary: Validate an automation IR or BPMN definition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              oneOf:
+                - required: [ir]
+                  properties: { ir: { type: object } }
+                - required: [bpmn_xml]
+                  properties: { bpmn_xml: { type: string } }
+              properties:
+                dmn_namespaces:
+                  type: object
+                  additionalProperties: { type: string }
+                dmn_summaries:
+                  type: object
+                  additionalProperties:
+                    $ref: "#/components/schemas/DecisionModelSummary"
+      responses:
+        "200":
+          description: Ladder and Kogito validation result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AutomationValidationResult" }
+        "400": { description: Invalid request shape }
+        "503":
+          description: Kogito validation unavailable; compiled BPMN is included when available
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: object
+                    properties:
+                      message: { type: string }
+                      bpmn_xml: { type: string, description: BPMN compiled with registered DMN namespaces }
+
   /api/v1/decisions/evaluate/{modelId}:
     post:
       operationId: evaluateDecision
@@ -401,7 +511,11 @@ paths:
         "400":
           description: Invalid patient data
         "422":
-          description: Unable to generate care plan (e.g., no applicable decision models)
+          description: Unable to generate a usable care plan; includes the final composition or review feedback
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
     get:
       operationId: listCarePlans
@@ -479,6 +593,31 @@ paths:
         "404":
           description: Care plan not found
 
+  /api/v1/careplans/{careplanId}/automations/publish:
+    post:
+      operationId: retryAutomationPublication
+      summary: Retry a pending automation publication
+      description: >
+        Retries only pending or failed publication jobs. Returns the unchanged
+        status of an existing terminal or approving job without replaying the
+        FHIR transaction. The response contains status metadata only.
+      tags: [careplans]
+      parameters:
+        - name: careplanId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Current publication state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutomationPublicationStatus"
+        "404":
+          description: No publication job exists for the care plan
+
   # --- Health ---
 
   /health:
@@ -525,6 +664,47 @@ paths:
 components:
   schemas:
 
+    AutomationPublicationStatus:
+      type: object
+      required: [state, publish_attempts]
+      properties:
+        state:
+          type: string
+          enum: [approving, pending, published, failed, withdrawn, unconfigured, not-applicable]
+        publish_attempts:
+          type: integer
+          minimum: 0
+        configuration_reason:
+          type: string
+          enum: [missing-url, missing-token]
+
+    AutomationValidationResult:
+      type: object
+      description: Static and engine validation result for an automation IR or BPMN document.
+      properties:
+        valid:
+          type: boolean
+        bpmn_xml:
+          type: string
+          description: BPMN compiled with the DMN namespaces held by the decision registry, when compilation succeeds.
+        rungs_passed:
+          type: array
+          items: { type: string }
+        findings:
+          type: array
+          items: { type: object }
+        messages:
+          type: array
+          items: { type: object }
+        errors:
+          type: array
+          items: { type: string }
+        deferred:
+          type: array
+          items: { type: string }
+        unavailable:
+          type: boolean
+
     # --- Guidelines ---
 
     CPGMetadata:
@@ -540,6 +720,9 @@ components:
           type: string
         version:
           type: string
+        effective_date:
+          type: string
+          description: Effective date as stated in the guideline, preserving partial dates.
         publication_date:
           type: string
           format: date
@@ -589,6 +772,8 @@ components:
             type: string
         source_location:
           $ref: "#/components/schemas/SourceLocation"
+        namespace:
+          type: string
 
     DecisionModelDetail:
       allOf:
@@ -597,6 +782,25 @@ components:
           properties:
             dmn_xml:
               type: string
+
+    AutomationTemplate:
+      type: object
+      description: cpg-contracts AutomationTemplate contract (version 1.1).
+      required: [contract_version, summary, ir, bpmn_xml]
+      properties:
+        contract_version: { type: string, const: "1.1" }
+        summary: { type: object }
+        ir: { type: object }
+        bpmn_xml: { type: string }
+        dmn_namespaces:
+          type: object
+          description: DMN model namespaces captured from the decision registry for linked models.
+          additionalProperties: { type: string }
+        dmn_summaries:
+          type: object
+          description: Decision model summaries captured from the registry for linked models.
+          additionalProperties:
+            $ref: "#/components/schemas/DecisionModelSummary"
 
     DecisionVariable:
       type: object

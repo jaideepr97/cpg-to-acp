@@ -10,7 +10,7 @@ from enum import Enum
 from pydantic import BaseModel
 
 
-CONTRACT_VERSION = "1.0"
+CONTRACT_VERSION = "1.1"
 
 
 class GradingSystem(str, Enum):
@@ -27,6 +27,7 @@ class CPGMetadata(BaseModel):
     cpg_id: str
     title: str
     version: str | None = None
+    effective_date: str | None = None
     publication_date: date | None = None
     evidence_review_date: date | None = None
     issuing_body: str | None = None
