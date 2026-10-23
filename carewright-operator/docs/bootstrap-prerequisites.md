@@ -1,7 +1,9 @@
 # Bootstrap the external prerequisites
 
 Run `scripts/bootstrap-prerequisites.sh` **before** installing the
-carewright-operator or creating CPGIngester/CarePlanWriter resources. The script
+carewright-operator or creating CPGIngester/CarePlanWriter resources. For the
+full tested sequence, including operator installation and review-gated sample
+runs, see [the OpenShift end-to-end guide](openshift-e2e.md). The script
 is for development OpenShift clusters: it installs OpenShell 0.1.3 with
 unauthenticated plaintext access on its *cluster-internal* Service. Do not use
 this configuration on a shared production cluster.
@@ -20,6 +22,8 @@ and run:
 
 ```sh
 OPENSHELL_DEV_INSECURE=1 \
+LLM_ORIGIN=https://api.enmaas.devshift.net \
+LLM_MODEL=gpt-6-sol \
 LLM_API_KEY_FILE=/private/path/to/llm-api-key \
 scripts/bootstrap-prerequisites.sh --namespace jrao-carewright
 ```
@@ -101,8 +105,9 @@ artifactStore:
     secretRef:
       name: carewright-artifact-credentials
 llm:
-  url: https://api.openai.com
-  model: gpt-5.6
+  url: https://api.enmaas.devshift.net
+  model: gpt-6-sol
+  requestTimeoutSeconds: 600
   credentials:
     type: carewright-openai
     secretRef:
@@ -110,14 +115,19 @@ llm:
 ```
 
 The `jrao-carewright` overlay targets `https://api.enmaas.devshift.net` with
-model `rits/zai-org/glm-5-3`. For a fresh bootstrap using that overlay, set
-`LLM_ORIGIN=https://api.enmaas.devshift.net` and
-`LLM_MODEL=rits/zai-org/glm-5-3`, and provide an API key for that service.
+model `gpt-6-sol` and a 600-second per-request timeout. For a fresh
+bootstrap using that overlay, set `LLM_ORIGIN=https://api.enmaas.devshift.net`
+and `LLM_MODEL=gpt-6-sol`, and provide an API key for that service.
 Configure the bare origin here and in `spec.llm.url`: the application appends
 `/v1` to inference requests. The profile ID remains `carewright-openai` for
 compatibility, but its endpoint must match the origin. The bootstrap script
-stops if an existing profile points to a different host; change that profile
-explicitly before rerunning it with the new `LLM_ORIGIN`.
+stops if an existing profile points to a different host; follow the
+[explicit endpoint recovery steps](openshift-e2e.md#existing-namespace-endpoint-recovery)
+before rerunning it with the new `LLM_ORIGIN`. Merely changing a pipeline CR's
+URL does not change the gateway profile. On rerun an existing
+`carewright-llm-credentials` Secret is reused even when
+`LLM_API_KEY_FILE` points to a different file; rotate that Secret separately
+if needed.
 
 The script does **not** install carewright-operator, its CRDs, pipeline CRs,
 SandboxRequests, per-sandbox egress policies, UI/BFF Deployments, or UI/workflow
