@@ -15,6 +15,7 @@ from acp_writer.nodes.fhir_server_writer import (
     get_care_plan,
     list_care_plans,
     reject_care_plan,
+    rehydrate_care_plans_from_jobs,
 )
 from acp_writer.planning_brief import (
     ActivityType,
@@ -588,3 +589,59 @@ class TestWriterApprovedTransition:
             for sec in e["resource"].get("meta", {}).get("security", [])
         }
         assert "AIAST" in codes
+
+
+class TestRehydration:
+    """The writer's care-plan index is rebuilt from the job store after a restart."""
+
+    def _approve_one(self, monkeypatch):
+        def fake_post(url, *, json=None, headers=None, timeout=None, **_kwargs):
+            if url != writer_module.FHIR_SERVER_URL or json is None:
+                return SimpleNamespace(status_code=201, content=b"{}", text="", json=lambda: {})
+            entries = [
+                {"response": {"location": f"{e['resource']['resourceType']}/{e['resource']['id']}/_history/1"}}
+                for e in json["entry"]
+            ]
+            return SimpleNamespace(status_code=201, content=b"{}", text="", json=lambda: {"entry": entries})
+
+        monkeypatch.setattr(writer_module.requests, "post", fake_post)
+        return fake_post
+
+    def test_approved_plan_is_restored_after_the_index_is_lost(self, monkeypatch):
+        self._approve_one(monkeypatch)
+        cp_id = TestApprovalWorkflow._store_care_plan(self)
+        approve_care_plan(cp_id, reviewer=ReviewerContext(display="Dr. Smith"))
+        live = deepcopy(get_care_plan(cp_id))
+
+        writer_module._care_plans.clear()
+        assert get_care_plan(cp_id) is None
+        assert rehydrate_care_plans_from_jobs() == 1
+
+        restored = get_care_plan(cp_id)
+        assert restored["status"] == "active"
+        assert restored["patient_name"] == live["patient_name"]
+        assert restored["server_ids"] == live["server_ids"]
+        assert restored["patient_reference"].startswith("Patient/")
+        assert restored["delivery_status"] == "delivered"
+        assert restored["automation_publication"]["status"] == live["automation_publication"]["status"]
+        assert [p["id"] for p in list_care_plans()] == [cp_id]
+        # Idempotent: a second call adds nothing.
+        assert rehydrate_care_plans_from_jobs() == 0
+
+    def test_rejected_plan_is_restored_as_entered_in_error(self, monkeypatch):
+        self._approve_one(monkeypatch)
+        monkeypatch.setattr(writer_module.requests, "put", lambda *a, **k: SimpleNamespace(status_code=200, text="", json=lambda: {}))
+        cp_id = TestApprovalWorkflow._store_care_plan(self)
+        approve_care_plan(cp_id, reviewer=ReviewerContext(display="Dr. Smith"))
+        reject_care_plan(cp_id, "demo reset")
+
+        writer_module._care_plans.clear()
+        rehydrate_care_plans_from_jobs()
+        assert get_care_plan(cp_id)["status"] == "entered-in-error"
+
+    def test_drafts_are_not_restored(self):
+        cp_id = TestApprovalWorkflow._store_care_plan(self)
+        assert get_care_plan(cp_id)["status"] == "draft"
+        writer_module._care_plans.clear()
+        assert rehydrate_care_plans_from_jobs() == 0
+        assert get_care_plan(cp_id) is None

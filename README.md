@@ -85,6 +85,20 @@ Individual Videos:
 
 This walks through the full pipeline: CPG PDF → parse → extract DMN → deploy decisions → generate care plan.
 
+### Local demo stack (one command)
+
+For a demo or a full local run of both pipelines with the SonataFlow orchestration, three scripts manage the orchestrated compose profile in podman:
+
+```bash
+scripts/demo-up.sh --clean                 # empty stack: fresh Medplum, no guidelines, no runs
+scripts/demo-up.sh --clean --model gpt-6-astra   # choose the LiteLLM model alias (this is the default)
+scripts/demo-backup.sh [NAME]              # snapshot guidelines, run history, patients and care plans
+scripts/demo-down.sh                       # stop, keep data (--purge deletes it)
+scripts/demo-up.sh --restore [NAME]        # bring a snapshot back exactly as it was (newest by default)
+```
+
+Backups live under `working/backups/`. The scripts need `platform/litellm/deploy/.env` and `mock-EHR/deploy/.env` (see step 1 below) and a running podman machine. Ports: CareView 3000, acp-writer 3001, Medplum 3002, cpg-ingester 3003.
+
 ### Prerequisites
 
 - [Podman](https://podman.io/) (preferred) or Docker with compose support

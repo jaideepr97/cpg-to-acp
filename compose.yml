@@ -103,6 +103,7 @@ services:
       DATA_DIR: "/data"
       SMART_CONFIG_DIR: "/config/acp-writer-ui"
       FHIR_ENV_DIR: "/config"
+      MEDPLUM_SKIP_LOAD: "${MEDPLUM_SKIP_LOAD:-0}"
     volumes:
       - ./mock-EHR/deploy/load-medplum.sh:/load-medplum.sh:ro
       - ./mock-EHR/data:/data:ro

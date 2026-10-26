@@ -21,6 +21,14 @@ ACP_WRITER_REDIRECT_URI="${ACP_WRITER_REDIRECT_URI:-http://localhost:3001/}"
 
 CODE_CHALLENGE="mock_ehr_setup_challenge"
 
+# Set MEDPLUM_SKIP_LOAD=1 when the Medplum database is restored from a backup:
+# the project, users, patients and SMART client already exist, and the loader
+# is not idempotent (user creation fails on an existing account).
+if [ "${MEDPLUM_SKIP_LOAD:-0}" = "1" ]; then
+  echo "[load-medplum] MEDPLUM_SKIP_LOAD=1 - database restored from backup, skipping load"
+  exit 0
+fi
+
 # --- Helpers ---
 
 log() { echo "[load-medplum] $*"; }

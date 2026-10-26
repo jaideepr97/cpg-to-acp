@@ -17,6 +17,7 @@ from acp_writer.nodes.fhir_server_writer import (
     get_care_plan,
     list_care_plans,
     reject_care_plan,
+    rehydrate_care_plans_from_jobs,
 )
 from acp_writer.services.automation_publisher import get_publisher, publication_status_view
 
@@ -28,8 +29,11 @@ _phi_store = get_phi_store()
 
 @app.on_event("startup")
 def reconcile_publications():
-    """Resume approvals interrupted by a process restart."""
+    """Resume interrupted approvals, then rebuild the care-plan index from the job store."""
     get_publisher().reconcile_on_start()
+    restored = rehydrate_care_plans_from_jobs()
+    if restored:
+        logger.info("Rehydrated %d approved care plan(s) from the job store", restored)
 
 
 @app.get("/health")

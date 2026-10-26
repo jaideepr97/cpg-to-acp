@@ -7,8 +7,20 @@ services:
     profiles: [orchestrated]
     ports:
       - "8097:8080"
+    environment:
+      # Dev-mode keeps workflow instances in process memory unless the JDBC
+      # persistence add-on is present. Adding it (resolved by Maven at start,
+      # cached in the volume below) stores instances in the engine's embedded
+      # PostgreSQL, which the data directory setting keeps on a named volume.
+      # Together they make run history survive restarts and travel with backups.
+      QUARKUS_EXTENSIONS: org.kie:kie-addons-quarkus-persistence-jdbc:10.2.0
+      QUARKUS_EMBEDDED_POSTGRESQL_DATA_DIR: /var/lib/sonataflow/pg
     volumes:
       - ./working/orchestrated-workflows:/home/kogito/serverless-workflow-project/src/main/resources:ro
+      - sonataflow-data:/var/lib/sonataflow
+      # Maven cache for the add-on: an external volume so it survives `down -v`
+      # and is not part of demo backups. demo-up.sh creates it if missing.
+      - sonataflow-m2-cache:/home/kogito/.m2/repository
 
   artifact-store:
     image: docker.io/chrislusf/seaweedfs:4.22
@@ -154,3 +166,6 @@ services:
 
 volumes:
   orchestrated-artifact-store-data:
+  sonataflow-data:
+  sonataflow-m2-cache:
+    external: true

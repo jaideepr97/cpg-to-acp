@@ -439,6 +439,46 @@ def get_care_plan(careplan_id: str) -> dict | None:
     return _care_plans.get(careplan_id)
 
 
+def rehydrate_care_plans_from_jobs() -> int:
+    """Rebuild the in-memory care-plan index from the durable approval jobs.
+
+    Approved plans are written to the FHIR server and recorded as publication
+    jobs in the job store. The index that serves the writer's care-plan pages
+    lives in process memory, so after a restart it is empty although the plans
+    exist. Drafts awaiting review are not in the job store and are not restored.
+    Returns the number of plans added.
+    """
+    from acp_writer.services.automation_publisher import get_publisher
+
+    publisher = get_publisher()
+    restored = 0
+    for job in publisher.store.list():
+        careplan_id = job.get("careplan_id")
+        bundle = job.get("bundle")
+        if not careplan_id or not isinstance(bundle, dict) or careplan_id in _care_plans:
+            continue
+        server_ids = job.get("server_ids") or {}
+        withdrawn = publisher.store.get_withdrawal(careplan_id) is not None
+        patient_reference = next(
+            (value for value in server_ids.values() if isinstance(value, str) and value.startswith("Patient/")),
+            "",
+        )
+        _care_plans[careplan_id] = {
+            "id": careplan_id,
+            "bundle": bundle,
+            "status": "entered-in-error" if withdrawn else "active",
+            "patient_reference": patient_reference,
+            "patient_name": _extract_patient_name(bundle),
+            "generated_at": job.get("approved_at") or job.get("created_at"),
+            "server_ids": server_ids,
+            "delivery_status": "delivered" if server_ids else "stored_locally",
+            "fhir_server_response": job.get("transaction_response", {}),
+            "automation_publication": _publication_view(job),
+        }
+        restored += 1
+    return restored
+
+
 def list_care_plans(patient: str | None = None, status: str | None = None) -> list[dict]:
     results = list(_care_plans.values())
     if patient:
