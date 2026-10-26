@@ -9,7 +9,8 @@
 #   --clean          Remove all project data and start empty (fresh Medplum, no guidelines, no runs).
 #   --restore [NAME] Remove current data, then restore the backup working/backups/NAME
 #                    (default: the newest backup) and start. State comes back as it was:
-#                    guidelines, run history, patients, care plans.
+#                    guidelines, patients, care plans. Run history (the Runs pages) does not survive an
+#                    engine restart in dev-mode and is not part of a backup.
 #   --model MODEL    LLM model id sent through LiteLLM (default: gpt-6-astra).
 #   --build          Force an image rebuild (podman compose up --build). Without it, images are
 #                    built only when missing, so a code change needs --build to take effect.
@@ -49,11 +50,7 @@ if [ "$MODE" = restore ]; then
         log "note: $BACKUP_NAME has no manifest.json (pre-script backup); restoring from its volume archives"
     fi
     for v in "${DEMO_VOLUMES[@]}"; do
-        if [ ! -f "$BACKUP_DIR/$v.tar" ]; then
-            # Backups taken before the engine database was persisted lack sonataflow-data; restore without run history.
-            [ "$v" = sonataflow-data ] && { log "note: $BACKUP_NAME has no sonataflow-data.tar (older backup); run history will start empty"; continue; }
-            die "backup is missing volume archive $v.tar"
-        fi
+        [ -f "$BACKUP_DIR/$v.tar" ] || die "backup is missing volume archive $v.tar"
     done
 fi
 
@@ -93,7 +90,6 @@ if [ "$MODE" = restore ]; then
     for v in "${DEMO_VOLUMES[@]}"; do
         name=$(volume_name "$v")
         podman volume create "$name" >/dev/null
-        [ -f "$BACKUP_DIR/$v.tar" ] || continue
         podman volume import "$name" "$BACKUP_DIR/$v.tar"
         log "  restored volume $name"
     done
@@ -124,8 +120,6 @@ PYEOF
 fi
 
 # --- 4. Start ----------------------------------------------------------------------------------
-# The engine's Maven cache is an external volume: created once, kept across --clean and --purge.
-podman volume exists "$SONATAFLOW_M2_VOLUME" || podman volume create "$SONATAFLOW_M2_VOLUME" >/dev/null
 log "Starting the orchestrated stack (model $MODEL)${BUILD_FLAG:+ with image rebuild}"
 "${COMPOSE[@]}" up -d $BUILD_FLAG
 

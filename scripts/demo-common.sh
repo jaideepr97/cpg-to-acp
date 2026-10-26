@@ -6,8 +6,6 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEMO_PROJECT="${DEMO_PROJECT:-cpg-to-acp}"
 DEMO_DEFAULT_MODEL="gpt-6-astra"
 BACKUP_ROOT="$REPO_ROOT/working/backups"
-# Maven cache for the engine's persistence add-on; external so it outlives `down -v` and is never backed up.
-SONATAFLOW_M2_VOLUME="sonataflow-m2-cache"
 
 # The orchestrated profile: SonataFlow dev-mode plus one pod per security profile.
 COMPOSE=(podman compose -f "$REPO_ROOT/compose.yml" -f "$REPO_ROOT/compose.orchestrated.yml" --profile orchestrated -p "$DEMO_PROJECT")
@@ -16,7 +14,6 @@ COMPOSE=(podman compose -f "$REPO_ROOT/compose.yml" -f "$REPO_ROOT/compose.orche
 DEMO_VOLUMES=(
     orchestrated-artifact-store-data   # uploaded CPGs, published artifacts, PHI bundles
     medplum-postgres-data              # patients, CarePlans, SMART client
-    sonataflow-data                    # workflow run history (engine's embedded PostgreSQL)
     automation-data                    # automation service records
     acp-job-data                       # approval/publication jobs (also rebuilds the writer's care-plan list)
 )

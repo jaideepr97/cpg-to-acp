@@ -9,7 +9,8 @@
 #
 # The stack is stopped while the volumes are exported so the databases are consistent; it is started again
 # afterwards. Captured: the artifact store (guidelines, published artifacts), Medplum (patients, care plans),
-# the workflow engine's run history, automation records, publication jobs, and the Medplum-written config files.
+# automation records, publication jobs, and the Medplum-written config files. Workflow run history is not
+# captured: the dev-mode engine keeps it in memory.
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/demo-common.sh"
 

@@ -92,7 +92,7 @@ For a demo or a full local run of both pipelines with the SonataFlow orchestrati
 ```bash
 scripts/demo-up.sh --clean                 # empty stack: fresh Medplum, no guidelines, no runs
 scripts/demo-up.sh --clean --model gpt-6-astra   # choose the LiteLLM model alias (this is the default)
-scripts/demo-backup.sh [NAME]              # snapshot guidelines, run history, patients and care plans
+scripts/demo-backup.sh [NAME]              # snapshot guidelines, patients and care plans (not run history)
 scripts/demo-down.sh                       # stop, keep data (--purge deletes it)
 scripts/demo-up.sh --restore [NAME]        # bring a snapshot back exactly as it was (newest by default)
 ```
