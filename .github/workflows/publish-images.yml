@@ -21,6 +21,9 @@ concurrency:
   group: publish-images-${{ github.ref }}-${{ inputs.pr_number }}-${{ inputs.branch }}
   cancel-in-progress: false
 
+env:
+  QUAY_NAMESPACE: ${{ vars.QUAY_NAMESPACE || 'carewright' }}
+
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -147,7 +150,7 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
           push: true
-          tags: quay.io/carewright/${{ matrix.image }}:${{ needs.changes.outputs.tag }}
+          tags: quay.io/${{ env.QUAY_NAMESPACE }}/${{ matrix.image }}:${{ needs.changes.outputs.tag }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ needs.changes.outputs.revision }}
@@ -158,8 +161,8 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           docker buildx imagetools create \
-            --tag quay.io/carewright/${{ matrix.image }}:latest \
-            quay.io/carewright/${{ matrix.image }}:${{ needs.changes.outputs.tag }}
+            --tag quay.io/${{ env.QUAY_NAMESPACE }}/${{ matrix.image }}:latest \
+            quay.io/${{ env.QUAY_NAMESPACE }}/${{ matrix.image }}:${{ needs.changes.outputs.tag }}
 
       - name: Report runner disk after Docling image build
         if: always() && matrix.image == 'cpg-ingester-ingestion'
@@ -216,7 +219,7 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
           push: true
-          tags: quay.io/carewright/${{ matrix.image }}:${{ needs.changes.outputs.tag }}
+          tags: quay.io/${{ env.QUAY_NAMESPACE }}/${{ matrix.image }}:${{ needs.changes.outputs.tag }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ needs.changes.outputs.revision }}
@@ -227,8 +230,8 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           docker buildx imagetools create \
-            --tag quay.io/carewright/${{ matrix.image }}:latest \
-            quay.io/carewright/${{ matrix.image }}:${{ needs.changes.outputs.tag }}
+            --tag quay.io/${{ env.QUAY_NAMESPACE }}/${{ matrix.image }}:latest \
+            quay.io/${{ env.QUAY_NAMESPACE }}/${{ matrix.image }}:${{ needs.changes.outputs.tag }}
 
   build-mock-ehr:
     needs: changes
@@ -259,7 +262,7 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
           push: true
-          tags: quay.io/carewright/${{ matrix.image }}:${{ needs.changes.outputs.tag }}
+          tags: quay.io/${{ env.QUAY_NAMESPACE }}/${{ matrix.image }}:${{ needs.changes.outputs.tag }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ needs.changes.outputs.revision }}
@@ -270,5 +273,5 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           docker buildx imagetools create \
-            --tag quay.io/carewright/${{ matrix.image }}:latest \
-            quay.io/carewright/${{ matrix.image }}:${{ needs.changes.outputs.tag }}
+            --tag quay.io/${{ env.QUAY_NAMESPACE }}/${{ matrix.image }}:latest \
+            quay.io/${{ env.QUAY_NAMESPACE }}/${{ matrix.image }}:${{ needs.changes.outputs.tag }}

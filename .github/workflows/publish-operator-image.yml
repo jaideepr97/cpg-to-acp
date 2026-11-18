@@ -24,6 +24,9 @@ concurrency:
   group: publish-operator-image-${{ github.ref }}-${{ inputs.pr_number }}-${{ inputs.branch }}
   cancel-in-progress: false
 
+env:
+  QUAY_NAMESPACE: ${{ vars.QUAY_NAMESPACE || 'carewright' }}
+
 jobs:
   source:
     runs-on: ubuntu-latest
@@ -97,7 +100,7 @@ jobs:
           file: carewright-operator/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: quay.io/carewright/carewright-operator:${{ steps.tag.outputs.value }}
+          tags: quay.io/${{ env.QUAY_NAMESPACE }}/carewright-operator:${{ steps.tag.outputs.value }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ steps.tag.outputs.revision }}
@@ -108,5 +111,5 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           docker buildx imagetools create \
-            --tag quay.io/carewright/carewright-operator:latest \
-            quay.io/carewright/carewright-operator:${{ steps.tag.outputs.value }}
+            --tag quay.io/${{ env.QUAY_NAMESPACE }}/carewright-operator:latest \
+            quay.io/${{ env.QUAY_NAMESPACE }}/carewright-operator:${{ steps.tag.outputs.value }}
