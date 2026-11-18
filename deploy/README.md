@@ -315,6 +315,20 @@ The [image publishing workflow](../.github/workflows/publish-images.yml) builds 
 
 The workflow publishes six CPG Ingester images, nine ACP Writer images, and two mock EHR images. Changes under `shared/` rebuild both application components. OpenShift BuildConfigs remain available for cluster builds; they use the separate `carewright-quay-push-secret` Kubernetes Secret. For a full stack deployment at a new SHA, run the workflow manually to publish every component image at that tag. The optional `mock-ehr-mcp` and LiteLLM images are external to this workflow and must be mirrored or built in `quay.io/carewright` before those components are enabled.
 
+To request images before merge, run the component workflow from `main` and provide either a PR number or a branch name as a workflow input. The workflow checks out the PR head or named branch and publishes every component image with an isolated tag:
+
+```bash
+# PR build: pr-<PR-number>-<short-sha>
+gh workflow run publish-images.yml --ref main -f pr_number=<PR-number>
+
+# Branch build: branch-<branch-name>-<short-sha>
+gh workflow run publish-images.yml --ref main -f branch=<branch-name>
+```
+
+The `pr_number` and `branch` inputs are mutually exclusive. Branch names are sanitized and truncated for use in the image tag.
+
+For an operator-managed pre-merge cluster test, request the operator image with the same PR number or branch. The [operator workflow](../.github/workflows/publish-operator-image.yml) uses the same tag naming convention. Then deploy the components and operator with the generated tag (for example, `--tag pr-123-a1b2c3d`). These request-driven tags are isolated from the main SHA tags. The `latest` tag is updated only by an automated push to `main`, never by a PR or branch image build.
+
 ## Image Tagging
 
 Images are tagged with the git SHA (`git rev-parse --short HEAD`). Mutable tags (`:phase3`, `:latest`) are not used in deploy paths.

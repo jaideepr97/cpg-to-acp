@@ -4,12 +4,21 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to build (mutually exclusive with branch)
+        required: false
+        type: number
+      branch:
+        description: Branch name to build (mutually exclusive with pr_number)
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: publish-images-${{ github.ref }}
+  group: publish-images-${{ github.ref }}-${{ inputs.pr_number }}-${{ inputs.branch }}
   cancel-in-progress: false
 
 jobs:
@@ -20,8 +29,33 @@ jobs:
       writer: ${{ steps.filter.outputs.writer }}
       mock_ehr: ${{ steps.filter.outputs.mock_ehr }}
       tag: ${{ steps.tag.outputs.value }}
+      revision: ${{ steps.tag.outputs.revision }}
+      checkout_ref: ${{ steps.source.outputs.checkout_ref }}
     steps:
+      - name: Validate and resolve image source
+        id: source
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          BRANCH_NAME: ${{ inputs.branch }}
+        run: |
+          if [[ -n "$PR_NUMBER" && -n "$BRANCH_NAME" ]]; then
+            echo "::error title=Invalid image source::Provide either pr_number or branch, not both."
+            exit 1
+          fi
+
+          if [[ -n "$PR_NUMBER" ]]; then
+            checkout_ref="refs/pull/$PR_NUMBER/head"
+          elif [[ -n "$BRANCH_NAME" ]]; then
+            checkout_ref="refs/heads/$BRANCH_NAME"
+          else
+            checkout_ref="$GITHUB_REF"
+          fi
+
+          echo "checkout_ref=$checkout_ref" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ steps.source.outputs.checkout_ref }}
 
       - id: filter
         uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
@@ -40,7 +74,28 @@ jobs:
               - '.github/workflows/publish-images.yml'
 
       - id: tag
-        run: echo "value=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          BRANCH_NAME: ${{ inputs.branch }}
+        run: |
+          sha="$(git rev-parse --short HEAD)"
+
+          if [[ -n "$PR_NUMBER" ]]; then
+            value="pr-$PR_NUMBER-$sha"
+          elif [[ -n "$BRANCH_NAME" ]]; then
+            branch_slug="$(printf '%s' "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]' | sed -E 's#[^a-z0-9._-]+#-#g; s#^-+##; s#-+$##')"
+            branch_slug="${branch_slug:0:80}"
+            value="branch-${branch_slug:-head}-$sha"
+          elif [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
+            value="$sha"
+          else
+            branch_slug="$(printf '%s' "$GITHUB_REF_NAME" | tr '[:upper:]' '[:lower:]' | sed -E 's#[^a-z0-9._-]+#-#g; s#^-+##; s#-+$##')"
+            branch_slug="${branch_slug:0:80}"
+            value="branch-${branch_slug:-head}-$sha"
+          fi
+
+          echo "value=$value" >> "$GITHUB_OUTPUT"
+          echo "revision=$sha" >> "$GITHUB_OUTPUT"
 
   build-ingester:
     needs: changes
@@ -71,6 +126,8 @@ jobs:
             file: cpg-ingester/ui/Containerfile
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.changes.outputs.checkout_ref }}
       - name: Reclaim runner disk for Docling image
         if: matrix.image == 'cpg-ingester-ingestion'
         run: |
@@ -93,12 +150,12 @@ jobs:
           tags: quay.io/carewright/${{ matrix.image }}:${{ needs.changes.outputs.tag }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.revision=${{ needs.changes.outputs.revision }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=min,scope=${{ matrix.image }}
 
       - name: Update latest tag
-        if: github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           docker buildx imagetools create \
             --tag quay.io/carewright/${{ matrix.image }}:latest \
@@ -146,6 +203,8 @@ jobs:
             file: acp-writer/decision-service/deploy/Containerfile
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.changes.outputs.checkout_ref }}
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
@@ -160,12 +219,12 @@ jobs:
           tags: quay.io/carewright/${{ matrix.image }}:${{ needs.changes.outputs.tag }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.revision=${{ needs.changes.outputs.revision }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=min,scope=${{ matrix.image }}
 
       - name: Update latest tag
-        if: github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           docker buildx imagetools create \
             --tag quay.io/carewright/${{ matrix.image }}:latest \
@@ -187,6 +246,8 @@ jobs:
             file: mock-EHR/deploy/Containerfile.loader
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.changes.outputs.checkout_ref }}
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
@@ -201,12 +262,12 @@ jobs:
           tags: quay.io/carewright/${{ matrix.image }}:${{ needs.changes.outputs.tag }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.revision=${{ needs.changes.outputs.revision }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=min,scope=${{ matrix.image }}
 
       - name: Update latest tag
-        if: github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           docker buildx imagetools create \
             --tag quay.io/carewright/${{ matrix.image }}:latest \
