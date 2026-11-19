@@ -33,7 +33,6 @@ jobs:
       mock_ehr: ${{ steps.filter.outputs.mock_ehr }}
       tag: ${{ steps.tag.outputs.value }}
       revision: ${{ steps.tag.outputs.revision }}
-      checkout_ref: ${{ steps.source.outputs.checkout_ref }}
     steps:
       - name: Validate and resolve image source
         id: source
@@ -51,7 +50,7 @@ jobs:
           elif [[ -n "$BRANCH_NAME" ]]; then
             checkout_ref="refs/heads/$BRANCH_NAME"
           else
-            checkout_ref="$GITHUB_REF"
+            checkout_ref="$GITHUB_SHA"
           fi
 
           echo "checkout_ref=$checkout_ref" >> "$GITHUB_OUTPUT"
@@ -81,7 +80,8 @@ jobs:
           PR_NUMBER: ${{ inputs.pr_number }}
           BRANCH_NAME: ${{ inputs.branch }}
         run: |
-          sha="$(git rev-parse --short HEAD)"
+          revision="$(git rev-parse HEAD)"
+          sha="$(git rev-parse --short "$revision")"
 
           if [[ -n "$PR_NUMBER" ]]; then
             value="pr-$PR_NUMBER-$sha"
@@ -98,7 +98,7 @@ jobs:
           fi
 
           echo "value=$value" >> "$GITHUB_OUTPUT"
-          echo "revision=$sha" >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
 
   build-ingester:
     needs: changes
@@ -130,7 +130,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ needs.changes.outputs.checkout_ref }}
+          ref: ${{ needs.changes.outputs.revision }}
       - name: Reclaim runner disk for Docling image
         if: matrix.image == 'cpg-ingester-ingestion'
         run: |
@@ -207,7 +207,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ needs.changes.outputs.checkout_ref }}
+          ref: ${{ needs.changes.outputs.revision }}
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
@@ -250,7 +250,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ needs.changes.outputs.checkout_ref }}
+          ref: ${{ needs.changes.outputs.revision }}
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
