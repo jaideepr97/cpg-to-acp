@@ -129,7 +129,7 @@ For upgrades and failures—including provider endpoint mismatches and image tag
 
 ## Local development
 
-Go 1.25+ is required. From `carewright-operator/`, run `make test` or `make run` against a cluster with prerequisites installed. Set `WATCH_NAMESPACE` when running a local controller so it does not reconcile unrelated namespaces. Use `go run ./cmd/main.go --controllers=sandboxrequest` to run only the SandboxRequest controller. The operator image is published by [the build workflow](../.github/workflows/publish-operator-image.yml) on changes to `carewright-operator/**` on `main`.
+Go 1.25+ is required. From `carewright-operator/`, run `make test` or `make run` against a cluster with prerequisites installed. Set `WATCH_NAMESPACE` when running a local controller so it does not reconcile unrelated namespaces. Use `go run ./cmd/main.go --controllers=sandboxrequest` to run only the SandboxRequest controller. The operator image is published by [the build workflow](../.github/workflows/publish-operator-image.yml) on changes to `carewright-operator/**` on `main`. The workflow can also be dispatched with a PR number or from a branch to publish a `pr-<PR-number>-<short-sha>` or `branch-<branch-name>-<short-sha>` pre-merge image; these runs do not update `latest`.
 
 ## License
 
