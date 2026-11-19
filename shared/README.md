@@ -44,3 +44,7 @@ generates presigned URLs with sandbox placeholders.
 Regular deployments such as the BFF continue to use
 `ARTIFACT_STORE_ACCESS_KEY` and `ARTIFACT_STORE_SECRET_KEY` directly. Both AWS
 variables must be present together, or artifact-store initialization fails.
+
+## Image-build integration test
+
+This temporary change exists only to exercise the shared-code path in the on-demand image publishing workflow.
