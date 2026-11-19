@@ -1096,6 +1096,12 @@ components:
           type: string
         patient_reference:
           type: string
+        issuer:
+          type: string
+          description: >
+            Issuer of the session that approved the plan, from the signed
+            approval record; empty when there was none. Used with
+            patient_reference to scope browser access.
         title:
           type: string
         status:

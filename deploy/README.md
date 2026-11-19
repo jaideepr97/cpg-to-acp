@@ -4,6 +4,8 @@ This guide covers deploying the full CPG-to-ACP system to an OpenShift cluster w
 
 > **Deployment paths:** This guide describes the existing script/Helm-based deployment. The Kubernetes operator is maintained in [`carewright-operator/`](../carewright-operator/) and has a separate external-prerequisites bootstrap plus CR-based pipeline deployment path. For that path, follow the [operator end-to-end OpenShift guide](../carewright-operator/docs/openshift-e2e.md). Do not run both deployment paths in the same namespace; they would manage overlapping application resources.
 
+> **Browser sessions and SMART launch need the operator path.** The scripts and Helm charts in this guide do not deliver the application credentials added for sessions and service-to-service calls: the per-receiver service tokens, the approval and session signing keys, and the writer's SMART settings (client credentials, issuer allowlist, public origin). Without them the script-deployed writer BFF cannot give a browser a session, so SMART launch from the mock EHR does not complete on this path. Those settings are wired only for the operator-managed pipelines (`spec.serviceTokens`, `spec.approvalSigning`, `spec.sessionSigning`, `spec.smart`); see [Track B application credentials](#track-b-application-credentials) and the [operator guide](../carewright-operator/docs/openshift-e2e.md). The script path is scheduled for retirement in favour of the operator ([release plan](../dev_docs/release-plan.md), A6).
+
 ## Prerequisites
 
 Before deploying, ensure:
@@ -169,6 +171,8 @@ cp deploy/config/secrets.env.template deploy/config/secrets.env
 ./deploy/setup/setup-namespace.sh --config deploy/config/cluster.env
 
 # 7. Deploy all components
+#    This does not set up browser sessions or SMART launch for the writer;
+#    see the note at the top of this guide.
 ./deploy/deploy-all.sh --config deploy/config/cluster.env
 
 # 8. Verify
@@ -185,6 +189,7 @@ Non-secret configuration. Template checked in; actual file gitignored.
 |---|---|---|
 | `NAMESPACE` | OpenShift project (max 35 chars) | `sschifma-cpg-to-acp` |
 | `CLUSTER_DOMAIN` | Cluster domain for Route hostnames | `apps.rosa.agentic-mcp.jolf.p3.openshiftapps.com` |
+| `SMART_WRITER_ORIGIN` | Used by `mock-EHR/deploy/deploy.sh` only (optional). The writer UI origin the mock EHR trusts for SMART launch: one value drives the SMART client the loader registers and the EHR authorization page's redirect allowlist. It configures the EHR side only; launch also needs a writer BFF configured with the same public origin and the SMART client credentials, which today means the operator-managed writer (`spec.smart`). Set it to that writer's UI route. Unset, it falls back to `https://acp-ui-<NAMESPACE>.<CLUSTER_DOMAIN>`, the script-deployed UI route, which cannot complete a launch | `https://care-plan-writer-ui-ns.apps.example.com` |
 | `MAAS_GATEWAY_URL` | LLM gateway base URL (bare origin, no `/v1`) | `http://maas-default-gateway-...:80` or `https://api.enmaas.devshift.net` |
 | `MAAS_ROUTE_SEGMENT` | Optional model path segment (leave empty for EnMaaS) | `gpt-5-6` |
 | `LLM_MODEL_DEFAULT` | Model parameter in API payloads | `gpt-5.6-terra` |

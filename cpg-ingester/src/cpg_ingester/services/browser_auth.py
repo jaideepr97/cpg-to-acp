@@ -9,6 +9,7 @@ from cpg_contracts.web_session import (
     ObjectStoreSessionStore,
     OneTimeStore,
     SessionManager,
+    is_loopback_origin,
 )
 from fastapi import Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -16,11 +17,18 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 def install_browser_auth(app, store, *, mock_mode=False):
     signing_key = os.getenv('CPG_SIGNING_KEY', '')
+    public_origin = os.getenv('CPG_PUBLIC_ORIGIN', '')
+    # The development auto-session mints an operator session with no credential.
+    # It exists for local mock-mode work only and must never be reachable on a
+    # cluster, so the service refuses to start with it off a localhost origin.
+    dev_auto_session = os.getenv('CPG_DEV_AUTO_SESSION', 'false').lower() == 'true'
+    if dev_auto_session and not is_loopback_origin(public_origin):
+        raise RuntimeError('CPG_DEV_AUTO_SESSION requires a localhost CPG_PUBLIC_ORIGIN')
     sessions = ObjectStoreSessionStore(store, signing_key=signing_key) if store is not None else MemorySessionStore()
     manager = SessionManager(sessions, cookie_name='cpg_session',
         ttl_hours=float(os.getenv('CPG_SESSION_TTL_HOURS', '8')),
         secure=os.getenv('SESSION_COOKIE_SECURE', 'true').lower() != 'false',
-        public_origin=os.getenv('CPG_PUBLIC_ORIGIN', ''))
+        public_origin=public_origin)
     links = OneTimeStore(store, prefix='launch-links/', signing_key=signing_key)
     app.state.sessions = manager
     app.state.launch_links = links
@@ -72,7 +80,7 @@ def install_browser_auth(app, store, *, mock_mode=False):
         raw = None
         try:
             session = manager.load(request)
-            if session is None and mock_mode and os.getenv('CPG_DEV_AUTO_SESSION','false').lower() == 'true':
+            if session is None and mock_mode and dev_auto_session:
                 import logging
                 logging.getLogger(__name__).warning('Development operator auto-session enabled')
                 session, raw = manager.create('operator','operator')

@@ -54,6 +54,7 @@ def test_matching_review_records_then_sends_one_event(client):
     assert record['workflowInstanceId'] == 'sf-1'
     assert record['fhirBundleRef'] == 'cpg-phi:run-1/fhir_bundle.json'
     assert record['sessionSubject'] == 'p1'
+    assert record['issuer'] == ''
     assert record['reviewer']['display'] != 'forged'
     event = client.fake.send_review.await_args.args[2]
     assert event['approvalRef'] == 'cpg-phi:run-1/approvals/0.json'
@@ -111,3 +112,19 @@ def test_get_run_resolves_by_business_key(client):
 
 def test_get_unknown_run_returns_404(client):
     assert client.get('/api/v1/runs/does-not-exist').status_code == 404
+
+
+def test_approval_record_carries_the_session_issuer(client, monkeypatch):
+    """The issuer of the approving session is signed into the record; it scopes later reads."""
+    from cpg_contracts.web_session import MemorySessionStore, SessionManager
+
+    manager = SessionManager(MemorySessionStore(), cookie_name='acp_session')
+    session, cookie = manager.create('patient', 'p1', ['run-1'], meta={'iss': 'https://ehr.example/fhir/R4/'})
+    monkeypatch.setattr(bff, '_sessions', manager)
+    client.cookies.set('acp_session', cookie)
+    client.headers['X-CSRF-Token'] = session.csrf_token
+
+    assert review(client).status_code == 202
+    record = client.store.records['run-1/approvals/0.json']
+    assert verify_record(record, 'test-signing-key')
+    assert (record['sessionSubject'], record['issuer']) == ('p1', 'https://ehr.example/fhir/R4/')

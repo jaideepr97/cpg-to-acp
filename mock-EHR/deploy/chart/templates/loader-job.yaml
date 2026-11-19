@@ -1,6 +1,6 @@
 {{- if .Values.loader.enabled }}
-{{- $clusterDomain := .Values.clusterDomain | default "apps.example.com" -}}
-{{- $acpWriterUiRoute := printf "https://acp-ui-%s.%s" .Release.Namespace $clusterDomain -}}
+{{- /* The same writer origin feeds the OAuth page's redirect allowlist (see _helpers.tpl). */ -}}
+{{- $acpWriterUiRoute := include "mock-ehr.acpWriterOrigin" . | default (printf "https://acp-ui-%s.apps.example.com" .Release.Namespace) -}}
 apiVersion: batch/v1
 kind: Job
 metadata:

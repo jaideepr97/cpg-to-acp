@@ -9,6 +9,9 @@ from cpg_contracts.tracing import trace_safe
 from fastapi import HTTPException
 
 
+_PATIENT_ID = re.compile(r'[A-Za-z0-9.-]{1,64}')
+
+
 def _missing(exc):
     return isinstance(exc, KeyError) or getattr(exc, 'response', {}).get('Error', {}).get('Code') in {'NoSuchKey', 'NotFound', '404'}
 
@@ -65,8 +68,14 @@ def write_approved_bundle(data: dict, store, writer) -> dict:
         reviewer = ReviewerContext.model_validate(record.get('reviewer')).model_dump()
     except Exception:
         raise HTTPException(403, detail={'error': 'approval-required'}) from None
-    plans = [entry.get('resource', {}) for entry in bundle.get('entry', []) if entry.get('resource', {}).get('resourceType') == 'CarePlan']
-    patient_reference = plans[0].get('subject', {}).get('reference', '') if len(plans) == 1 else ''
+    # Who may read the published plan is decided by the signed approval record:
+    # the EHR patient and issuer of the session that approved it. The bundle's
+    # own subject is a bundle-local reference and proves nothing about that.
+    subject = record.get('sessionSubject')
+    issuer = record.get('issuer') or ''
+    if not isinstance(subject, str) or not _PATIENT_ID.fullmatch(subject) or not isinstance(issuer, str):
+        raise HTTPException(403, detail={'error': 'approval-required'})
     result = writer({'fhir_bundle': bundle, 'careplan_id': record['workflowInstanceId'],
-                     'patient_reference': patient_reference, 'approved': True, 'reviewer': reviewer})
+                     'patient_reference': 'Patient/' + subject, 'issuer': issuer,
+                     'approved': True, 'reviewer': reviewer})
     return {**result, 'reviewRound': record['reviewRound'], 'artifactRevision': record['artifactRevision']}

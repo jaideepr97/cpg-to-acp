@@ -24,6 +24,26 @@ from cpg_contracts.tracing import trace_safe
 logger = logging.getLogger(__name__)
 
 
+_LOOPBACK_HOSTS = frozenset({'localhost', '127.0.0.1', '::1'})
+
+
+def is_loopback_origin(origin) -> bool:
+    """True only for an http(s) origin whose host is this machine.
+
+    Development-only switches (insecure cookies, direct IPS submission) are
+    honoured only when the public origin says the service is not reachable
+    from anywhere else. An empty or unparseable origin is not loopback.
+    """
+    if not isinstance(origin, str) or not origin:
+        return False
+    try:
+        parts = urlsplit(origin)
+        hostname = parts.hostname
+    except ValueError:
+        return False
+    return parts.scheme in {'http', 'https'} and hostname in _LOOPBACK_HOSTS
+
+
 def token_hash(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
@@ -269,8 +289,7 @@ class OneTimeStore:
 class SessionManager:
     def __init__(self, store: SessionStore, *, cookie_name: str, ttl_hours=8, secure=True, same_site='lax', public_origin=''):
         if not secure:
-            origin = urlsplit(public_origin)
-            if origin.scheme != 'http' or origin.hostname not in {'localhost', '127.0.0.1', '::1'}:
+            if urlsplit(public_origin).scheme != 'http' or not is_loopback_origin(public_origin):
                 raise ValueError('Insecure session cookies require a localhost HTTP origin')
             logger.warning('Insecure session cookies enabled for localhost development')
         self.store = store

@@ -72,25 +72,52 @@ async def test_restart_relaunch_scopes_old_runs(context, monkeypatch):
     assert other.get('/api/v1/runs/unknown').status_code == 404
 
 
-def test_careplan_filter_and_reference_parsing(context, monkeypatch):
+def test_careplan_scope_uses_recorded_patient_and_issuer_not_caller_filters(context, monkeypatch):
     _, browser = context
     client, _ = browser('synthetic')
-    reference = 'https://ehr.example/fhir/R4/Patient/synthetic'
+    issuer = 'https://ehr.example/fhir/R4/'
+    # The bundle's subject is bundle-local in real output; it must be ignored.
+    bundle = {'entry': [{'resource': {'resourceType': 'CarePlan', 'subject': {'reference': 'urn:uuid:local'}}}]}
+    detail = {'id': 'own', 'patient_reference': 'Patient/synthetic', 'issuer': issuer, 'bundle': bundle}
     calls = []
     def handle(request):
         calls.append(request)
         if request.url.path == '/api/v1/careplans':
             return httpx.Response(200, json=[
-                {'id': 'own', 'patient_reference': 'Patient/synthetic'},
-                {'id': 'other', 'patient_reference': 'Patient/another'},
+                {'id': 'own', 'patient_reference': 'Patient/synthetic', 'issuer': issuer},
+                {'id': 'other', 'patient_reference': 'Patient/another', 'issuer': issuer},
+                {'id': 'other-issuer', 'patient_reference': 'Patient/synthetic', 'issuer': 'https://another-ehr.example/fhir/R4/'},
+                {'id': 'no-issuer', 'patient_reference': 'Patient/synthetic'},
+                {'id': 'local-subject', 'patient_reference': 'urn:uuid:synthetic', 'issuer': issuer},
             ])
-        return httpx.Response(200, json={'id': 'own', 'bundle': {'entry': [{'resource': {'resourceType': 'CarePlan', 'subject': {'reference': reference}}}]}})
+        return httpx.Response(200, json=detail)
     monkeypatch.setattr(bff, '_http', httpx.AsyncClient(transport=httpx.MockTransport(handle)))
-    assert len(client.get('/api/v1/careplans?patient=another').json()) == 1
+    assert [plan['id'] for plan in client.get('/api/v1/careplans?patient=another').json()] == ['own']
     assert calls[-1].url.params['patient'] == 'synthetic'
     assert client.get('/api/v1/careplans/own').status_code == 200
-    for reference in ('Patient/another', 'Practitioner/synthetic', 'urn:uuid:synthetic', 'invalid'):
-        assert client.get('/api/v1/careplans/own').status_code == 403
+    for changed in ({'patient_reference': 'Patient/another'}, {'patient_reference': 'Practitioner/synthetic'},
+                    {'patient_reference': 'urn:uuid:synthetic'}, {'patient_reference': 'invalid'},
+                    {'patient_reference': None}, {'issuer': 'https://another-ehr.example/fhir/R4/'}, {'issuer': ''}):
+        detail.update({'patient_reference': 'Patient/synthetic', 'issuer': issuer, **changed})
+        assert client.get('/api/v1/careplans/own').status_code == 403, changed
+    # A bundle that names this patient does not grant access on its own.
+    detail.update({'patient_reference': '', 'issuer': issuer,
+                   'bundle': {'entry': [{'resource': {'resourceType': 'CarePlan', 'subject': {'reference': 'Patient/synthetic'}}}]}})
+    assert client.get('/api/v1/careplans/own').status_code == 403
+
+
+@pytest.mark.parametrize('reference, expected', [
+    ('Patient/synthetic', 'synthetic'),
+    ('https://ehr.example/fhir/R4/Patient/synthetic', 'synthetic'),
+    ('Patient/another', 'another'),
+    ('Practitioner/synthetic', None),
+    ('urn:uuid:synthetic', None),
+    ('https://ehr.example/fhir/R4/Patient/synthetic?x=1', None),
+    ('invalid', None),
+    (None, None),
+])
+def test_reference_patient_parsing(reference, expected):
+    assert bff._reference_patient(reference) == expected
 
 
 def test_expired_session_and_anonymous_routes(context, monkeypatch):

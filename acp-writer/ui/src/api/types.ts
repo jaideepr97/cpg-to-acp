@@ -16,7 +16,7 @@ export interface paths {
         put?: never;
         /**
          * PatientEntryPage — start a run from an IPS bundle
-         * @description Synthetic development only (ACP_ALLOW_DIRECT_IPS=true); disabled by default. Stores the supplied IPS and creates the same patient session as SMART.
+         * @description Synthetic development only (ACP_ALLOW_DIRECT_IPS=true with a localhost ACP_PUBLIC_ORIGIN); disabled by default and never available on a cluster. Stores the supplied IPS and creates the same patient session as SMART.
          */
         post: operations["createRun"];
         delete?: never;

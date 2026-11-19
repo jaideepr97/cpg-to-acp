@@ -286,8 +286,14 @@ class AutomationPublisher:
         approved_at: str | datetime,
         *,
         bundle: dict,
+        patient_reference: str = "",
+        issuer: str = "",
     ) -> tuple[dict, bool]:
-        """Persist the approval and report whether this call reused a prior job."""
+        """Persist the approval and report whether this call reused a prior job.
+
+        ``patient_reference`` and ``issuer`` come from the signed approval
+        record and are kept with the job so access scoping survives a restart.
+        """
         revision_key = sorted(
             (item.get("automation_id", ""), item.get("revision", ""))
             for item in revisions
@@ -312,6 +318,8 @@ class AutomationPublisher:
             "created_at": _now(),
             "updated_at": _now(),
             "bundle": deepcopy(bundle),
+            "patient_reference": patient_reference or "",
+            "issuer": issuer or "",
         }
         self.store.put(job)
         return job, False

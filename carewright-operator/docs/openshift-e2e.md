@@ -121,20 +121,13 @@ SonataFlow resource is created for each template. Kogito preflight is optional
 and remains disabled unless `BPMN_PREFLIGHT_URL` is configured for the ingester
 LLM-analysis sandbox together with appropriate egress policy.
 
-Then forward the writer BFF in a separate terminal:
-
-```sh
-oc -n jrao-carewright port-forward service/care-plan-writer-bff 18082:80
-```
-
-Start a run with the synthetic hypertension IPS bundle:
-
-```sh
-jq -n --slurpfile ips acp-writer/benchmarks/bundles/htn-temporal-01.json \
-  '{ipsBundle:$ips[0]}' |
-  curl -fsS -H 'Content-Type: application/json' --data-binary @- \
-    http://127.0.0.1:18082/api/v1/runs
-```
+Then start a writer run for a synthetic patient by launching the writer from the
+mock EHR (SMART launch; see [Application sessions and credentials](#application-sessions-and-credentials)).
+The writer creates the run from the EHR's patient summary and opens it in the
+browser. Posting an IPS bundle straight to `/api/v1/runs` is not available on a
+cluster: that development entry creates a patient session without the EHR, so
+the writer BFF accepts `ACP_ALLOW_DIRECT_IPS=true` only with a localhost public
+origin and refuses to start otherwise.
 
 Open the `care-plan-writer-ui` Route and submit the care-plan review when
 requested. Poll `GET /api/v1/runs/<runId>`; success is `status=completed`

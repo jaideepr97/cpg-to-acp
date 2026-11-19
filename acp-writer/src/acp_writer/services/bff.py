@@ -50,6 +50,7 @@ from cpg_contracts.web_session import (
     ObjectStoreSessionStore,
     OneTimeStore,
     SessionManager,
+    is_loopback_origin,
     new_pkce,
     sign_browser_record,
     token_hash,
@@ -96,6 +97,17 @@ SMART_FHIR_INTERNAL_BASE = os.getenv('SMART_FHIR_INTERNAL_BASE', '')
 ACP_PUBLIC_ORIGIN = os.getenv('ACP_PUBLIC_ORIGIN', '').rstrip('/')
 SMART_REDIRECT_URI = os.getenv('SMART_REDIRECT_URI') or (ACP_PUBLIC_ORIGIN + '/api/v1/launch/callback' if ACP_PUBLIC_ORIGIN else '')
 ACP_ALLOW_DIRECT_IPS = os.getenv('ACP_ALLOW_DIRECT_IPS', '').lower() == 'true'
+if ACP_ALLOW_DIRECT_IPS and not is_loopback_origin(ACP_PUBLIC_ORIGIN):
+    # Direct IPS submission creates a patient session without the EHR. It is a
+    # synthetic-data development entry and must never be reachable on a cluster.
+    raise RuntimeError('ACP_ALLOW_DIRECT_IPS requires a localhost ACP_PUBLIC_ORIGIN')
+
+
+def _direct_ips_allowed() -> bool:
+    """Direct IPS is honoured only with the flag set and a loopback public origin."""
+    return bool(ACP_ALLOW_DIRECT_IPS) and is_loopback_origin(ACP_PUBLIC_ORIGIN)
+
+
 SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'true').lower() != 'false'
 SESSION_TTL_HOURS = float(os.getenv('SESSION_TTL_HOURS', '8'))
 APPROVAL_SIGNING_KEY = os.getenv('APPROVAL_SIGNING_KEY', '')
@@ -222,16 +234,19 @@ def _reference_patient(reference):
     return parts[-1]
 
 
-def _careplan_patient(raw):
-    if not isinstance(raw, dict):
-        return None
-    if raw.get('resourceType') == 'CarePlan':
-        return _reference_patient(raw.get('subject', {}).get('reference'))
-    bundle = raw.get('bundle', {})
-    plans = [entry.get('resource', {}) for entry in bundle.get('entry', []) if entry.get('resource', {}).get('resourceType') == 'CarePlan']
-    if len(plans) != 1:
-        return None
-    return _reference_patient(plans[0].get('subject', {}).get('reference'))
+def _careplan_in_session(record, session) -> bool:
+    """Whether a care plan record belongs to this session's patient and issuer.
+
+    The fhir-server pod records both from the signed approval, so this never
+    reads the bundle: its subject is a bundle-local reference, not the EHR
+    patient. A record without an issuer matches only a session without one,
+    exactly as run scoping does in ``_patient_session``.
+    """
+    if not isinstance(record, dict):
+        return False
+    patient = _reference_patient(record.get('patient_reference'))
+    return (patient is not None and patient == session.subject
+            and (record.get('issuer') or '') == (session.meta.get('iss') or ''))
 
 
 install_phi_span_processor()
@@ -270,6 +285,35 @@ def health():
     }
 
 
+_PUBLISHED_BUCKET = "cpg-artifacts"
+_PUBLISHED_PREFIX = "published/"
+_ARTIFACT_TYPES = {"metadata", "dmn", "recommendations", "bpmn"}
+
+
+def _published_artifact_ref(ref) -> str:
+    """Return the canonical ref of a published CPG artifact, or raise ValueError.
+
+    Registration only ever reads published guideline artifacts. A reference
+    that names another bucket (the PHI bucket shares these credentials) or a
+    key outside ``published/`` is refused before any object-store read.
+    """
+    if not isinstance(ref, str) or not ref:
+        raise ValueError("invalid-ref")
+    qualifier = _PUBLISHED_BUCKET + ":"
+    if ref.startswith(qualifier):
+        key = ref[len(qualifier):]
+    elif ":" in ref.split("/", 1)[0]:
+        # A bucket (or URL scheme) qualifier other than the published bucket.
+        raise ValueError("invalid-ref")
+    else:
+        key = ref
+    if not key.startswith(_PUBLISHED_PREFIX) or "\\" in key or any(ord(c) < 32 or ord(c) == 127 for c in key):
+        raise ValueError("invalid-ref")
+    if any(segment in {"", ".", ".."} for segment in key.split("/")):
+        raise ValueError("invalid-ref")
+    return qualifier + key
+
+
 # ---------------------------------------------------------------------------
 # Notifications from cpg-ingester SonataFlow
 # ---------------------------------------------------------------------------
@@ -296,6 +340,12 @@ async def artifacts_available(request: Request):
         art_type = artifact.get("type", "")
         ref = artifact.get("ref", "")
         if not ref:
+            continue
+        try:
+            _published_artifact_ref(ref)
+        except ValueError:
+            logger.error("Rejected %s artifact with a reference outside the published area", art_type if art_type in _ARTIFACT_TYPES else "unknown")
+            results["errors"].append(f"invalid-ref: {art_type if art_type in _ARTIFACT_TYPES else 'unknown'}")
             continue
 
         try:
@@ -333,7 +383,7 @@ def _register_metadata(ref: str) -> None:
     """Pull CPG metadata from MinIO and register with the llm-reasoning pod."""
     if not _artifacts_store:
         raise RuntimeError("No artifact store configured")
-    metadata = _artifacts_store.get(ref)
+    metadata = _artifacts_store.get(_published_artifact_ref(ref))
     resp = http_requests.post(
         f"{LLM_REASONING_URL}/api/v1/guidelines",
         headers=service_token_headers('SERVICE_TOKEN_ACP_LLM_REASONING'), json=metadata,
@@ -347,12 +397,10 @@ def _register_dmn_model(ref: str, name: str, cpg_id: str | None = None) -> None:
     """Pull DMN XML from MinIO and deploy to the decision-engine pod."""
     if not _artifacts_store:
         raise RuntimeError("No artifact store configured")
-    dmn_xml = _artifacts_store.get_raw(ref)
-    url = f"{DECISION_ENGINE_URL}/api/v1/decisions/models"
-    if cpg_id:
-        url += f"?source_cpg={cpg_id}"
+    dmn_xml = _artifacts_store.get_raw(_published_artifact_ref(ref))
     resp = http_requests.post(
-        url,
+        f"{DECISION_ENGINE_URL}/api/v1/decisions/models",
+        params={"source_cpg": cpg_id} if cpg_id else None,
         data=dmn_xml,
         headers={**{"Content-Type": "application/xml"}, **service_token_headers('SERVICE_TOKEN_ACP_DECISION_ENGINE')},
         timeout=10,
@@ -365,7 +413,7 @@ def _register_recommendations(ref: str, cpg_id: str) -> int:
     """Pull recommendation bundle from MinIO and ingest into the llm-reasoning pod."""
     if not _artifacts_store:
         raise RuntimeError("No artifact store configured")
-    bundle = _artifacts_store.get(ref)
+    bundle = _artifacts_store.get(_published_artifact_ref(ref))
     resp = http_requests.post(
         f"{LLM_REASONING_URL}/api/v1/knowledge/recommendations/batch",
         headers=service_token_headers('SERVICE_TOKEN_ACP_LLM_REASONING'), json=bundle,
@@ -382,7 +430,7 @@ def _register_automation_template(ref: str, cpg_id: str) -> None:
     """Pull a published template from MinIO and register it with decision-engine."""
     if not _artifacts_store:
         raise RuntimeError("No artifact store configured")
-    template = _artifacts_store.get(ref)
+    template = _artifacts_store.get(_published_artifact_ref(ref))
     response = http_requests.post(
         f"{DECISION_ENGINE_URL}/api/v1/automation/templates",
         headers=service_token_headers('SERVICE_TOKEN_ACP_DECISION_ENGINE'), params={"source_cpg": cpg_id},
@@ -454,7 +502,7 @@ def _reload_cpg_artifacts() -> None:
                 if not key.endswith("/latest.json"):
                     continue
                 try:
-                    pointer = _artifacts_store.get(f"cpg-artifacts:{key}")
+                    pointer = _artifacts_store.get(_published_artifact_ref(f"cpg-artifacts:{key}"))
                     latest_versions[key.rsplit("/", 2)[-2]] = pointer.get("version")
                 except Exception as exc:
                     logger.warning('Could not read latest template pointer exception_type=%s (details redacted)', type(exc).__name__)
@@ -551,7 +599,7 @@ async def create_run(request: Request):
     in the background — the UI polls GET /runs/{id} for progress.
     """
     _require_session_signing()
-    if not ACP_ALLOW_DIRECT_IPS:
+    if not _direct_ips_allowed():
         raise HTTPException(404, detail={'error': 'direct-ips-disabled'})
     body = await request.json()
     bundle = body.get('ipsBundle')
@@ -748,6 +796,7 @@ async def submit_review(run_id: str, gate: str, request: Request):
                 'fhirBundleRef': normalize_ref(current['artifactRef']), 'artifactRevision': revision,
                 'decision': decision, 'reviewer': default_reviewer().model_dump(),
                 'sessionSubject': request.state.session.subject,
+                'issuer': request.state.session.meta.get('iss') or '',
                 'reviewerHint': request.state.session.meta.get('fhirUser'),
                 'recordedAt': datetime.now(timezone.utc).isoformat(),
                 # Keep the server's sanitized event in the signed record so a
@@ -823,7 +872,11 @@ async def list_careplans(request: Request, patient: str | None = None, status: s
     except Exception as exc:
         logger.error('Failed to list care plans exception_type=%s (details redacted)', type(exc).__name__)
         return JSONResponse(status_code=502, content={"message": "Failed to reach FHIR server"})
-    return [_to_careplan_summary(cp) for cp in (raw_plans if isinstance(raw_plans, list) else []) if (_careplan_patient(cp) or _reference_patient(cp.get("patient_reference"))) == patient]
+    return [
+        _to_careplan_summary(cp)
+        for cp in (raw_plans if isinstance(raw_plans, list) else [])
+        if _careplan_in_session(cp, request.state.session)
+    ]
 
 
 @app.get("/api/v1/careplans/{careplan_id}", dependencies=[Depends(_patient_session)])
@@ -833,11 +886,11 @@ async def get_careplan(careplan_id: str, request: Request):
         resp.raise_for_status()
         raw = resp.json()
     except Exception as exc:
-        logger.error('Failed to get care plan careplan_id=%s', careplan_id)
+        logger.error('Failed to get care plan careplan_id=%s exception_type=%s (details redacted)', careplan_id, type(exc).__name__)
         return JSONResponse(status_code=502, content={"message": "Failed to reach FHIR server"})
     if not raw:
         return JSONResponse(status_code=404, content={"message": f"Care plan {careplan_id} not found"})
-    if _careplan_patient(raw) != request.state.session.subject:
+    if not _careplan_in_session(raw, request.state.session):
         raise HTTPException(403, detail={"error": "out-of-scope"})
     detail = _to_careplan_detail(raw)
     await _merge_brief_automations(detail, careplan_id)
@@ -866,7 +919,11 @@ async def _merge_brief_automations(detail: dict, careplan_id: str) -> None:
         try:
             full = await _sonataflow.get_instance(inst["id"])
         except Exception as exc:
-            logger.warning('Could not load run run_id=%s', run_id)
+            # Enrichment is optional: the persisted plan is still readable.
+            logger.warning(
+                'Could not load run to enrich care plan instance_id=%s exception_type=%s (details redacted)',
+                inst.get("id"), type(exc).__name__,
+            )
             return
         run_detail = enrich_run_detail(map_to_run_detail(full), _phi_store, _artifacts_store)
         if not detail.get("runId"):
@@ -1474,9 +1531,9 @@ async def browser_session(request: Request):
     except Exception:
         raise _sessions.unavailable() from None
     if session is None:
-        return JSONResponse(status_code=401, content={'detail': {'error': 'session-required'}, 'directIpsEnabled': ACP_ALLOW_DIRECT_IPS})
+        return JSONResponse(status_code=401, content={'detail': {'error': 'session-required'}, 'directIpsEnabled': _direct_ips_allowed()})
     return {'kind': session.kind, 'subject': session.subject, 'runIds': session.run_ids,
-            'csrfToken': session.csrf_token, 'expiresAt': session.expires_at, 'directIpsEnabled': ACP_ALLOW_DIRECT_IPS}
+            'csrfToken': session.csrf_token, 'expiresAt': session.expires_at, 'directIpsEnabled': _direct_ips_allowed()}
 
 
 @app.post('/api/v1/session/logout', dependencies=[Depends(_patient_session)])
@@ -1508,7 +1565,7 @@ async def _browser_record_maintenance():
 
 @app.on_event('startup')
 async def start_browser_maintenance():
-    if ACP_ALLOW_DIRECT_IPS:
+    if _direct_ips_allowed():
         logger.warning('Dev-only direct IPS submission is enabled')
     app.state.browser_maintenance = asyncio.create_task(_browser_record_maintenance())
 

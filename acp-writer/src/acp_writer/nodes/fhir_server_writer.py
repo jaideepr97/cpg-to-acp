@@ -148,13 +148,18 @@ def fhir_server_writer(state: CarePlanComposerState) -> dict:
         # just the security-tag swap it did before (issue #169 F1).
         reviewer = _state_reviewer(state)
         apply_approval_transition(bundle, reviewer)
-        approval_job, _was_existing = _start_approval_job(careplan_id, bundle, reviewer)
+        approval_job, _was_existing = _start_approval_job(
+            careplan_id, bundle, reviewer,
+            patient_reference=state.get("patient_reference", ""),
+            issuer=state.get("issuer", ""),
+        )
 
     _care_plans[careplan_id] = {
         "id": careplan_id,
         "bundle": bundle,
         "status": initial_status,
         "patient_reference": state.get("patient_reference", ""),
+        "issuer": state.get("issuer", ""),
         "patient_name": _extract_patient_name(bundle),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "server_ids": {},
@@ -292,8 +297,15 @@ def _automation_revisions(bundle: dict) -> list[dict[str, str]]:
 
 
 @trace_safe(name="fhir_server_writer.start_approval_job", ids=('careplan_id',))
-def _start_approval_job(careplan_id: str, bundle: dict, reviewer: "ReviewerContext") -> tuple[dict, bool]:
-    """Persist the approved bundle before any FHIR transaction is sent."""
+def _start_approval_job(
+    careplan_id: str,
+    bundle: dict,
+    reviewer: "ReviewerContext",
+    *,
+    patient_reference: str = "",
+    issuer: str = "",
+) -> tuple[dict, bool]:
+    """Persist the approved bundle, and who may read it, before any FHIR transaction is sent."""
     from acp_writer.services.automation_publisher import get_publisher
 
     return get_publisher().start_approval_with_status(
@@ -302,6 +314,8 @@ def _start_approval_job(careplan_id: str, bundle: dict, reviewer: "ReviewerConte
         reviewer,
         datetime.now(timezone.utc),
         bundle=bundle,
+        patient_reference=patient_reference,
+        issuer=issuer,
     )
 
 
@@ -452,7 +466,10 @@ def rehydrate_care_plans_from_jobs() -> int:
             continue
         server_ids = job.get("server_ids") or {}
         withdrawn = publisher.store.get_withdrawal(careplan_id) is not None
-        patient_reference = next(
+        # The approval's own patient and issuer decide who may read the plan.
+        # Jobs written before those were recorded fall back to the patient the
+        # FHIR server assigned and carry no issuer.
+        patient_reference = job.get("patient_reference") or next(
             (value for value in server_ids.values() if isinstance(value, str) and value.startswith("Patient/")),
             "",
         )
@@ -461,6 +478,7 @@ def rehydrate_care_plans_from_jobs() -> int:
             "bundle": bundle,
             "status": "entered-in-error" if withdrawn else "active",
             "patient_reference": patient_reference,
+            "issuer": job.get("issuer") or "",
             "patient_name": _extract_patient_name(bundle),
             "generated_at": job.get("approved_at") or job.get("created_at"),
             "server_ids": server_ids,
@@ -483,6 +501,7 @@ def list_care_plans(patient: str | None = None, status: str | None = None) -> li
         "id": cp["id"],
         "patient_name": cp.get("patient_name", ""),
         "patient_reference": cp.get("patient_reference", ""),
+        "issuer": cp.get("issuer", ""),
         "status": cp.get("status", ""),
         "generated_at": cp.get("generated_at"),
     } for cp in results]
@@ -563,7 +582,11 @@ def approve_care_plan(
     reviewer_context = reviewer or default_reviewer()
     apply_approval_transition(bundle, reviewer_context)
     cp["status"] = "active"
-    job, was_existing = _start_approval_job(careplan_id, bundle, reviewer_context)
+    job, was_existing = _start_approval_job(
+        careplan_id, bundle, reviewer_context,
+        patient_reference=cp.get("patient_reference", ""),
+        issuer=cp.get("issuer", ""),
+    )
     resumed = _resume_existing_approval(job) if was_existing else None
     if resumed is None:
         delivery = _post_bundle(bundle)

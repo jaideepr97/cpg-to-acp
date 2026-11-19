@@ -173,3 +173,24 @@ def test_keyed_locks_serialize_waiters_and_release_on_failure_and_cancel():
                 raise ValueError('synthetic')
         assert not locks._entries
     asyncio.run(run())
+
+
+@pytest.mark.parametrize('origin, expected', [
+    ('http://localhost:3001', True),
+    ('https://localhost', True),
+    ('http://127.0.0.1:8080', True),
+    ('http://[::1]:3001', True),
+    ('https://writer.example', False),
+    ('http://localhost.evil.example', False),
+    ('http://localhost@evil.example', False),
+    ('http://evil.example/localhost', False),
+    ('ftp://localhost', False),
+    ('localhost:3001', False),
+    ('http://[::1', False),
+    ('', False),
+    (None, False),
+])
+def test_is_loopback_origin(origin, expected):
+    from cpg_contracts.web_session import is_loopback_origin
+
+    assert is_loopback_origin(origin) is expected

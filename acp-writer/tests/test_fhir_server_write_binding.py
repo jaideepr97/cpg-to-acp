@@ -33,6 +33,7 @@ def context(request, monkeypatch):
         'runId': 'run-1', 'workflowInstanceId': 'workflow-1', 'reviewRound': 0,
         'fhirBundleRef': 'cpg-phi:run-1/fhir_bundle.json', 'artifactRevision': artifact_revision(BUNDLE),
         'decision': 'approve', 'reviewer': default_reviewer().model_dump(),
+        'sessionSubject': 'ehr-patient-7', 'issuer': 'https://ehr.example/fhir/R4/',
     }, 'test-signing-key')
     store = Store(record)
     module = importlib.import_module(request.param)
@@ -55,12 +56,14 @@ def test_matching_approval_writes_exact_reviewed_artifact(context):
     assert state['fhir_bundle'] == BUNDLE
     assert state['approved'] is True
     assert state['reviewer'] == default_reviewer().model_dump()
-    assert state['patient_reference'] == 'Patient/synthetic'
+    # Ownership comes from the signed record, not from the bundle's subject.
+    assert state['patient_reference'] == 'Patient/ehr-patient-7'
+    assert state['issuer'] == 'https://ehr.example/fhir/R4/'
     assert response.json()['artifactRevision'] == artifact_revision(BUNDLE)
     assert response.json()['reviewRound'] == 0
 
 
-@pytest.mark.parametrize('case,status', [('hash',409),('reference',409),('workflow',409),('missing',403),('tampered',403),('wrong-key',403),('unconfigured',503),('outside',400),('malformed',400),('denied',403)])
+@pytest.mark.parametrize('case,status', [('hash',409),('reference',409),('workflow',409),('missing',403),('tampered',403),('wrong-key',403),('unconfigured',503),('outside',400),('malformed',400),('denied',403),('no-subject',403),('bad-subject',403),('bad-issuer',403)])
 def test_rejects_before_any_write(context, case, status, monkeypatch):
     client, store, writer, body = context
     if case == 'hash': store.bundle['entry'][0]['resource']['id'] = 'changed'
@@ -73,6 +76,9 @@ def test_rejects_before_any_write(context, case, status, monkeypatch):
     if case == 'outside': body['approval_ref'] = 'cpg-artifacts:run-1/approvals/0.json'
     if case == 'malformed': body['approval_ref'] = 'cpg-phi:run-1/approvals/../0.json'
     if case == 'denied': store.record = sign_record({**store.record, 'decision': 'request_changes'}, 'test-signing-key')
+    if case == 'no-subject': store.record = sign_record({k: v for k, v in store.record.items() if k != 'sessionSubject'}, 'test-signing-key')
+    if case == 'bad-subject': store.record = sign_record({**store.record, 'sessionSubject': 'a/../b'}, 'test-signing-key')
+    if case == 'bad-issuer': store.record = sign_record({**store.record, 'issuer': ['https://ehr.example']}, 'test-signing-key')
     response = client.post('/api/v1/write', json=body)
     assert response.status_code == status, response.text
     writer.assert_not_called()

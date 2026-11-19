@@ -63,6 +63,7 @@ def _signed_approval(monkeypatch, bundle):
         "fhirBundleRef": "cpg-phi:" + bundle_key,
         "artifactRevision": artifact_revision(bundle), "decision": "approve",
         "reviewer": default_reviewer().model_dump(),
+        "sessionSubject": "slice-patient", "issuer": "",
     }, signing_key)
     class Store:
         def get_raw_in_bucket(self, bucket, key):
@@ -73,12 +74,22 @@ def _signed_approval(monkeypatch, bundle):
             "fhir_bundle_ref": "cpg-phi:" + bundle_key}
 
 
+def _published(ref: str) -> str:
+    """The canonical published-artifact ref the BFF accepts for a fixture key."""
+    return f"cpg-artifacts:published/{CPG_ID}/{ref}"
+
+
+def _fixture_key(ref: str) -> str:
+    return ref.removeprefix(f"cpg-artifacts:published/{CPG_ID}/")
+
+
 class GoldenArtifactStore:
     def __init__(self, templates: dict[str, Path], dmns: dict[str, Path]):
         self.templates = templates
         self.dmns = dmns
 
     def get(self, ref: str):
+        ref = _fixture_key(ref)
         template = json.loads(self.templates[ref].read_text())
         template_id = template["summary"]["id"]
         # The source goldens use one placeholder recommendation id; the replay
@@ -87,7 +98,7 @@ class GoldenArtifactStore:
         return template
 
     def get_raw(self, ref: str):
-        return self.dmns[ref].read_bytes()
+        return self.dmns[_fixture_key(ref)].read_bytes()
 
 
 class SavedResponseLLM:
@@ -113,6 +124,7 @@ class LiveArtifactStore:
         }
 
     def get(self, ref: str):
+        ref = _fixture_key(ref)
         if ref == "live/recommendations.json":
             return json.loads((LIVE / "recommendations.json").read_text())
         if ref in self.template_overrides:
@@ -123,7 +135,7 @@ class LiveArtifactStore:
         raise KeyError(ref)
 
     def get_raw(self, ref: str):
-        return self.dmns[ref].read_bytes()
+        return self.dmns[_fixture_key(ref)].read_bytes()
 
 
 def _json_prompt_section(prompt: str, heading: str) -> dict:
@@ -429,11 +441,11 @@ def test_saved_replay_generates_and_publishes_approved_careplan(monkeypatch, tmp
             "cpg_id": CPG_ID,
             "artifacts": [
                 *[
-                    {"type": "dmn", "ref": ref, "name": Path(ref).stem}
+                    {"type": "dmn", "ref": _published(ref), "name": Path(ref).stem}
                     for ref in sorted(dmn_by_ref)
                 ],
                 *[
-                    {"type": "bpmn", "ref": ref}
+                    {"type": "bpmn", "ref": _published(ref)}
                     for ref in sorted(template_by_ref)
                 ],
             ],
@@ -653,11 +665,11 @@ def test_live_fixture_replay_runs_pipeline_validation_approval_and_publication(m
             "cpg_id": CPG_ID,
             "artifacts": [
                 *[
-                    {"type": "dmn", "ref": ref, "name": Path(ref).stem}
+                    {"type": "dmn", "ref": _published(ref), "name": Path(ref).stem}
                     for ref in dmn_refs
                 ],
-                {"type": "recommendations", "ref": "live/recommendations.json"},
-                *[{"type": "bpmn", "ref": ref} for ref in template_refs],
+                {"type": "recommendations", "ref": _published("live/recommendations.json")},
+                *[{"type": "bpmn", "ref": _published(ref)} for ref in template_refs],
             ],
         })
         assert registration.status_code == 200

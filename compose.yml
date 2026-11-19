@@ -353,6 +353,9 @@ services:
       CPG_SIGNING_KEY: ${CPG_SIGNING_KEY:-carewright-local-cpg-signing-key-dev-only}
       CPG_PUBLIC_ORIGIN: http://localhost:3003
       SESSION_COOKIE_SECURE: "false"
+      # Local mock-mode only: gives the UI an operator session with no launch
+      # link. Opt in with CPG_DEV_AUTO_SESSION=true; refused off localhost.
+      CPG_DEV_AUTO_SESSION: ${CPG_DEV_AUTO_SESSION:-false}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
       interval: 5s

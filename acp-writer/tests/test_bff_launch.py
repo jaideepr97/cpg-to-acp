@@ -146,6 +146,13 @@ def test_direct_submission_is_opt_in_and_scoped(browser, monkeypatch):
     bundle = {'resourceType': 'Bundle', 'entry': [{'resource': {'resourceType': 'Patient', 'id': 'synthetic-patient'}}]}
     assert browser.post('/api/v1/runs', json={'ipsBundle': bundle}).status_code == 404
     monkeypatch.setattr(bff, 'ACP_ALLOW_DIRECT_IPS', True)
+    # The flag alone is not enough: off a localhost origin the entry stays shut
+    # and the session endpoint does not advertise it.
+    for origin in ('https://writer.example', 'https://writer.apps.cluster.example', 'http://localhost.evil.example', ''):
+        monkeypatch.setattr(bff, 'ACP_PUBLIC_ORIGIN', origin)
+        assert browser.post('/api/v1/runs', json={'ipsBundle': bundle}).status_code == 404
+        assert browser.get('/api/v1/session').json()['directIpsEnabled'] is False
+    monkeypatch.setattr(bff, 'ACP_PUBLIC_ORIGIN', 'http://localhost:3001')
     response = browser.post('/api/v1/runs', json={'ipsBundle': bundle})
     assert response.status_code == 202
     assert bff.run_metadata(response.json()['runId'])['patientId'] == 'synthetic-patient'
@@ -216,3 +223,33 @@ def test_writer_module_defaults_to_secure_cookies(monkeypatch):
     module._sessions.set_cookie(response,cookie)
     for attribute in ('Secure','HttpOnly','SameSite=lax','Path=/'):
         assert attribute in response.headers['set-cookie']
+
+
+@pytest.mark.parametrize('origin', ['https://writer.example', 'https://writer.apps.cluster.example', ''])
+def test_service_refuses_to_start_with_direct_ips_off_localhost(origin):
+    """The import-time guard: a cluster deployment cannot enable direct IPS."""
+    import os
+    import subprocess
+    import sys
+
+    env = {**os.environ, 'ACP_ALLOW_DIRECT_IPS': 'true', 'ACP_PUBLIC_ORIGIN': origin, 'MINIO_ENDPOINT': '', 'SONATAFLOW_URL': ''}
+    result = subprocess.run(
+        [sys.executable, '-c', 'import acp_writer.services.bff'],
+        env=env, capture_output=True, text=True, timeout=120,
+    )
+    assert result.returncode != 0
+    assert 'ACP_ALLOW_DIRECT_IPS requires a localhost ACP_PUBLIC_ORIGIN' in result.stderr
+
+
+def test_service_starts_with_direct_ips_on_localhost():
+    import os
+    import subprocess
+    import sys
+
+    env = {**os.environ, 'ACP_ALLOW_DIRECT_IPS': 'true', 'ACP_PUBLIC_ORIGIN': 'http://localhost:3001',
+           'SESSION_COOKIE_SECURE': 'false', 'MINIO_ENDPOINT': '', 'SONATAFLOW_URL': ''}
+    result = subprocess.run(
+        [sys.executable, '-c', 'import acp_writer.services.bff as b; assert b._direct_ips_allowed()'],
+        env=env, capture_output=True, text=True, timeout=120,
+    )
+    assert result.returncode == 0, result.stderr[-400:]

@@ -1,6 +1,7 @@
 import { Alert, Title } from '@mantine/core';
 import { SignInForm } from '@medplum/react';
 import { useSearchParams } from 'react-router';
+import { appConfig } from '../config';
 import { oauthRedirect } from '../oauthRedirect';
 
 /** Medplum hosts authorization at its appBaseUrl, separately from its API. */
@@ -9,7 +10,7 @@ export function OAuthPage() {
   const clientId = params.get('client_id');
   const redirectUri = params.get('redirect_uri');
   const challenge = params.get('code_challenge');
-  const redirect = oauthRedirect(redirectUri, import.meta.env.VITE_SMART_REDIRECT_ORIGINS || '');
+  const redirect = oauthRedirect(redirectUri, appConfig().smartRedirectOrigins);
   if (!clientId || !redirect || !challenge || params.get('code_challenge_method') !== 'S256') {
     return <Alert color="red" title="Invalid authorization request">Return to your EHR and launch the application again.</Alert>;
   }
