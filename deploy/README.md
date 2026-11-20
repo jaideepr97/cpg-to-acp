@@ -311,9 +311,23 @@ The downloaded YAML contains a registry credential. Store and transfer it secure
 
 ### GitHub Actions image publishing
 
-The [image publishing workflow](../.github/workflows/publish-images.yml) builds changed components on pushes to `main` and publishes them to `quay.io/carewright` with the short commit SHA as the tag. A manual run builds all images. Configure the repository Actions variable `QUAY_USERNAME` with the Carewright robot username and the repository Actions secret `QUAY_TOKEN` with its token. The robot needs write access to every repository named in the workflow. No registry credentials belong in the workflow file.
+The [image publishing workflow](../.github/workflows/publish-images.yml) builds changed components on pushes to `main` and publishes them to `quay.io/carewright` with the short commit SHA as the tag. A manual run builds all images. Configure the repository Actions variable `QUAY_USERNAME` with the robot username, the repository Actions secret `QUAY_TOKEN` with its token, and optionally the repository Actions variable `QUAY_NAMESPACE` with the target Quay namespace (the default is `carewright`). The robot needs write access to every image repository named in the workflow under that namespace. No registry credentials belong in the workflow file.
 
 The workflow publishes six CPG Ingester images, nine ACP Writer images, and two mock EHR images. Changes under `shared/` rebuild both application components. OpenShift BuildConfigs remain available for cluster builds; they use the separate `carewright-quay-push-secret` Kubernetes Secret. For a full stack deployment at a new SHA, run the workflow manually to publish every component image at that tag. The optional `mock-ehr-mcp` and LiteLLM images are external to this workflow and must be mirrored or built in `quay.io/carewright` before those components are enabled.
+
+To request images before merge, run the component workflow from `main` and provide either a PR number or a branch name as a workflow input. The workflow checks out the PR head or named branch and publishes every component image with an isolated tag:
+
+```bash
+# PR build: pr-<PR-number>-<short-sha>
+gh workflow run publish-images.yml --ref main -f pr_number=<PR-number>
+
+# Branch build: branch-<branch-name>-<short-sha>
+gh workflow run publish-images.yml --ref main -f branch=<branch-name>
+```
+
+The `pr_number` and `branch` inputs are mutually exclusive. Branch names are sanitized and truncated for use in the image tag.
+
+For an operator-managed pre-merge cluster test, request the operator image with the same PR number or branch. The [operator workflow](../.github/workflows/publish-operator-image.yml) uses the same tag naming convention. Then deploy the components and operator with the generated tag (for example, `--tag pr-123-a1b2c3d`) and the matching Quay namespace. These request-driven tags are isolated from the main SHA tags. The `latest` tag is updated only by an automated push to `main`, never by a PR or branch image build.
 
 ## Image Tagging
 
