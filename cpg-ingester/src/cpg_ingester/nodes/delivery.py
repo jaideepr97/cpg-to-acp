@@ -5,7 +5,11 @@ It publishes artifacts to a well-known location in MinIO/S3 and returns
 a manifest.  The SonataFlow orchestrator owns downstream notification.
 """
 
+import hashlib
+import json
 import logging
+import re
+import unicodedata
 
 import mlflow
 from cpg_contracts import get_artifact_store
@@ -15,6 +19,18 @@ from cpg_ingester.artifact_id import make_artifact_id
 from cpg_ingester.output import write_artifact
 
 logger = logging.getLogger(__name__)
+
+
+@mlflow.trace(name="delivery.dmn_object_filename")
+def _dmn_object_filename(name: str, section: str) -> str:
+    """Return a stable basename that needs no URL-path percent encoding."""
+    ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    slug = re.sub(r"[^a-z0-9_-]+", "-", ascii_name.lower()).strip("-_")
+    slug = slug[:50].rstrip("-_") or "dmn"
+    # Encode fields separately so delimiters in names/sections cannot alias.
+    identity = json.dumps([name, section], ensure_ascii=False, separators=(",", ":"))
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:12]
+    return f"{slug}-{digest}.dmn"
 
 
 @mlflow.trace(name="delivery")
@@ -70,7 +86,7 @@ def delivery(state: dict) -> dict:
         artifact_id = make_artifact_id(cpg_id, "dmn", name, section)
         try:
             ref = store.put_raw(
-                f"{base_key}/dmn/{name}.dmn",
+                f"{base_key}/dmn/{_dmn_object_filename(name, section)}",
                 dmn_xml.encode("utf-8"),
                 "application/xml",
             )
