@@ -30,9 +30,9 @@ import (
 	"strings"
 	"time"
 
-	openshellv1 "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
-	openshelltypes "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1/types"
-	sandboxv1 "github.com/NVIDIA/OpenShell/sdk/go/proto/sandboxv1"
+	openshellv1 "github.com/ai-openshell/sdk-go/openshell/v1"
+	openshelltypes "github.com/ai-openshell/sdk-go/openshell/v1/types"
+	sandboxv1 "github.com/ai-openshell/sdk-go/proto/sandboxv1"
 	"google.golang.org/protobuf/encoding/protojson"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -761,7 +761,7 @@ func (r *SandboxRequestReconciler) createSandbox(
 	}
 	defer closeSession(session)
 
-	sandbox, err := session.Client.Sandboxes().Create(ctx, workspace(request), name, spec, labels)
+	sandbox, err := session.Client.Sandboxes().Create(ctx, workspace(request), name, spec, openshellv1.WithLabels(labels))
 	if err != nil {
 		return sandboxObservation{}, err
 	}
