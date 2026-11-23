@@ -100,6 +100,14 @@ It uses the same gateway, artifact store, and LLM credentials, and also configur
 
 The writer BFF receives published BPMN templates through the existing ingester notification, registers them with its decision-engine service, and reloads published artifacts when the BFF starts. The operator's writer workflow passes a stable `careplan_id` through bundle generation and FHIR approval. The separate automation receiver is not deployed by this operator; approved plans can still be stored without publication to that service.
 
+The operator adds outbound access to `rxnav.nlm.nih.gov:443` only for the
+FHIR-generation sandbox, which uses the public RxNorm API to verify medication
+codes. This is a declarative host/port allowance, not unrestricted internet
+access; existing OpenShell policy enforcement remains enabled. No RxNav
+credential provider is required. Network failures leave affected codes marked
+as unverifiable rather than verified. Other terminology endpoints are not added
+by this rule.
+
 ## 5. Check the generated resources
 
 ```sh
