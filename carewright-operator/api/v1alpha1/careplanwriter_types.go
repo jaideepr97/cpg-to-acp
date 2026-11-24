@@ -118,6 +118,10 @@ type DecisionServiceComponentSpec struct {
 
 // CarePlanWriterSpec defines the desired state of CarePlanWriter.
 type CarePlanWriterSpec struct {
+	// Security opts into generated application secrets and experimental local files.
+	// +optional
+	Security *PipelineSecuritySpec `json:"security,omitempty"`
+
 	// ServiceTokens supplies per-receiver X-Service-Token credentials.
 	// +optional
 	ServiceTokens *ProviderSourceSpec `json:"serviceTokens,omitempty"`

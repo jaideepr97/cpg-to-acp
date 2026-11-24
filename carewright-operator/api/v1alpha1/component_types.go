@@ -238,3 +238,17 @@ type SmartClientSpec struct {
 	// +optional
 	InternalFHIRBase string `json:"internalFHIRBase,omitempty"`
 }
+
+// PipelineSecuritySpec opts into operator-managed application credentials.
+// Neither option provisions external LLM, object-store, or SMART credentials.
+type PipelineSecuritySpec struct {
+	// ManagedSecrets creates missing namespace-shared bootstrap-compatible Secrets.
+	// Existing Secrets and explicitly referenced Secrets are validated, never overwritten.
+	// +optional
+	ManagedSecrets bool `json:"managedSecrets,omitempty"`
+	// LocalCredentialFiles explicitly accepts copying scoped credentials through
+	// NON-SECRET OpenShell provider config into files and process environments.
+	// Experimental; use only with synthetic data in a trusted gateway workspace.
+	// +optional
+	LocalCredentialFiles bool `json:"localCredentialFiles,omitempty"`
+}

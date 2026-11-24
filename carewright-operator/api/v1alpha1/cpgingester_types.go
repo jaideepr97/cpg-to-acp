@@ -78,6 +78,10 @@ type CPGLLMAnalysisComponentSpec struct {
 
 // CPGIngesterSpec defines the desired state of CPGIngester.
 type CPGIngesterSpec struct {
+	// Security opts into generated application secrets and experimental local files.
+	// +optional
+	Security *PipelineSecuritySpec `json:"security,omitempty"`
+
 	// ServiceTokens supplies per-receiver X-Service-Token credentials.
 	// +optional
 	ServiceTokens *ProviderSourceSpec `json:"serviceTokens,omitempty"`

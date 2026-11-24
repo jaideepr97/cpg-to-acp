@@ -67,6 +67,13 @@ OpenShell supervisors. Requests still traverse the gateway and supervisor;
 they do not connect directly to sandbox workload Pods. `OPENSHELL_SERVICE_PROXY_IMAGE`
 overrides the default Red Hat UBI Nginx image if your cluster needs a mirror.
 
+Set `OPERATOR_MANAGED_SECURITY=1` only when the pipeline CRs will opt into
+`spec.security.managedSecrets: true`. That defers the four application-key Secrets
+to the operator; it does not skip external LLM/storage credentials. Experimental
+local credential files require a separate explicit CR opt-in. See
+[Managed application security](managed-application-security.md) for the trust
+exception, existing-secret reuse, and migration procedure.
+
 The script reuses compatible resources on rerun. It updates an existing
 `carewright-minio` profile if its credential declarations or MinIO SigV4
 signing settings differ from the bootstrap template. It updates the image of a
