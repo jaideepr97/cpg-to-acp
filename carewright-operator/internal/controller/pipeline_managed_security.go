@@ -36,14 +36,33 @@ var applicationSecretKeys = map[string][]string{
 	"carewright-ingester-signing-key": {"CPG_SIGNING_KEY"},
 }
 
-func pipelineSecurityOptions(owner client.Object) *appsv1alpha1.PipelineSecuritySpec {
+type resolvedPipelineSecurity struct {
+	ManagedSecrets       bool
+	LocalCredentialFiles bool
+}
+
+// Resolve defaults at runtime as well as in the CRD: fake clients and older
+// stored resources may omit the security object or either individual field.
+func pipelineSecurityOptions(owner client.Object) *resolvedPipelineSecurity {
+	var spec *appsv1alpha1.PipelineSecuritySpec
 	switch p := owner.(type) {
 	case *appsv1alpha1.CarePlanWriter:
-		return p.Spec.Security
+		spec = p.Spec.Security
 	case *appsv1alpha1.CPGIngester:
-		return p.Spec.Security
+		spec = p.Spec.Security
+	default:
+		return nil
 	}
-	return nil
+	options := &resolvedPipelineSecurity{ManagedSecrets: true, LocalCredentialFiles: true}
+	if spec != nil {
+		if spec.ManagedSecrets != nil {
+			options.ManagedSecrets = *spec.ManagedSecrets
+		}
+		if spec.LocalCredentialFiles != nil {
+			options.LocalCredentialFiles = *spec.LocalCredentialFiles
+		}
+	}
+	return options
 }
 
 // preparePipelineSecurity changes only the effective in-memory pipeline copy.
@@ -59,14 +78,24 @@ func preparePipelineSecurity(ctx context.Context, c client.Client, owner client.
 	}
 	defaults := map[string]bool{}
 	provider := func(source **appsv1alpha1.ProviderSourceSpec, name, profile string) {
-		if *source == nil && options.ManagedSecrets {
+		if !options.ManagedSecrets {
+			return
+		}
+		if *source == nil {
 			*source = &appsv1alpha1.ProviderSourceSpec{Type: profile, SecretRef: corev1.LocalObjectReference{Name: name}}
+		}
+		if (*source).SecretRef.Name == name && (*source).Type == profile {
 			defaults[name] = true
 		}
 	}
 	signing := func(source **appsv1alpha1.SecretSourceSpec, name string) {
-		if *source == nil && options.ManagedSecrets {
+		if !options.ManagedSecrets {
+			return
+		}
+		if *source == nil {
 			*source = &appsv1alpha1.SecretSourceSpec{SecretRef: corev1.LocalObjectReference{Name: name}}
+		}
+		if (*source).SecretRef.Name == name {
 			defaults[name] = true
 		}
 	}

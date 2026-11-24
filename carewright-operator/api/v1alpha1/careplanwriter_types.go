@@ -118,7 +118,9 @@ type DecisionServiceComponentSpec struct {
 
 // CarePlanWriterSpec defines the desired state of CarePlanWriter.
 type CarePlanWriterSpec struct {
-	// Security opts into generated application secrets and experimental local files.
+	// Security configures generated application secrets and experimental local files.
+	// Both behaviors default to enabled; explicitly set individual fields false to opt out.
+	// +kubebuilder:default={}
 	// +optional
 	Security *PipelineSecuritySpec `json:"security,omitempty"`
 

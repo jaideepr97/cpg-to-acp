@@ -40,7 +40,7 @@ func securityTestScheme(t *testing.T) *runtime.Scheme {
 }
 
 func securityTestWriter() *appsv1alpha1.CarePlanWriter {
-	return &appsv1alpha1.CarePlanWriter{ObjectMeta: metav1.ObjectMeta{Name: "writer", Namespace: "test", UID: types.UID("writer-uid")}, Spec: appsv1alpha1.CarePlanWriterSpec{Security: &appsv1alpha1.PipelineSecuritySpec{ManagedSecrets: true, LocalCredentialFiles: true}}}
+	return &appsv1alpha1.CarePlanWriter{ObjectMeta: metav1.ObjectMeta{Name: "writer", Namespace: "test", UID: types.UID("writer-uid")}, Spec: appsv1alpha1.CarePlanWriterSpec{Security: &appsv1alpha1.PipelineSecuritySpec{ManagedSecrets: ptrTo(true), LocalCredentialFiles: ptrTo(true)}}}
 }
 
 func TestManagedSecurityDefaultsAreStableAndShared(t *testing.T) {
@@ -73,7 +73,7 @@ func TestManagedSecurityDefaultsAreStableAndShared(t *testing.T) {
 		t.Fatal("effective reference not wired")
 	}
 	revision := writer.Annotations[securityRevisionAnnotation]
-	ingester := &appsv1alpha1.CPGIngester{ObjectMeta: metav1.ObjectMeta{Name: "ingester", Namespace: "test"}, Spec: appsv1alpha1.CPGIngesterSpec{Security: &appsv1alpha1.PipelineSecuritySpec{ManagedSecrets: true, LocalCredentialFiles: true}}}
+	ingester := &appsv1alpha1.CPGIngester{ObjectMeta: metav1.ObjectMeta{Name: "ingester", Namespace: "test"}, Spec: appsv1alpha1.CPGIngesterSpec{Security: &appsv1alpha1.PipelineSecuritySpec{ManagedSecrets: ptrTo(true), LocalCredentialFiles: ptrTo(true)}}}
 	if err := preparePipelineSecurity(ctx, c, ingester); err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,45 @@ func TestExplicitMissingSecretIsNotGenerated(t *testing.T) {
 	}
 }
 
-func TestSecurityOptInsAreIndependent(t *testing.T) {
+func TestSecurityDefaultsAndOptOuts(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		spec           *appsv1alpha1.PipelineSecuritySpec
+		managed, files bool
+	}{
+		{"omitted", nil, true, true},
+		{"empty", &appsv1alpha1.PipelineSecuritySpec{}, true, true},
+		{"generation-only-disabled", &appsv1alpha1.PipelineSecuritySpec{ManagedSecrets: ptrTo(false)}, false, true},
+		{"files-only-disabled", &appsv1alpha1.PipelineSecuritySpec{LocalCredentialFiles: ptrTo(false)}, true, false},
+		{"both-disabled", &appsv1alpha1.PipelineSecuritySpec{ManagedSecrets: ptrTo(false), LocalCredentialFiles: ptrTo(false)}, false, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			writer := securityTestWriter()
+			writer.Spec.Security = test.spec
+			ingester := &appsv1alpha1.CPGIngester{Spec: appsv1alpha1.CPGIngesterSpec{Security: test.spec}}
+			for _, owner := range []client.Object{writer, ingester} {
+				got := pipelineSecurityOptions(owner)
+				if got.ManagedSecrets != test.managed || got.LocalCredentialFiles != test.files {
+					t.Fatal("wrong effective security defaults")
+				}
+			}
+			// Explicit false must survive JSON round trips (no bool/omitempty trap).
+			data, err := json.Marshal(writer)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var roundTrip appsv1alpha1.CarePlanWriter
+			if err := json.Unmarshal(data, &roundTrip); err != nil {
+				t.Fatal(err)
+			}
+			if *pipelineSecurityOptions(&roundTrip) != *pipelineSecurityOptions(writer) {
+				t.Fatal("opt-out lost during serialization")
+			}
+		})
+	}
+}
+
+func TestDefaultSecurityGeneratesKeysAndFiles(t *testing.T) {
 	ctx := context.Background()
 	c := fake.NewClientBuilder().WithScheme(securityTestScheme(t)).Build()
 	writer := securityTestWriter()
@@ -140,15 +178,49 @@ func TestSecurityOptInsAreIndependent(t *testing.T) {
 	if err := preparePipelineSecurity(ctx, c, writer); err != nil {
 		t.Fatal(err)
 	}
-	if writer.Spec.ServiceTokens != nil || componentLocalCredentialRegistration(writer, "patient-data") != nil {
-		t.Fatal("legacy behavior changed without opt-in")
+	if writer.Spec.ServiceTokens == nil || componentLocalCredentialRegistration(writer, "patient-data") == nil {
+		t.Fatal("default security is not functional")
 	}
-	writer.Spec.Security = &appsv1alpha1.PipelineSecuritySpec{ManagedSecrets: true}
+	ingester := &appsv1alpha1.CPGIngester{ObjectMeta: metav1.ObjectMeta{Name: "ingester", Namespace: "test"}}
+	if err := preparePipelineSecurity(ctx, c, ingester); err != nil {
+		t.Fatal(err)
+	}
+	if ingester.Spec.ServiceTokens == nil || ingester.Spec.Signing == nil || componentLocalCredentialRegistration(ingester, "ingestion") == nil {
+		t.Fatal("ingester defaults not functional")
+	}
+	disabled := securityTestWriter()
+	disabled.Spec.Security = &appsv1alpha1.PipelineSecuritySpec{ManagedSecrets: ptrTo(false), LocalCredentialFiles: ptrTo(false)}
+	if err := preparePipelineSecurity(ctx, c, disabled); err != nil {
+		t.Fatal(err)
+	}
+	if disabled.Spec.ServiceTokens != nil || componentLocalCredentialRegistration(disabled, "patient-data") != nil {
+		t.Fatal("explicit opt-out ignored")
+	}
+	generationOnly := securityTestWriter()
+	generationOnly.Spec.Security = &appsv1alpha1.PipelineSecuritySpec{LocalCredentialFiles: ptrTo(false)}
+	if err := preparePipelineSecurity(ctx, c, generationOnly); err != nil {
+		t.Fatal(err)
+	}
+	if generationOnly.Spec.ServiceTokens == nil || componentLocalCredentialRegistration(generationOnly, "patient-data") != nil {
+		t.Fatal("file-only opt-out not respected")
+	}
+}
+
+func TestBuiltInSecretReferencesCanBeGenerated(t *testing.T) {
+	ctx := context.Background()
+	c := fake.NewClientBuilder().WithScheme(securityTestScheme(t)).Build()
+	writer := securityTestWriter()
+	writer.Spec.Security = nil
+	writer.Spec.ServiceTokens = &appsv1alpha1.ProviderSourceSpec{Type: "carewright-service-tokens", SecretRef: corev1.LocalObjectReference{Name: serviceTokenSecret}}
+	writer.Spec.ApprovalSigning = &appsv1alpha1.ProviderSourceSpec{Type: "carewright-approval-signing", SecretRef: corev1.LocalObjectReference{Name: "carewright-approval-signing-key"}}
+	writer.Spec.SessionSigning = &appsv1alpha1.SecretSourceSpec{SecretRef: corev1.LocalObjectReference{Name: "carewright-session-signing-key"}}
 	if err := preparePipelineSecurity(ctx, c, writer); err != nil {
 		t.Fatal(err)
 	}
-	if writer.Spec.ServiceTokens == nil || componentLocalCredentialRegistration(writer, "patient-data") != nil {
-		t.Fatal("generating secrets implicitly enabled unsafe file delivery")
+	// This is the shape already used in the shipped deployment overlays.
+	var tokens corev1.Secret
+	if err := c.Get(ctx, client.ObjectKey{Namespace: "test", Name: serviceTokenSecret}, &tokens); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -592,15 +664,37 @@ func TestBootstrapCanDelegateApplicationKeyGeneration(t *testing.T) {
 		t.Fatal("bootstrap security function not terminated")
 	}
 	function := tail[:end+3]
+	assignment := ""
+	for _, line := range strings.Split(string(script), "\n") {
+		if strings.HasPrefix(line, "operator_managed_security=") {
+			assignment = line
+			break
+		}
+	}
+	if assignment == "" {
+		t.Fatal("bootstrap delegation default missing")
+	}
+
 	// Any call to the legacy Secret generation path fails this test.
 	command := exec.Command("bash", "-c", `set -e
 log() { :; }
 exists() { exit 91; }
 oc() { exit 92; }
 openssl() { exit 93; }
-operator_managed_security=1
-`+function+"\nensure_security_secrets\n")
+unset OPERATOR_MANAGED_SECURITY
+`+assignment+"\n"+function+"\nensure_security_secrets\n")
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("delegation called bootstrap key generation: %s", output)
 	}
+	legacy := exec.Command("bash", "-c", `set -e
+log() { :; }
+exists() { exit 91; }
+OPERATOR_MANAGED_SECURITY=0
+`+assignment+"\n"+function+"\nensure_security_secrets\n")
+	if err := legacy.Run(); err == nil {
+		t.Fatal("bootstrap opt-out did not reach legacy generation")
+	} else if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 91 {
+		t.Fatal("unexpected bootstrap opt-out failure")
+	}
+
 }

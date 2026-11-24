@@ -1,9 +1,12 @@
 # Draft: operator-managed application credentials
 
-This is an **experimental, opt-in design**, stacked on application-security
-PR #203 and the standalone SDK migration #206. It is not a gateway upgrade or a
-claim that provider configuration is a secure secret channel. Do not use local
-credential files with production clinical data or production keys.
+This is an **experimental design** built on the merged application-security and
+standalone SDK changes. **Application-secret generation and local provider-file
+delivery are enabled by default.** Either can be explicitly disabled. The file
+mechanism is a NON-SECRET provider-config channel, not protected credential
+injection; this default is intended for the synthetic-data development deployment.
+Do not use it with production clinical data or production keys without a separate
+security review and an approved delivery mechanism.
 
 ## Ownership boundary
 
@@ -20,7 +23,10 @@ The operator can generate the random application keys currently created by
 Each missing default Secret is created with independent cryptographically random
 32-byte values encoded as 64 hex characters. Reconciliation does not regenerate
 existing keys, replace incomplete Secrets, adopt externally owned Secrets, or
-change explicit Secret references. Missing or invalid required keys stop dependent
+change existing Secret references. Explicit built-in default names are eligible
+for generation too, so shipped deployment overlays work without removing their
+references. Explicit custom Secret names must already exist. Missing or invalid
+required keys stop dependent
 reconciliation. Application credential failures clear stale `Ready=True` and set
 `SecurityReady=False`; existing running processes are not forcibly revoked by
 that condition alone. `SecurityReady=True` means references were resolved, not
@@ -42,10 +48,10 @@ registry push/pull credentials remain externally provisioned. In particular,
 generating a random SMART client secret is not equivalent to registering it with
 an authorization server.
 
-## Opt-in API
+## Defaults and opt-outs
 
-Use this fragment on both pipeline CRs, keeping all their normal component,
-image, endpoint, and resource configuration:
+No `security` block is required. Both pipeline CRs behave as though configured
+with:
 
 ```yaml
 spec:
@@ -54,36 +60,59 @@ spec:
     localCredentialFiles: true
 ```
 
-The options are independent and default to false:
+Omitting the entire block, supplying `security: {}`, or omitting either individual
+field enables that behavior. The CRD and controller runtime apply the same
+defaults, including for older stored resources that omit these fields. Explicit
+`false` values are preserved, not replaced by defaults.
 
-- `managedSecrets` fills **omitted** application Secret references on the effective
-  in-memory pipeline spec and creates missing default Secrets. It does not write
-  generated key values or resolved provider config to the parent CR.
-- `localCredentialFiles` explicitly accepts using OpenShell's **NON-SECRET**
-  provider-config/file mechanism for selected local validation keys. It can also
-  be used with externally supplied `serviceTokens` / `approvalSigning` references.
-  Those values must be 64-character hex tokens in this initial implementation.
-  Merely generating Secrets does not enable file delivery or fix placeholder-only
-  local validation.
+To opt out of both behaviors:
 
-For an operator-owned fresh bootstrap, set `OPERATOR_MANAGED_SECURITY=1` when
-running `scripts/bootstrap-prerequisites.sh`. It skips application-key creation
-only; it still provisions external prerequisites and imports the existing
-provider profiles for compatibility. The operator imports/verifies its local-file
-profile when needed. The script's default behavior is unchanged for deployments
-that do not opt in.
+```yaml
+spec:
+  security:
+    managedSecrets: false
+    localCredentialFiles: false
+```
 
-Explicit references remain authoritative. For example,
-`spec.serviceTokens.secretRef.name: external-tokens` means that Secret must
-already exist; enabling `managedSecrets` does not create it. To generate defaults
-in a fresh installation, omit the corresponding explicit reference. Existing
-bootstrap-created default Secrets are reused without changing their contents.
+The settings are independent:
+
+- `managedSecrets: false` prevents application-key generation and automatic
+  default references. Supply existing application Secret references yourself.
+  File delivery remains enabled unless separately disabled.
+- `localCredentialFiles: false` disables the scoped provider-config/file path
+  and startup loader. Generation remains enabled unless separately disabled.
+  Supply an alternative working local-validation credential mechanism; the
+  legacy placeholder-only provider path does not itself fix local validation.
+
+The default `managedSecrets: true` fills omitted application Secret references
+on the effective in-memory pipeline spec and creates missing built-in default
+Secrets. Explicit references to those same built-in names/profiles are also
+eligible for creation. Existing values are never replaced. Explicit **custom**
+Secret references must already exist; the operator does not generate credentials
+in arbitrary externally named Secrets.
+
+The default `localCredentialFiles: true` uses OpenShell's **NON-SECRET**
+provider-config/file mechanism for selected local validation keys. It also works
+with externally supplied service-token / approval-signing references. Those keys
+must contain 64-character hex tokens in this initial implementation. No generated
+key values or resolved provider config are written to the parent CR.
+
+Bootstrap now defaults to `OPERATOR_MANAGED_SECURITY=1`, skipping application-key
+creation while still provisioning external prerequisites and importing existing
+provider profiles. The operator imports/verifies its local-file profile when
+needed. Set `OPERATOR_MANAGED_SECURITY=0` for legacy script-based application-key
+generation. That switch does not change CR settings: use the explicit `false`
+fields above if the operator should also relinquish generation/file delivery.
+
+Existing bootstrap-created Secrets are reused unchanged. Before upgrading a
+manually patched installation, follow the migration section below or explicitly
+opt out until a replacement delivery mechanism is in place.
 
 ## File/provider path
 
 ```mermaid
 flowchart LR
-    CR[Pipeline CR: opt-ins and references] --> OP[Pipeline reconciler]
+    CR[Pipeline CR: defaults, opt-outs, and references] --> OP[Pipeline reconciler]
     OP --> KS[Kubernetes application Secrets]
     OP --> SR[SandboxRequest: selectors only]
     KS --> SC[SandboxRequest reconciler]
@@ -133,7 +162,7 @@ in its arguments.
 No browser-session/ingester signing keys enter component sandboxes or workflow
 pods. No local-file provider is attached to decision-service or MCP. Existing
 external LLM, object-store, and FHIR providers remain on their existing paths.
-In file mode, the legacy blanket service-token/signing provider attachments are
+With the default file delivery, the legacy blanket service-token/signing provider attachments are
 replaced rather than layered on top of the scoped file providers.
 
 ### Security cost of the workaround
@@ -170,7 +199,8 @@ exported provider config payload secret again.
   reconciliation. That is key loss/rekeying, not recovery of the old value;
   protect Secrets with backups and appropriately scoped RBAC.
 
-Before enabling file mode on the manually patched test installation, remove the
+**Before upgrading** the manually patched test installation (file mode is now
+default-on), remove the
 manual credential-loader `command`, `carewright-file-*` `extraProviders`, and
 `CAREWRIGHT_FILE_REVISION` workaround settings from each affected **parent CR**.
 Keep unrelated component overrides/providers. The operator rejects recognized

@@ -78,7 +78,9 @@ type CPGLLMAnalysisComponentSpec struct {
 
 // CPGIngesterSpec defines the desired state of CPGIngester.
 type CPGIngesterSpec struct {
-	// Security opts into generated application secrets and experimental local files.
+	// Security configures generated application secrets and experimental local files.
+	// Both behaviors default to enabled; explicitly set individual fields false to opt out.
+	// +kubebuilder:default={}
 	// +optional
 	Security *PipelineSecuritySpec `json:"security,omitempty"`
 

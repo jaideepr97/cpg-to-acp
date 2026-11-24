@@ -31,7 +31,7 @@ sonataflow_channel="${SONATAFLOW_CHANNEL:-}"
 sonataflow_source="${SONATAFLOW_SOURCE:-}"
 openshell_cli="${OPENSHELL_CLI:-}"
 expose_minio_console="${EXPOSE_MINIO_CONSOLE:-0}"
-operator_managed_security="${OPERATOR_MANAGED_SECURITY:-0}"
+operator_managed_security="${OPERATOR_MANAGED_SECURITY:-1}"
 port_forward_pid=""
 temporary_dir=""
 
@@ -58,8 +58,8 @@ Common settings (environment variables):
   LLM_ORIGIN                 Profile endpoint (default: https://api.openai.com)
   LLM_MODEL                  Pipeline model hint (default: gpt-5.6)
   EXPOSE_MINIO_CONSOLE       Set to 1 to create a console Route
-  OPERATOR_MANAGED_SECURITY Set to 1 to leave application-key generation to
-                             spec.security.managedSecrets (external keys unchanged)
+  OPERATOR_MANAGED_SECURITY Default: 1, operator generates application keys.
+                             Set to 0 for legacy bootstrap generation.
   OPENSHELL_RELEASE          Gateway name (default: <namespace>-openshell)
   OPENSHELL_SERVICE_PROXY_IMAGE  Internal sandbox-service proxy image
   OPENSHELL_CLI              Optional matching-version OpenShell CLI path
@@ -522,7 +522,7 @@ EOF
 
 ensure_security_secrets() {
   if [[ "$operator_managed_security" == 1 ]]; then
-    log 'Application Secret generation deferred to operator (set spec.security.managedSecrets: true)'
+    log 'Application Secret generation deferred to operator (default behavior)'
     return
   fi
   local secret key file
@@ -766,8 +766,8 @@ fi
 
 if [[ "$operator_managed_security" == 1 ]]; then
   printf '  spec.security: {managedSecrets: true}\n'
-  printf '  Omit serviceTokens/signing references to generate missing default application Secrets.\n'
-  printf '  Experimental local files require a separate explicit spec.security.localCredentialFiles: true opt-in.\n'
+  printf '  Default-named application Secrets are generated/reused; custom references must exist.\n'
+  printf '  Local provider files are enabled by default (NON-SECRET config channel); opt out with spec.security.localCredentialFiles: false.\n'
 else
   printf '  spec.serviceTokens: {type: carewright-service-tokens, secretRef: {name: carewright-service-tokens}}\n'
   printf '  writer spec.approvalSigning: {type: carewright-approval-signing, secretRef: {name: carewright-approval-signing-key}}\n'
