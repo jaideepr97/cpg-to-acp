@@ -104,6 +104,16 @@ identity. Inputs with explicit temporal language may also carry an
 `acp:extraction` JSON annotation naming one of the supported temporal
 primitives and its parameters; ordinary inputs omit the annotation.
 
+Published DMN objects under `published/<cpg_id>/dmn/` use a bounded ASCII
+filename: a readable slug (up to 50 characters), a 12-hex-character SHA-256
+suffix derived from the original decision name and section, and `.dmn`. This
+avoids encoding-sensitive object basenames on the OpenShell/S3 signing path and
+distinguishes names that normalize to the same slug. Consumers should use the
+`ref` returned in `delivery-status.json`, not construct keys from display names.
+This changes only published object filenames: manifest names, artifact IDs, and
+DMN XML identities/content remain unchanged. Existing published objects are not
+renamed or deleted; republishing may leave older keys alongside the new ones.
+
 ### Legacy commands (still available)
 
 ```bash
