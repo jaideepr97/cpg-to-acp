@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -590,6 +591,17 @@ func TestManualCredentialOverridesRejected(t *testing.T) {
 }
 
 func TestLocalFileSandboxRecreatedOnRotation(t *testing.T) {
+	assertValidLabels := func(labels map[string]string) {
+		t.Helper()
+		for key, value := range labels {
+			if problems := validation.IsValidLabelValue(value); len(problems) != 0 {
+				t.Errorf("sandbox label %q is invalid: %v", key, problems)
+			}
+		}
+		if len(labels["carewright.io/spec-hash"]) != 63 {
+			t.Error("credential revision hash must retain the existing 63-character label format")
+		}
+	}
 	ctx := context.Background()
 	s := securityTestScheme(t)
 	writer := securityTestWriter()
@@ -619,6 +631,7 @@ func TestLocalFileSandboxRecreatedOnRotation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	assertValidLabels(first.Labels)
 	if _, err := r.Reconcile(ctx, key); err != nil {
 		t.Fatal(err)
 	}
@@ -644,6 +657,7 @@ func TestLocalFileSandboxRecreatedOnRotation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	assertValidLabels(rotated.Labels)
 	if !rotated.CreatedAt.After(first.CreatedAt) || first.Labels["carewright.io/spec-hash"] == rotated.Labels["carewright.io/spec-hash"] {
 		t.Fatal("file credentials updated without replacing the running process")
 	}

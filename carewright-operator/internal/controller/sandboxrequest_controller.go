@@ -170,7 +170,8 @@ func (r *SandboxRequestReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	if revision := localCredentialRevision(&request); revision != "" {
 		sum := sha256.Sum256([]byte(desiredHash + "/" + revision))
-		desiredHash = hex.EncodeToString(sum[:])
+		// Keep the revision-derived hash label-safe, just like requestHash.
+		desiredHash = hex.EncodeToString(sum[:])[:63]
 	}
 	sandboxName := effectiveSandboxName(&request)
 	if request.Status.SpecHash != "" && previousLocationChanged(&request, sandboxName) {
