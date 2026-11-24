@@ -146,6 +146,16 @@ var _ = Describe("CarePlanWriter Controller", func() {
 		defaultPolicyName := ""
 		for index := range requests.Items {
 			request := &requests.Items[index]
+			rxnavAccess := appsv1alpha1.SandboxNetworkAccessSpec{
+				Name: "rxnav", Host: "rxnav.nlm.nih.gov", Port: 443, Protocol: "rest",
+			}
+			if request.Name == resourceName+"-fhir-generation" {
+				Expect(request.Spec.NetworkAccess).To(ContainElement(rxnavAccess))
+			} else {
+				for _, access := range request.Spec.NetworkAccess {
+					Expect(access.Host).NotTo(Equal("rxnav.nlm.nih.gov"))
+				}
+			}
 			Expect(request.Spec.PolicyRef).NotTo(BeNil())
 			Expect(request.Spec.PolicyRef.Key).To(Equal(defaultComponentPolicyKey))
 			if defaultPolicyName == "" {

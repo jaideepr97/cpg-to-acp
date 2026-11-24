@@ -186,6 +186,8 @@ func carePlanWriterComponents(writer *appsv1alpha1.CarePlanWriter, endpoints map
 	}
 	llmProvider, llmRegistration := managedProvider(writer, "llm", externalLLMProvider, llmSource)
 	inferenceAccess := networkAccessForURL("inference", llmEnv["LITELLM_URL"])
+	// FHIR generation verifies medication codes using the public RxNorm API.
+	rxnavAccess := networkAccessForURL("rxnav", "https://rxnav.nlm.nih.gov")
 	baseEnv := mergedEnv(artifactEnv, observabilityEnv)
 
 	pythonEnv := func(spec appsv1alpha1.PythonComponentSpec) map[string]string {
@@ -255,7 +257,7 @@ func carePlanWriterComponents(writer *appsv1alpha1.CarePlanWriter, endpoints map
 		{Name: "patient-data", Port: 8080, Spec: writer.Spec.PatientData.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.patient_data:app", "8080"), Env: pythonEnv(writer.Spec.PatientData), Providers: []string{artifactProvider}, Registrations: providerRegistrations(artifactRegistration), NetworkAccess: artifactAccess},
 		{Name: "llm-reasoning", Port: 8080, Spec: writer.Spec.LLMReasoning.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.llm_reasoning:app", "8080"), Env: reasoningEnv, Providers: []string{artifactProvider, llmProvider, embeddingProvider}, Registrations: providerRegistrations(artifactRegistration, llmRegistration, embeddingRegistration), NetworkAccess: combinedNetworkAccess(artifactAccess, inferenceAccess, embeddingAccess, decisionEngineAccess)},
 		{Name: "decision-engine", Port: 8080, Spec: writer.Spec.DecisionEngine.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.decision_engine:app", "8080"), Env: decisionEnv, Providers: []string{artifactProvider}, Registrations: providerRegistrations(artifactRegistration), NetworkAccess: combinedNetworkAccess(artifactAccess, decisionServiceAccess)},
-		{Name: "fhir-generation", Port: 8080, Spec: writer.Spec.FHIRGeneration.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.fhir_generation:app", "8080"), Env: fhirGenerationEnv, Providers: []string{artifactProvider, llmProvider}, Registrations: providerRegistrations(artifactRegistration, llmRegistration), NetworkAccess: combinedNetworkAccess(artifactAccess, inferenceAccess)},
+		{Name: "fhir-generation", Port: 8080, Spec: writer.Spec.FHIRGeneration.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.fhir_generation:app", "8080"), Env: fhirGenerationEnv, Providers: []string{artifactProvider, llmProvider}, Registrations: providerRegistrations(artifactRegistration, llmRegistration), NetworkAccess: combinedNetworkAccess(artifactAccess, inferenceAccess, rxnavAccess)},
 		{Name: "fhir-server", Port: 8080, Spec: writer.Spec.FHIRServer.ComponentSpec, Command: pythonServiceCommand("acp_writer.services.fhir_server:app", "8080"), Env: fhirEnv, Providers: []string{artifactProvider, fhirProvider}, Registrations: providerRegistrations(artifactRegistration, fhirRegistration), NetworkAccess: combinedNetworkAccess(artifactAccess, fhirTargetAccess)},
 		{Name: "mcp", Port: 8090, Spec: writer.Spec.MCP.ComponentSpec, Command: pythonServiceCommand("acp_writer.mcp_proxy:app", "8090"), Env: mcpEnv, Providers: []string{llmProvider}, Registrations: providerRegistrations(llmRegistration), NetworkAccess: combinedNetworkAccess(inferenceAccess, decisionServiceAccess, fhirServerAccess)},
 		{Name: "decision-service", Port: 8081, Spec: writer.Spec.DecisionService.ComponentSpec, Command: []string{"java", "-jar", "/app/quarkus-run.jar"}, Env: decisionServiceEnv},
