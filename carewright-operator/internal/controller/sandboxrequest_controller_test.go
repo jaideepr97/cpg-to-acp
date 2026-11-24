@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	openshellv1 "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
-	openshellfake "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1/fake"
+	openshellv1 "github.com/ai-openshell/sdk-go/openshell/v1"
+	openshellfake "github.com/ai-openshell/sdk-go/openshell/v1/fake"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -61,7 +61,7 @@ func serviceKey(workspace, sandboxName, serviceName string) string {
 	return workspace + "/" + sandboxName + "/" + serviceName
 }
 
-func (c *fakeServiceClient) Expose(_ context.Context, workspace, sandboxName, serviceName string, targetPort uint32, domain bool) (*openshellv1.ServiceEndpoint, error) {
+func (c *fakeServiceClient) Expose(_ context.Context, workspace, sandboxName, serviceName string, targetPort uint32, domain bool, _ ...openshellv1.ExposeServiceOptions) (*openshellv1.ServiceEndpoint, error) {
 	endpoint := &openshellv1.ServiceEndpoint{
 		ID:         "endpoint-" + serviceName,
 		Sandbox:    sandboxName,
@@ -225,6 +225,9 @@ filesystem_policy:
 		Expect(sandbox.Spec.Policy.Filesystem.ReadOnly).To(Equal([]string{"/usr"}))
 		Expect(sandbox.Spec.Policy.Filesystem.ReadWrite).To(Equal([]string{"/sandbox"}))
 		Expect(sandbox.Labels).To(HaveKeyWithValue("app.kubernetes.io/component", "worker"))
+		Expect(sandbox.Labels).To(HaveKeyWithValue("carewright.io/request-name", resourceName))
+		Expect(sandbox.Labels).To(HaveKeyWithValue("carewright.io/request-namespace", "default"))
+		Expect(sandbox.Labels).To(HaveKeyWithValue("carewright.io/request-uid", string(request.UID)))
 		Expect(sandbox.Labels["carewright.io/spec-hash"]).To(HaveLen(63))
 
 		Expect(k8sClient.Get(ctx, key, request)).To(Succeed())

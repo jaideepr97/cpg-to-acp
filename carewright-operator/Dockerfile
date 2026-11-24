@@ -1,7 +1,7 @@
 # Build the manager binary on the host architecture and cross-compile it for
 # the requested target. This avoids relying on QEMU during multi-arch builds.
 ARG BUILDPLATFORM
-FROM --platform=${BUILDPLATFORM} golang:1.25 AS builder
+FROM --platform=${BUILDPLATFORM} golang:1.26 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
